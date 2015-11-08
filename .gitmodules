@@ -1,0 +1,3 @@
+[submodule "writeup"]
+	path = writeup
+	url = git@github.com:gwk/writeup.git
