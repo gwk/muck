@@ -1,0 +1,9 @@
+# python.
+.pyc
+
+# osx.
+.DS_Store
+
+# muck.
+_bld/
+_misc/
