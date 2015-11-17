@@ -1,5 +1,5 @@
 # python.
-.pyc
+*.pyc
 
 # osx.
 .DS_Store
