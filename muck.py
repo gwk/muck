@@ -45,6 +45,11 @@ def load_source(target_path):
   fn = load_source_dispatch.get(ext, open) # default to regular file open.
   return fn(path)
 
+# module exports. when imported, muck provides functions that make data dependencies explicit.
+__ALL__ = [
+  load_source,
+]  
+
 def py_dependencies(src_path, src_file):
   src_text = src_file.read()
   tree = ast.parse(src_text, src_path)
@@ -57,11 +62,6 @@ def py_dependencies(src_path, src_file):
     if len(node.args) != 1 or not isinstance(node.args[0], ast.Str):
       failF('muck error: {}:{}:{}: muck.load_source argument must be a single string literal.', src_path, node.lineno, node.col_offset)
     yield node.args[0].s
-
-# module exports. when imported, muck provides functions that make data dependencies explicit.
-__ALL__ = [
-  load_source,
-]  
 
 # main executable.
 if __name__ == '__main__':
@@ -110,6 +110,7 @@ if __name__ == '__main__':
       deps_fn, build_tool = source_tools[src_ext]
     except KeyError:
       failF('muck error: unsupported source file extension: `{}`', src_ext)
+    # TODO: fall back to generic .deps file.
     deps = deps_fn(src_path, open(src_path)) if deps_fn else []
     dependency_map = {}
     for dep in sorted(deps): # sort for build consistency.
