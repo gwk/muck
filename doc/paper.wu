@@ -1,0 +1,51 @@
+# Muck
+
+Muck is a build tool; given a target (a file to be built), it looks in the current directory for a source file with a matching name, determines its dependencies, recursively builds those, and then finally builds the target. Unlike traditional build systems such as Make, Muck determines the dependencies of a given file by analyzing the file source; there is no 'makefile'. This means that Muck is limited to source languages that it understands, and to source code written using Muck conventions. Muck also provides conventional functions that imply data dependencies, allowing data transformation projects to be organized as a series of dependent steps.
+
+
+# Background
+
+## Dependencies and Directed Acyclic Graphs
+
+Well-written software is broken up into components; the way in which these components depend on each other is key to understanding the behavior of the program as a whole. These relationships can be represented using a mathematical structure, the directed graph.
+
+### Directed Acyclic Graphs
+A graph is a mathematical object representing a network of any kind; it consists of a set of vertices or nodes, and a set of edges or links between vertices. A directed graph is a graph whose edges have a direction, as opposed to an undirected graph where an edge from A to B is the same as from B to A. Finally, a directed acyclic graph (DAG) is a directed graph for which there is no path from a vertex back to itself.
+
+### Strongly Connected Components
+A graph is "strongly connected" if each vertex can reach be reached from each other vertex. The strongly connected components (SCCs) of a directed graph are the subgraphs that are strongly connected; replacing each SCC with a single vertex results in a DAG, called the "condensation" of the original.
+
+### Dependency Graphs
+Graphs can be used to represent a variety of properties of programs; we focus here on the dependency relationships between code components (e.g. functions, files or modules). Depending on the semantics of a programming language, these components may or may not have cyclic dependencies. Typically, mutually recursive functions are legal, which create cyclic dependencies, but module dependencies must be acyclic. In any case, we can treat any such cycles as SCCs and use the resulting condensed DAG as the meaningful "dependency graph".
+
+## Separate Compilation
+
+Many traditional compiled programming languages can be slow to compile. As programmers make incremental changes to large projects, they want to be able to test their changes immediately; compilation times of more than a second or so can reduce productivity and influence work habits. There are essentially two solutions to this problem: either make the compilation faster (e.g. by using a dynamic language which omits major workloads like type checking), or break the compilation down into separate pieces, an approach called 'separate compilation'.
+
+Separate compilation traditionally requires two programs: the 'compiler', which takes source code and outputs native machine code as 'object files', and the 'linker', which takes all the object files required for a target output, plus any external dependencies like system libraries, and creates the final executable program. Many modern compilers serve both roles, but the two phases are still distinct. When a single change is made, at best only the corresponding object file must be recompiled; the link step is designed to perform only those last operations which must always operate on the entire set of code objects to produce the final product.
+
+However, in practice a small change to the source code may affect any number of output objects. For this reason, as well as the cumbersome nature of specifying complex options to compilers and linkers, an additional tool is used: the build system.
+
+## Build Systems
+
+The traditional Unix build system is Make, and most systems today follow its basic model. The programmer writes a 'makefile', which lists each target file to be produced, followed by its dependencies and the command to build it. Interestingly, there is no explicit distinction between source, intermediate, and product files, or code and data; there are only dependencies between files.
+
+The command `make some/target` tells Make to build the file `some/target`; it recursively builds all dependencies, and then builds the requested file. However, if a file is deemed up-to-date (by comparing its modification time to that of all its dependencies), then make does not rebuild it. Make has several shortcomings regarding this process (TODO: cite djb'see redo) but these are technical details.
+
+A more fundamental concern is the need to specify dependencies correctly and completely in the makefile. Omitting a single dependency can result in a build process that seems to work for a while (perhaps because the omitted target was explicitly built during development and rarely changed) and then at some point produces a target using a stale dependency. This is an insidious sort of error because it may go unnoticed, or appear to have a mysterious cause.
+
+Variants of the original Make offer pattern matching features to reduce the burden of writing makefiles, but these do not address the fundamental issue: as long as dependencies are written and not inferred, they will be a source of tedious work and errors.
+
+# Dependency Inference
+
+What is necessary for Muck to infer dependencies for a project? Essentially, it must have knowledge of the source languages it is operating on. Make is completely agnostic regarding languages, and ignorent of them. Furthermore, it is traditionally used to build projects written in C, a language for which perfect dependency inference is practically impossible due to the C preprocessor. However, if the programmer is willing to adopt strict conventions in how source files are written, then dependency inference becomes straightforward.
+
+## Python
+
+The Muck prototype focuses on Python, with an eye towards supporting other modern languages. In Python there is no need to build executables from source, but dependency analysis is still useful for producing complicated data transformations, and as a tool for understanding complex code. Import statements can be extracted from the source file's abstract syntax tree (AST), as provided by the python `ast` module. Muck must understand the Python import mechanism well enough to correctly determine the mapping between import names and the files that Python will load. Additionally, Muck must determine data dependencies, a task which requires the programmer to use Muck conventions. This simply means using one of the functions that Muck has knowledge of to load input data. For example:
+| import muck
+| source = muck.load_source('test.csv')
+
+Output is even simpler: just write to `stdout` by using `print`. Muck should allow additional outputs using a `muck.sink("output.txt")` or similar function.
+
+This is admittedly limited, but sufficient to accomplish many sorts of data processing tasks. A more general purpose version might provide an argument parsing function similar to that of the `argparse` module, which would allow Muck to understand how command line arguments map to input and output files.
