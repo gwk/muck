@@ -1,0 +1,46 @@
+# Muck
+
+Muck is a build tool; given a target (a file to be built), it looks in the current directory for a source file with a matching name, determines its dependencies, recursively builds those, and then finally builds the target. Unlike traditional build systems such as Make, Muck determines the dependencies of a given file by analyzing the file source; there is no 'makefile'. This means that Muck is limited to source languages that it understands, and to source code written using Muck conventions. Muck also provides conventional functions that imply data dependencies, allowing data transformation projects to be organized as a series of dependent steps.
+
+# Installation
+
+- Install the latest python3 from http://python.org; Muck tracks python3 aggressively.
+- Install the following python dependencies:
+  - `pip3 --upgrade install agate pygal requests beautifulsoup4`
+- Clone the repository somewhere or add it as a submodule to your project.
+- In the `muck` root directory, run `git submodule update --init --recursive` to get Muck's dependencies.
+
+# Usage
+
+`muck.py` takes a list of targets as command line arguments.
+Given a target `dir/stem.ext`, muck tries to produce the target file using the following steps:
+- If it exists as named, then it does nothing.
+- If a script exists that begins with the whole target name, e.g. `dir/stem.ext.py`, then that script is executed and its standard output is piped to produce `_bld/stem.ext`.
+- If a script exists that begins with the stem, e.g. `dir/stem.py`, then that script is executed without piping stdout, and it is expected to produce `_bld/stem.ext` itself.
+- Otherwise Muck issues an error.
+
+When a python script is run, it is first analyzed by Muck for any dependencies, which will be built before running the script. Dependency analysis is limited to the conventions that Muck understands.
+
+# Examples
+
+Imagine the following files; the python scripts contain `load_source` functions which indicate data dependencies.
+- input.csv
+- step1.csv.py: load_source('input.csv')
+- step2.csv.py: load_source('step1.csv')
+- final.html.wu: <embed: step2.csv>
+
+Running `muck final.html` will cause the following to be built in order:
+- step1.csv
+- step2.csv
+- final.html
+
+
+# TODO
+
+- improve the muck python library function names and conventions. `source` and `sink`?
+- For source file types that Muck does not recognize, it should default to looking for an associated '.deps' file, which would provide a list of dependencies.
+- support graphviz dot files.
+- output and optionally render the dependency graph.
+
+
+
