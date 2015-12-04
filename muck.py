@@ -4,6 +4,7 @@
 import argparse
 import ast
 import copy
+import json
 import os
 import re
 import sys
@@ -28,10 +29,14 @@ def source_html(path):
   with open(path) as f:
     return BeautifulSoup(f, 'html.parser')
 
+def source_json(path):
+  with open(path) as f:
+    return json.load(f)
+
 source_dispatch = {
   '.csv': agate.Table.from_csv,
   '.html': source_html,
-  '.json': agate.Table.from_json, # TODO: use std json parser?
+  '.json': source_json,
 }
 
 _source_dependency_map = None
