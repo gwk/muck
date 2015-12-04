@@ -11,6 +11,8 @@ import string as _string
 import sys
 
 import agate
+from bs4 import BeautifulSoup
+
 from writeup.writeup import writeup_dependencies
 
 from common.fs import *
@@ -22,33 +24,39 @@ assert(sys.version_info.major == 3) # python 2 is not supported.
 
 # muck.
 
-load_source_dispatch = {
+def source_html(path):
+  with open(path) as f:
+    return BeautifulSoup(f, 'html.parser')
+
+source_dispatch = {
   '.csv': agate.Table.from_csv,
-  '.json': agate.Table.from_json,
+  '.html': source_html,
+  '.json': agate.Table.from_json, # TODO: use std json parser?
 }
 
-_load_source_dependency_map = None
-def load_source(target_path):
-  global _load_source_dependency_map
-  if _load_source_dependency_map is None:
+_source_dependency_map = None
+def source(target_path):
+  global _source_dependency_map
+  if _source_dependency_map is None:
     arg_parser = argparse.ArgumentParser(description='uses generic muck dependency map parser.')
     arg_parser.add_argument('-dependency-map', nargs='?', default='', help='map dependency names to paths; format is "k1=v1,...,kN=vN.')
     args = arg_parser.parse_args()
-    _load_source_dependency_map = {}
+    _source_dependency_map = {}
     for s in args.dependency_map.split(','):
       k, p, v = s.partition('=')
-      if k in _load_source_dependency_map:
+      if k in _source_dependency_map:
         failF('error: dependency map has duplicate key: {}', k)
-      _load_source_dependency_map[k] = v
-  path = _load_source_dependency_map.get(target_path, target_path)
+      _source_dependency_map[k] = v
+  path = _source_dependency_map.get(target_path, target_path)
   ext = path_ext(path)
-  fn = load_source_dispatch.get(ext, open) # default to regular file open.
+  fn = source_dispatch.get(ext, open) # default to regular file open.
   return fn(path)
 
 # module exports. when imported, muck provides functions that make data dependencies explicit.
 __ALL__ = [
-  load_source,
+  source,
 ]  
+
 
 def py_dependencies(src_path, src_file):
   src_text = src_file.read()
@@ -58,10 +66,14 @@ def py_dependencies(src_path, src_file):
     func = node.func
     if not isinstance(func, ast.Attribute): continue
     if not isinstance(func.value, ast.Name): continue
-    if func.value.id != 'muck' or func.attr != 'load_source': continue
+    if func.value.id != 'muck' or func.attr != 'source': continue
     if len(node.args) != 1 or not isinstance(node.args[0], ast.Str):
-      failF('muck error: {}:{}:{}: muck.load_source argument must be a single string literal.', src_path, node.lineno, node.col_offset)
+      failF('muck error: {}:{}:{}: muck.source argument must be a single string literal.', src_path, node.lineno, node.col_offset)
     yield node.args[0].s
+
+def fetch_url_dependencies(src_path, scr_file):
+  return []
+
 
 # main executable.
 if __name__ == '__main__':
@@ -72,14 +84,23 @@ if __name__ == '__main__':
 
   muck_dir = abs_path(path_dir(sys.argv[0]))
   writeup_path = path_join(muck_dir, 'writeup/writeup.py')
+  fetch_url_path = path_join(muck_dir, 'fetch-url.py')
 
   env = copy.copy(os.environ)
   pypath = list(filter(None, env.get('PYTHONPATH', '').split(':')))
   env['PYTHONPATH'] = ':'.join([muck_dir] + pypath)
+
   source_tools = {
     '.py' : (py_dependencies, 'python3'),
     '.wu' : (writeup_dependencies, writeup_path),
+    '.url' : (fetch_url_dependencies, fetch_url_path),
   }
+
+  def get_mtime(path):
+    try:
+      return os.path.getmtime(path)
+    except FileNotFoundError:
+      return 0.0
 
   def build(target_path):
     src_dir, dst_name = split_dir_name(target_path)
@@ -100,12 +121,10 @@ if __name__ == '__main__':
     src_path = path_join(src_dir, src_name)
     if src_path == target_path: # target exists as-is; nothing to build.
       logFL('muck: found `{}`', src_path)
-      return src_path
+      return (src_path, get_mtime(src_path))
     dst_dir = path_join('_bld', src_dir)
     dst_path = path_join(dst_dir, dst_name)
     dst_path_tmp = dst_path + '.tmp'
-    remove_file_if_exists(dst_path)
-    remove_file_if_exists(dst_path_tmp)
     try:
       deps_fn, build_tool = source_tools[src_ext]
     except KeyError:
@@ -113,8 +132,19 @@ if __name__ == '__main__':
     # TODO: fall back to generic .deps file.
     deps = deps_fn(src_path, open(src_path)) if deps_fn else []
     dependency_map = {}
+    src_mtime = get_mtime(src_path)
+    dst_mtime = get_mtime(dst_path)
+    is_fresh = (src_mtime < dst_mtime)
+    # TODO: calculate all source dependencies.
     for dep in sorted(deps): # sort for build consistency.
-      dependency_map[dep] = build(dep)
+      (dep_path, dep_mtime) = build(dep)
+      dependency_map[dep] = dep_path
+      is_fresh = is_fresh and dep_mtime < dst_mtime
+    if is_fresh:
+      logFL('muck: reusing `{}`', dst_path)
+      return (dst_path, dst_mtime)
+    remove_file_if_exists(dst_path)
+    remove_file_if_exists(dst_path_tmp)
     dependency_map_arg = ','.join('{}={}'.format(*kv) for kv in sorted(dependency_map.items()))
     make_dirs(dst_dir)
     cmd = [build_tool, src_path, '-dependency-map', dependency_map_arg]
@@ -128,7 +158,7 @@ if __name__ == '__main__':
     else:
       if not path_exists(dst_path):
         failF('muck error: {}: failed to produce `{}`', src_path, dst_path)
-    return dst_path
+    return (dst_path, get_mtime(dst_path))
 
   for target in args.targets:
     build(target)
