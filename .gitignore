@@ -5,5 +5,5 @@
 .DS_Store
 
 # muck.
-_bld/
+_build/
 _misc/
