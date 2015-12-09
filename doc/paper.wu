@@ -1,3 +1,7 @@
+writeup v0
+Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
+
+
 # Muck
 
 Muck is a build tool; given a target (a file to be built), it looks in the current directory for a source file with a matching name, determines its dependencies, recursively builds those, and then finally builds the target. Unlike traditional build systems such as Make, Muck determines the dependencies of a given file by analyzing the file source; there is no 'makefile'. This means that Muck is limited to source languages that it understands, and to source code written using Muck conventions. Muck also provides conventional functions that imply data dependencies, allowing data transformation projects to be organized as a series of dependent steps.
@@ -44,7 +48,7 @@ What is necessary for Muck to infer dependencies for a project? Essentially, it 
 
 The Muck prototype focuses on Python, with an eye towards supporting other modern languages. In Python there is no need to build executables from source, but dependency analysis is still useful for producing complicated data transformations, and as a tool for understanding complex code. Import statements can be extracted from the source file's abstract syntax tree (AST), as provided by the python `ast` module. Muck must understand the Python import mechanism well enough to correctly determine the mapping between import names and the files that Python will load. Additionally, Muck must determine data dependencies, a task which requires the programmer to use Muck conventions. This simply means using one of the functions that Muck has knowledge of to load input data. For example:
 | import muck
-| source = muck.load_source('test.csv')
+| source = muck.source('test.csv')
 
 Output is even simpler: just write to `stdout` by using `print`. Muck should allow additional outputs using a `muck.sink("output.txt")` or similar function.
 

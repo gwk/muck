@@ -1,3 +1,6 @@
+writeup v0
+Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
+
 # Muck
 
 Muck is a build tool; given a target (a file to be built), it looks in the current directory for a source file with a matching name, determines its dependencies, recursively builds those, and then finally builds the target. Unlike traditional build systems such as Make, Muck determines the dependencies of a given file by analyzing the file source; there is no 'makefile'. This means that Muck is limited to source languages that it understands, and to source code written using Muck conventions. Muck also provides conventional functions that imply data dependencies, allowing data transformation projects to be organized as a series of dependent steps.
