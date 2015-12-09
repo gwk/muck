@@ -18,18 +18,18 @@ Muck is a build tool; given a target (a file to be built), it looks in the curre
 `muck.py` takes a list of targets as command line arguments.
 Given a target `dir/stem.ext`, muck tries to produce the target file using the following steps:
 - If it exists as named, then it does nothing.
-- If a script exists that begins with the whole target name, e.g. `dir/stem.ext.py`, then that script is executed and its standard output is piped to produce `_bld/stem.ext`.
-- If a script exists that begins with the stem, e.g. `dir/stem.py`, then that script is executed without piping stdout, and it is expected to produce `_bld/stem.ext` itself.
+- If a script exists that begins with the whole target name, e.g. `dir/stem.ext.py`, then that script is executed and its standard output is piped to produce `_build/stem.ext`.
+- If a script exists that begins with the stem, e.g. `dir/stem.py`, then that script is executed without piping stdout, and it is expected to produce `_build/stem.ext` itself.
 - Otherwise Muck issues an error.
 
 When a python script is run, it is first analyzed by Muck for any dependencies, which will be built before running the script. Dependency analysis is limited to the conventions that Muck understands.
 
 # Examples
 
-Imagine the following files; the python scripts contain `load_source` functions which indicate data dependencies.
+Imagine the following files; the python scripts contain `muck.source` function calls which indicate data dependencies.
 - input.csv
-- step1.csv.py: load_source('input.csv')
-- step2.csv.py: load_source('step1.csv')
+- step1.csv.py: muck.source('input.csv')
+- step2.csv.py: muck.source('step1.csv')
 - final.html.wu: <embed: step2.csv>
 
 Running `muck final.html` will cause the following to be built in order:
