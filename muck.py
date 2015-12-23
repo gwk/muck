@@ -15,6 +15,7 @@ import sys
 
 import agate
 from bs4 import BeautifulSoup
+import requests
 
 from writeup.writeup import writeup_dependencies
 
@@ -64,9 +65,34 @@ def source(target_path):
       logFL('note: nor does a file exist at source path: {}', target_path)
     raise
 
+
+class MuckHTTPError(Exception):
+  def __init__(self, message, request):
+    super().__init__(message)
+    self.request = request
+
+def source_url(url, target, expected_status_code=200):
+  is_cached = (target is not None)
+  if not is_cached:
+    # implementing uncached requests efficiently requires new versions of the source functions;
+    # these will take a text argument instead of a path argument.
+    # alternatively, the source functions could be reimplemented to take text strings,
+    # and muck would do the open and read.
+    raise ValueError('source_url does not yet support uncached requests.')
+  path = product_path_for_target(target)
+  if not path_exists(path): 
+    r = requests.get(url)
+    if r.status_code != expected_status_code:
+      raise MuckHTTPError('source_url failed with HTTP code: {}'.format(r.status_code), r)
+    with open(path, 'w') as f:
+      f.write(r.text)
+  return source(path)
+
+
 # module exports. when imported, muck provides functions that make data dependencies explicit.
 __ALL__ = [
   source,
+  source_url,
 ]  
 
 
@@ -102,6 +128,17 @@ if __name__ == '__main__':
   reserved_exts = {
     '.tmp',
   }
+
+  arg_parser = argparse.ArgumentParser(description='muck around with dependencies.')
+  arg_parser.add_argument('targets', nargs='*', default=['index.html'], help='target file names.')
+  args = arg_parser.parse_args()
+
+  # must run commands before load_info, so that clean removes stale info first.
+  for command in args.targets:
+    try:
+      fn = commands[command]
+    except KeyError: continue
+    fn()
 
   # info dictionaries.
   # key: target path (not product paths prefixed with build_dir).
@@ -154,6 +191,8 @@ if __name__ == '__main__':
       func = node.func
       if not isinstance(func, ast.Attribute): continue
       if not isinstance(func.value, ast.Name): continue
+      # TODO: dispatch to handlers for all known functions.
+      # add handler for source_url; this should check that repeated urls and targets are consistent across entire project.
       if func.value.id != 'muck' or func.attr != 'source': continue
       if len(node.args) != 1 or not isinstance(node.args[0], ast.Str):
         failF('{}:{}:{}: muck.source argument must be a single string literal.', src_path, node.lineno, node.col_offset)
@@ -314,10 +353,10 @@ if __name__ == '__main__':
         noteF(target_path, 'old product was deleted: {}', actual_path)
 
     src_path = None
-    file_hash = None # always updated to a string value.
+    file_hash = None
+
     if is_product:
       src_path, use_std_out = source_for_target(target_path)
-
       if old_src_path != src_path:
         is_stale = True
         if old_src_path:
@@ -330,21 +369,14 @@ if __name__ == '__main__':
       if not is_stale: # only calculate hash of existing product if we might still reuse it.
         file_hash = hash_for_path(actual_path)
         is_stale = (file_hash != old_hash)
-        infoF(target_path, 'stale product hash: {}', is_stale)
-      if is_stale: # must rebuild product.
-        # the source of this product might itself be a product.
-        # if so, use its actual path for the build step.
-        is_src_a_product = not path_exists(src_path)
-        actual_src_path = product_path_for_target(src_path) if is_src_a_product else src_path
-        build_product(target_path, actual_src_path, actual_path, use_std_out)
-        file_hash = hash_for_path(actual_path)
+        if is_stale:
+          warnF(target_path, 'product hash changed; product may have been accidentally modified.')
+
     else: # non-product source.
       file_hash = hash_for_path(actual_path)
       is_stale_hash = (file_hash != old_hash)
       infoF(target_path, 'stale source hash: {}', is_stale_hash)
       is_stale = is_stale or is_stale_hash
-
-    assert file_hash != None
 
     if is_stale:
       deps = calc_dependencies(actual_path)
@@ -354,21 +386,19 @@ if __name__ == '__main__':
       is_dep_stale = update_dependency(dep)
       is_stale = is_stale or is_dep_stale
 
+    if is_stale and is_product: # must rebuild product.
+      # the source of this product might itself be a product.
+      # if so, use its actual (product) path for the build step.
+      is_src_a_product = not path_exists(src_path)
+      actual_src_path = product_path_for_target(src_path) if is_src_a_product else src_path
+      build_product(target_path, actual_src_path, actual_path, use_std_out)
+      file_hash = hash_for_path(actual_path)
+
     status_dict[target_path] = is_stale # replace sentinal with final is_changed value.
-    info_dict[target_path] = [file_hash, src_path] + deps
+    info_dict[target_path] = [file_hash or old_hash, src_path] + deps
     if is_stale:
-      noteF(target_path, 'changed')
+      noteF(target_path, 'updated')
     return is_stale
-
-  arg_parser = argparse.ArgumentParser(description='muck around with dependencies.')
-  arg_parser.add_argument('targets', nargs='*', default=['index.html'], help='target file names.')
-  args = arg_parser.parse_args()
-
-  for command in args.targets:
-    try:
-      fn = commands[command]
-    except KeyError: continue
-    fn()
 
   for target in args.targets:
     if target in commands: continue
