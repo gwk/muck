@@ -12,6 +12,7 @@ import re
 import sys
 import string as _string
 import sys
+import urllib.parse
 
 import agate
 from bs4 import BeautifulSoup
@@ -67,23 +68,69 @@ def source(target_path):
 
 
 class MuckHTTPError(Exception):
-  def __init__(self, message, request):
+  def __init__(self, message, response, underlying_exception=None):
     super().__init__(message)
-    self.request = request
+    self.response = response
+    self.underlying_exception = underlying_exception
 
-def source_url(url, target, expected_status_code=200):
-  is_cached = (target is not None)
-  if not is_cached:
-    # implementing uncached requests efficiently requires new versions of the source functions;
-    # these will take a text argument instead of a path argument.
-    # alternatively, the source functions could be reimplemented to take text strings,
-    # and muck would do the open and read.
-    raise ValueError('source_url does not yet support uncached requests.')
+def plus_encode_byte(b):
+  '''
+  plus encoding is similar to url percent encoding, but uses '+' as the escape character.
+  it is used to create convenient file system paths out of urls.
+  just like url encoding, letters, digits, and the characters '_.-' are left unescaped.
+  additionally, percent characters are not escaped, to make prior url encoding more readable.
+  all other bytes are encoded as "+XX", where XX is the capitalized hexadecimal byte value.
+  ascii notes:
+  0x25: '%'
+  0x2d: '-'
+  0x2e: '.'
+  0x30-39: '0'-'9'
+  0x41-5a: 'A'-'Z'
+  0x5f: '_'
+  0x61-7a: 'a'-'z'
+  '''
+  if (0x61 <= b <= 0x7a) or \
+    (0x41 <= b <= 0x5a) or \
+    (0x30 <= b <= 0x39) or \
+    b == 0x25 or \
+    b == 0x2d or \
+    b == 0x2e or \
+    b == 0x5f:
+    return chr(b)
+  else:
+    return '+{:2X}'.format(b)
+ 
+def plus_encode(string):
+  utf8 = string.encode('utf-8')
+  return ''.join(plus_encode_byte(b) for b in utf8)
+
+
+def target_path_from_url(url):
+  '''
+  produce a local target path from a url.
+  '''
+  parts = urllib.parse.urlsplit(url) # returns five-element sequence.
+  name = plus_encode(''.join((parts.netloc, parts.path, parts.query, parts.fragment)))
+  return path_join(parts.scheme, name)
+
+
+def source_url(url, target=None, expected_status_code=200, timeout=4, headers={}):
+  if target is None: # create a target name from the url.
+    target = target_path_from_url(url)
+    logFL('source_url synthesized target: {}', target)
+  # implementing uncached requests efficiently requires new versions of the source functions;
+  # these will take a text argument instead of a path argument.
+  # alternatively, the source functions could be reimplemented to take text strings,
+  # and muck would do the open and read.
   path = product_path_for_target(target)
   if not path_exists(path): 
-    r = requests.get(url)
+    try:
+      r = requests.get(url, timeout=timeout, headers=headers)
+    except Exception as e:
+      raise MuckHTTPError('source_url failed with exception: {}'.format(e), None, underlying_exception=e)
     if r.status_code != expected_status_code:
       raise MuckHTTPError('source_url failed with HTTP code: {}'.format(r.status_code), r)
+    make_dirs(path_dir(path))
     with open(path, 'w') as f:
       f.write(r.text)
   return source(path)
