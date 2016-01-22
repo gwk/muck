@@ -52,11 +52,12 @@ source_dispatch = {
 }
 
 
-def source(target_path):
+def source(target_path, ext=None):
   'Muck API to open a dependency such that Muck can analyze dependencies statically.'
   # TODO: optional open_fn argument.
   path = target_path if path_exists(target_path) else product_path_for_target(target_path)
-  ext = path_ext(path)
+  if ext is None:
+    ext = path_ext(path)
   fn = source_dispatch.get(ext, open) # default to regular file open.
   try:
     return fn(path)
@@ -114,7 +115,7 @@ def target_path_from_url(url):
   return path_join(parts.scheme, name)
 
 
-def source_url(url, target=None, expected_status_code=200, timeout=4, headers={}):
+def source_url(url, target=None, ext=None, expected_status_code=200, timeout=4, headers={}):
   if target is None: # create a target name from the url.
     target = target_path_from_url(url)
     logFL('source_url synthesized target: {}', target)
@@ -131,9 +132,9 @@ def source_url(url, target=None, expected_status_code=200, timeout=4, headers={}
     if r.status_code != expected_status_code:
       raise MuckHTTPError('source_url failed with HTTP code: {}'.format(r.status_code), r)
     make_dirs(path_dir(path))
-    with open(path, 'w') as f:
-      f.write(r.text)
-  return source(path)
+    with open(path, 'wb') as f:
+      f.write(r.content)
+  return source(path, ext=ext)
 
 
 # module exports. when imported, muck provides functions that make data dependencies explicit.
