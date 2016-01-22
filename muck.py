@@ -8,7 +8,9 @@ import copy
 import hashlib
 import json
 import os
+import random
 import re
+import time
 import sys
 import string as _string
 import sys
@@ -115,10 +117,11 @@ def target_path_from_url(url):
   return path_join(parts.scheme, name)
 
 
-def source_url(url, target=None, ext=None, expected_status_code=200, timeout=4, headers={}):
+def fetch(url, target=None, ext='', expected_status_code=200, headers={},
+ timeout=4, delay=0, delayRange=0):
   if target is None: # create a target name from the url.
-    target = target_path_from_url(url)
-    logFL('source_url synthesized target: {}', target)
+    target = target_path_from_url(url + ext)
+    #logFL('source_url synthesized target: {}', target)
   # implementing uncached requests efficiently requires new versions of the source functions;
   # these will take a text argument instead of a path argument.
   # alternatively, the source functions could be reimplemented to take text strings,
@@ -134,7 +137,16 @@ def source_url(url, target=None, ext=None, expected_status_code=200, timeout=4, 
     make_dirs(path_dir(path))
     with open(path, 'wb') as f:
       f.write(r.content)
-  return source(path, ext=ext)
+    sleepMin = max(0, delay - delayRange * 0.5)
+    sleepMax = delay + delayRange * 0.5
+    time.sleep(random.uniform(sleepMin, sleepMax))
+  return target
+
+def source_url(url, target=None, ext='', expected_status_code=200, headers={},
+ timeout=4, delay=0, delayRange=0):
+  target = fetch(url, target=target, ext=ext, expected_status_code=expected_status_code,
+    headers=headers, timeout=timeout, delay=delay, delayRange=delayRange)
+  source(target)
 
 
 # module exports. when imported, muck provides functions that make data dependencies explicit.
