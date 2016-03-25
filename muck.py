@@ -146,7 +146,7 @@ def source_url(url, target=None, ext='', expected_status_code=200, headers={},
  timeout=4, delay=0, delayRange=0):
   target = fetch(url, target=target, ext=ext, expected_status_code=expected_status_code,
     headers=headers, timeout=timeout, delay=delay, delayRange=delayRange)
-  source(target)
+  return source(target)
 
 
 # module exports. when imported, muck provides functions that make data dependencies explicit.

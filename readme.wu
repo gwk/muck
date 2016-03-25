@@ -9,7 +9,7 @@ Muck is a build tool; given a target (a file to be built), it looks in the curre
 
 - Install the latest python3 from http://python.org; Muck tracks python3 aggressively.
 - Install the following python dependencies:
-  - `pip3 --upgrade install agate pygal requests beautifulsoup4`
+  - `pip3 install --upgrade agate pygal requests beautifulsoup4`
 - Clone the repository somewhere or add it as a submodule to your project.
 - In the `muck` root directory, run `git submodule update --init --recursive` to get Muck's dependencies.
 
