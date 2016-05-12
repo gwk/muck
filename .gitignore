@@ -7,3 +7,4 @@
 # muck.
 _build/
 _misc/
+muck.egg-info
