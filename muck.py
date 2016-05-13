@@ -173,7 +173,9 @@ def source_for_target(target_path, dir_names_cache=None):
   # if a source file stem contains the complete target name, including extension, prefer that.
   src_names = list(filter_source_names(src_dir_names, prod_name))
   if src_names:
-    use_std_out = True
+    # only use stdout for targets with extensions;
+    # extensionless targets are typically either phony or binary programs.
+    use_std_out = bool(path_ext(prod_name))
     src_stem = prod_name
   else: # fall back to sources that do not indicate output extension.
     src_names = list(filter_source_names(src_dir_names, prod_stem))
@@ -456,12 +458,14 @@ def build_product(info_dict: dict, target_path: str, src_path: str, prod_path: s
   make_dirs(prod_dir)
   cmd = build_tool + [src_path, prod_path_tmp]
   noteF(target_path, 'building: `{}`', ' '.join(cmd))
-  with (open(prod_path_out, 'wb') if use_std_out else None) as out_file:
-    time_start = time.time()
-    code = runC(cmd, out=out_file)
-    time_end = time.time()
+  out_file = open(prod_path_out, 'wb') if use_std_out else None
+  time_start = time.time()
+  code = runC(cmd, out=out_file)
+  time_end = time.time()
+  if out_file: out_file.close()
+  has_product = True
   if code != 0:
-    muck_failF(target_path, 'build failed with code {}', code)
+    muck_failF(target_path, 'build failed with code: {}', code)
   if use_std_out:
     if path_exists(prod_path_tmp):
       noteF(target_path, 'source produced product file: {}', prod_path_tmp)
@@ -471,11 +475,17 @@ def build_product(info_dict: dict, target_path: str, src_path: str, prod_path: s
     else:
       noteF(target_path, 'source produced std output.')
       move_file(prod_path_out, prod_path)
-  else:
-    if not path_exists(prod_path_tmp):
+  else: # not use_std_out.
+    if path_exists(prod_path_tmp):
+      move_file(prod_path_tmp, prod_path)
+    elif path_ext(prod_path): # target is not bare (possibly phony) target.
       muck_failF(target_path, 'build failed to produce product: {}', prod_path_tmp)
-    move_file(prod_path_tmp, prod_path)
-  noteF(target_path, 'finished: {:0.2f} seconds', time_end - time_start)
+    else:
+      has_product = False
+      noteF(target_path, 'no product.')
+  noteF(target_path, 'finished: {:0.2f} seconds; {:0.2f} MB.',
+    time_end - time_start, (file_size(prod_path) / 1,000,000.0) if has_product else 0)
+  return has_product
 
 
 def update_dependency(ctx: tuple, target_path: str, force=False):
@@ -565,8 +575,9 @@ def update_dependency(ctx: tuple, target_path: str, force=False):
   if is_product and (force or is_stale): # must rebuild product.
     # the source of this product might itself be a product.
     actual_src_path = actual_path_for_target(src_path)
-    build_product(info_dict, target_path, actual_src_path, actual_path, use_std_out)
-    file_hash = hash_for_path(actual_path)
+    has_product = build_product(info_dict, target_path, actual_src_path, actual_path, use_std_out)
+    if has_product:
+      file_hash = hash_for_path(actual_path)
 
   status_dict[target_path] = is_stale # replace sentinal with final is_changed value.
   info_dict[target_path] = [file_hash or old_hash, src_path] + deps
