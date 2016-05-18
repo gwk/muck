@@ -17,6 +17,7 @@ import urllib.parse
 import agate
 import requests
 
+from itertools import repeat
 from bs4 import BeautifulSoup
 from pithy import errFL
 from writeup import writeup_dependencies
@@ -209,6 +210,7 @@ info_path = path_join(build_dir, info_name)
 # val: [file_hash, src_path, dependencies...]
 # src_path may be None for non-product sources.
 # each dependency is a target path.
+# TODO: save info about muck version itself in the dict.
 
 def load_info():
   try:
@@ -221,17 +223,10 @@ def load_info():
     return {}
 
 
-def save_info(info_dict):
+def save_info(info: dict):
   with open(info_path, 'w') as f:
-    json.dump(info_dict, f, indent=2)
+    json.dump(info, f, indent=2)
 
-
-dbg = False
-
-def dbgF(path, fmt, *items):
-  if dbg:
-    errF('muck dbg: {}: ', path)
-    errFL(fmt, * items)
 
 def noteF(path, fmt, *items):
   errF('muck note: {}: ', path)
@@ -262,29 +257,46 @@ muck {} error: {}: first line of patch file is invalid;
   return ((words[1] == '--muck'), words[2], words[3])
 
 
-def patch_dependencies(src_path, src_file):
+def patch_dependencies(src_path, src_file, dir_names):
   is_empty, orig_path, _ = parse_patch_first_line(src_path, src_file)
   dep = orig_path[(len(build_dir) + 1):] if is_product_path(orig_path) else orig_path
   return [dep]
 
 
-def py_dependencies(src_path, src_file):
+def py_dep_call(src_path, node):
+  func = node.func
+  if not isinstance(func, ast.Attribute): return
+  if not isinstance(func.value, ast.Name): return
+  # TODO: dispatch to handlers for all known functions.
+  # add handler for source_url;
+  # this should check that repeated (url, target) pairs are consistent across entire project.
+  if (func.value.id, func.attr) != ('muck', 'source'): return None
+  if len(node.args) != 1 or not isinstance(node.args[0], ast.Str):
+    muck_failF('{}:{}:{}: muck.source argument must be a single string literal.',
+      src_path, node.lineno, node.col_offset)
+  yield node.args[0].s # the string literal value from the ast.Str.
+
+
+def py_dep_import(src_path, module_name, dir_names):
+  src_dir = path_dir(src_path)
+  module_parts = module_name.split('.')
+  module_path = path_join(src_dir, *module_parts) + '.py'
+  if is_file(module_path):
+    yield module_path
+
+
+def py_dependencies(src_path, src_file, dir_names):
   'Calculate dependencies of a python3 source file.'
   src_text = src_file.read()
   tree = ast.parse(src_text, src_path)
   for node in ast.walk(tree):
-    if not isinstance(node, ast.Call): continue
-    func = node.func
-    if not isinstance(func, ast.Attribute): continue
-    if not isinstance(func.value, ast.Name): continue
-    # TODO: dispatch to handlers for all known functions.
-    # add handler for source_url;
-    # this should check that repeated urls and targets are consistent across entire project.
-    if (func.value.id, func.attr) != ('muck', 'source'): continue
-    if len(node.args) != 1 or not isinstance(node.args[0], ast.Str):
-      muck_failF('{}:{}:{}: muck.source argument must be a single string literal.',
-        src_path, node.lineno, node.col_offset)
-    yield node.args[0].s
+    if isinstance(node, ast.Call):
+      yield from py_dep_call(src_path, node)
+    elif isinstance(node, ast.Import):
+      for alias in node.names:
+        yield from py_dep_import(src_path, alias.name, dir_names)
+    elif isinstance(node, ast.ImportFrom):
+      yield from py_dep_import(src_path, node.module, dir_names)
 
 
 dependency_fns = {
@@ -299,11 +311,14 @@ build_tools = {
   '.wu' : ['writeup']
 }
 
-def calc_dependencies(path):
+def calc_dependencies(path, dir_names):
   ext = path_ext(path)
-  dep_fn = dependency_fns.get(ext)
+  try:
+    dep_fn = dependency_fns.get(ext)
+  except KeyError:
+    return []
   with open(path) as f:
-    return sorted(dep_fn(path, f)) if dep_fn else []
+    return sorted(dep_fn(path, f, dir_names))
 
 
 def hash_for_path(path):
@@ -351,16 +366,15 @@ def muck_apply(args):
 def muck_clean(ctx, args):
   if not args:
     failF('muck clean error: clean command takes specific target arguments; use clean-all to remove all products.')
-  info_dict = ctx[0]
   for arg in args:
     try:
-      info = info_dict[arg]
+      info = ctx.info[arg]
     except KeyError:
       errFL('muck clean note: {}: skipping unknown target.', arg)
       continue
     prod_path = product_path_for_target(arg)
     remove_file_if_exists(prod_path)
-    del info_dict[arg]
+    del ctx.info[arg]
 
 
 def muck_clean_all(args):
@@ -437,7 +451,7 @@ reserved_exts = {
 }
 
 
-def build_product(info_dict: dict, target_path: str, src_path: str, prod_path: str, use_std_out: bool):
+def build_product(info: dict, target_path: str, src_path: str, prod_path: str, use_std_out: bool):
   '''
   build a product from a source.
   ''' 
@@ -449,7 +463,7 @@ def build_product(info_dict: dict, target_path: str, src_path: str, prod_path: s
     muck_failF(target_path, 'unsupported source file extension: `{}`', src_ext)
   prod_path_out = prod_path + '.out'
   prod_path_tmp = prod_path + '.tmp'
-  info_dict.pop(target_path, None) # delete metadata along with file.
+  info.pop(target_path, None) # delete metadata along with file.
   remove_file_if_exists(prod_path)
   remove_file_if_exists(prod_path_out)
   remove_file_if_exists(prod_path_tmp)
@@ -483,115 +497,143 @@ def build_product(info_dict: dict, target_path: str, src_path: str, prod_path: s
     else:
       has_product = False
       noteF(target_path, 'no product.')
-  noteF(target_path, 'finished: {:0.2f} seconds; {:0.2f} MB.',
-    time_end - time_start, (file_size(prod_path) / 1,000,000.0) if has_product else 0)
+  size_suffix = '; {:0.2f} MB'.format(file_size(prod_path) / 1000000) if has_product else ''
+  noteF(target_path, 'finished: {:0.2f} seconds{}.', time_end - time_start, size_suffix)
   return has_product
 
 
-def update_dependency(ctx: tuple, target_path: str, force=False):
+def file_size_and_mtime(path):
+  stats = os.stat(path)
+  return (stats.st_size, stats.st_mtime)
+
+
+Ctx = namedtuple('Ctx', 'info statuses dir_names dbgF')
+# statuses: target_path: str => is_changed: bool | None (the recursion sentinal).
+# dir_names: dir_path: str => names: [str].
+
+
+def update_dependency(ctx: Ctx, target_path: str, force=False):
   '''
   returns is_changed.
-  ctx is a triple of (info_dict: dict, status_dict: dict, dir_names_cache: dict).
   '''
-  info_dict, status_dict, dir_names_cache = ctx
+  target_ext = path_ext(target_path)
 
   if target_path in reserved_names:
     muck_failF(target_path, 'target name is reserved; please rename the target.')
-  if path_ext(target_path) in reserved_exts:
+  if target_ext in reserved_exts:
     muck_failF(target_path, 'target name has reserved extension; please rename the target.')
 
-  try: # if in status_dict, this path has already been visited on this run.
-    status = status_dict[target_path]
-    if status is None: # recursion sentinal.
-      muck_failF(target_path, 'target has circular dependency.')
+  try: # if in ctx.statuses, this path has already been visited on this run.
+    status = ctx.statuses[target_path]
+    if status is Ellipsis: # recursion sentinal.
+      involved_paths = sorted(path for path, status in ctx.statuses.items() if status is Ellipsis)
+      muck_failF(target_path, 'target has circular dependency; involved paths:\n  {}',
+        '\n  '.join(involved_paths))
     return status
   except KeyError: pass
 
-  dbgF(target_path, 'update')
-
-  status_dict[target_path] = None # recursion sentinal is replaced before return.
+  ctx.statuses[target_path] = Ellipsis # recursion sentinal is replaced before return.
   
+  ctx.dbgF(target_path, 'examining...')
+
   is_product = not path_exists(target_path)
   actual_path = actual_path_for_target(target_path)
+  try:
+    size, mtime = file_size_and_mtime(actual_path)
+    has_existing = True
+  except FileNotFoundError:
+    size = None
+    mtime = None
+    has_existing = False
 
-  try: # if in info_dict, cached info may be reusable.
-    old_info = info_dict[target_path]
+  needs_update = force or not has_existing
+
+  try:
+    old_info = ctx.info[target_path]
   except KeyError: # no previous record.
-    dbgF(target_path, 'no cached info')
-    old_hash = None
-    old_src_path = None
+    ctx.dbgF(target_path, 'no cached info')
+    old_size, old_mtime, old_hash, old_src_path = repeat(None, 4)
     old_deps = []
-    is_stale = True
+    has_old = True
+    needs_update = True
   else: # have previous record. must check that it is not stale.
-    dbgF(target_path, 'cached info: {}', old_info)
-    old_hash = old_info[0]
-    old_src_path = old_info[1]
-    old_deps = old_info[2:]
-    is_stale = False
+    old_size, old_mtime, old_hash, old_src_path = old_info[:4]
+    old_deps = old_info[4:]
+    has_old = False
+    ctx.dbgF(target_path, 'cached size: {}; mtime: {}; hash: {}; src: {}; deps: {}',
+      old_size, old_mtime, old_hash, old_src_path, old_deps)
     old_is_product = bool(old_src_path)
     if old_is_product != is_product: # nature of the target changed.
-      is_stale = True
+      needs_update = True
       noteF(target_path, 'target is {} a product', 'now' if is_product else 'no longer')
-    elif not path_exists(actual_path): # file was deleted.
-      is_stale = True
-      noteF(target_path, 'old product was deleted: {}', actual_path)
+    elif not has_existing: # file was deleted.
+      assert is_product
+      needs_update = True
+      if target_ext: # definitely not a phony target, so show the message.
+        noteF(target_path, 'old product was deleted: {}', actual_path)
 
-  src_path = None
-  file_hash = None
+  file_hash = old_hash # will update with the new product later if necessary.
+  src_path = None # filled in for product.
 
   if is_product:
-    src_path, use_std_out = source_for_target(target_path, dir_names_cache)
-    deps_path = src_path
+    if has_existing and has_old: # existing product should not have been modified since info was stored.
+      if file_size == old_size or hash_for_path(actual_path) != old_hash:
+        muck_failF(target_path, 'existing product has changed; did you mean to update a patch?\n'
+          '  please save your changes if necessary and then delete the modified file.')
+    src_path, use_std_out = source_for_target(target_path, ctx.dir_names)
     if old_src_path != src_path:
-      is_stale = True
+      needs_update = True
       if old_src_path:
-        noteF(target_path, 'source path of target product changed')
-        noteF(target_path, '  was: {}', old_src_path)
-        noteF(target_path, '  now: {}', src_path)
+        noteF(target_path, 'source path of target product changed\n  was: {}\n  now: {}',
+          old_src_path, src_path)
     is_src_changed = update_dependency(ctx, src_path)
-    dbgF(target_path, 'source changed: {}', is_src_changed)
-    is_stale = is_stale or is_src_changed
-    if not is_stale: # only calculate hash of existing product if we might still reuse it.
-      file_hash = hash_for_path(actual_path)
-      is_stale = (file_hash != old_hash)
-      if is_stale:
-        warnF(target_path, 'product hash changed; product may have been accidentally modified.')
+    needs_update = needs_update or is_src_changed
+    deps_path = src_path
 
   else: # non-product source.
-    deps_path = actual_path
+    assert has_existing
     file_hash = hash_for_path(actual_path)
-    is_stale_hash = (file_hash != old_hash)
-    dbgF(target_path, 'stale source hash: {}', is_stale_hash)
-    is_stale = is_stale or is_stale_hash
+    is_changed = size != old_size or file_hash != old_hash
+    if is_changed:
+      noteF(target_path, 'changed.')
+    needs_update = needs_update or is_changed
+    deps_path = actual_path
 
-  if is_stale:
-    deps = calc_dependencies(deps_path)
+  if needs_update:
+    deps = calc_dependencies(deps_path, ctx.dir_names)
   else:
     deps = old_deps
   for dep in deps:
     is_dep_stale = update_dependency(ctx, dep)
-    is_stale = is_stale or is_dep_stale
+    needs_update = needs_update or is_dep_stale
 
-  if is_product and (force or is_stale): # must rebuild product.
+  if is_product and needs_update: # must rebuild product.
     # the source of this product might itself be a product.
     actual_src_path = actual_path_for_target(src_path)
-    has_product = build_product(info_dict, target_path, actual_src_path, actual_path, use_std_out)
+    has_product = build_product(ctx.info, target_path, actual_src_path, actual_path, use_std_out)
     if has_product:
+      size, mtime = file_size_and_mtime(actual_path)
       file_hash = hash_for_path(actual_path)
+      needs_update = (file_hash != old_hash) # result is unchanged.
 
-  status_dict[target_path] = is_stale # replace sentinal with final is_changed value.
-  info_dict[target_path] = [file_hash or old_hash, src_path] + deps
-  #if is_stale: noteF(target_path, 'updated')
-  return is_stale
+  ctx.statuses[target_path] = needs_update # replace sentinal with final is_changed value.
+  ctx.info[target_path] = [size, mtime, file_hash, src_path] + deps
+  #if needs_update: noteF(target_path, 'updated')
+  return needs_update
 
 
 def main():
-  global dbg
   arg_parser = argparse.ArgumentParser(description='muck around with dependencies.')
   arg_parser.add_argument('targets', nargs='*', default=['index.html'], help='target file names.')
   arg_parser.add_argument('-dbg', action='store_true')
   args = arg_parser.parse_args()
-  dbg = args.dbg
+
+  if args.dbg:
+    def dbgF(path, fmt, *items):
+      errF('muck dbg: {}: ', path)
+      errFL(fmt, *items)
+  else:
+    def dbgF(path, fmt, *items): pass
 
   command_needs_ctx, command_fn = commands.get(args.targets[0], (None, None))
 
@@ -600,10 +642,7 @@ def main():
 
   make_dirs(build_dir) # required for load_info.
 
-  info_dict = load_info()
-  status_dict = {} # target_path: str => is_changed: bool | None (the recursion sentinal).
-  dir_names_cache = {} # dir_path: str => names: [str].
-  ctx = (info_dict, status_dict, dir_names_cache)
+  ctx = Ctx(info=load_info(), statuses={}, dir_names={}, dbgF=dbgF)
 
   try:
     if command_fn:
@@ -613,10 +652,10 @@ def main():
       for target in args.targets:
         update_dependency(ctx, target, force=True)
   except SystemExit:
-    save_info(info_dict)
+    save_info(ctx.info)
     raise
   else:
-    save_info(info_dict)
+    save_info(ctx.info)
 
 
 if __name__ == '__main__':
