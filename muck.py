@@ -17,8 +17,10 @@ import urllib.parse
 import agate
 import requests
 
+from http import HTTPStatus
 from itertools import repeat
 from bs4 import BeautifulSoup
+from pat import pat_dependencies
 from pithy import errFL
 from writeup import writeup_dependencies
 from pithy import *
@@ -90,6 +92,27 @@ def target_path_from_url(url):
   return path_join(parts.scheme, plus_encode(parts.netloc), name)
 
 
+def _fetch(url, timeout, headers):
+  '''
+  wrap the call to get with try/except that flattens any exception trace into an HTTPError.
+  without this the backtrace due to a network failure is massive, involves multiple exceptions,
+  and is mostly irrelevant to the caller.
+  '''
+  try:
+    msg = None
+    r = requests.get(url, timeout=timeout, headers=headers)
+  except Exception as e:
+    msg = 'fetch failed with exception: {}: {}'.format(
+      type(e).__name__, ', '.join(str(a) for a in e.args))
+  else:
+    if r.status_code != expected_status_code:
+      s = HTTPStatus(r.status_code)
+      msg = 'fetch failed with HTTP code: {}: {}; {}.'.format(s.code, s.phrase, s.description)
+  if msg is not None:
+    raise HTTPError(msg)
+  return r
+
+
 def fetch(url, path, ext='', expected_status_code=200, headers={}, timeout=4, delay=0, delay_range=0):
   'Muck API to fetch a url.'
   # seems weird for the api to allow either target or product paths,
@@ -101,13 +124,8 @@ def fetch(url, path, ext='', expected_status_code=200, headers={}, timeout=4, de
   else:
     product_path = product_path_for_target(path)
   errFL('fetch: {}', product_path)
-  if not path_exists(product_path): 
-    try:
-      r = requests.get(url, timeout=timeout, headers=headers)
-    except Exception as e:
-      raise HTTPError('fetch failed with exception: {}'.format(e)) from e
-    if r.status_code != expected_status_code:
-      raise HTTPError('fetch failed with HTTP code: {}'.format(r.status_code)) from e
+  if not path_exists(product_path):
+    r = _fetch(url, timeout, headers)
     make_dirs(path_dir(product_path))
     with open(product_path, 'wb') as f:
       f.write(r.content)
