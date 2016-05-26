@@ -10,7 +10,7 @@ from setuptools import setup
 
 
 long_description = '''\
-Muck is a build tool; given a target (a file to be built), it looks in the current directory for a source file with a matching name, determines its dependencies, recursively builds those, and then finally builds the target. Unlike traditional build systems such as Make, Muck determines the dependencies of a given file by analyzing the file source; there is no 'makefile'. This means that Muck is limited to source languages that it understands, and to source code written using Muck conventions. Muck also provides conventional functions that imply data dependencies, allowing data transformation projects to be organized as a series of dependent steps. See readme.wu for documentation.
+Muck is a build tool; given a target (a file to be built), it looks in the current directory for a source file with a matching name, determines its dependencies, recursively builds those, and then finally builds the target. Unlike traditional build systems such as Make, Muck determines the dependencies of a given file by analyzing the file source; there is no 'makefile'. This means that Muck is limited to source languages that it understands, and to source code written to respect Muck's limitations. In addition to understanding code dependencies (e.g. Python import statements), Muck also provides several input functions that denote data dependencies, principly the `source` function. This allows data transformation projects to be organized as a series of dependent steps; Muck will cache build results for both code and data, allowing for efficient, iterative development. See readme.wu for documentation.
 '''
 
 setup(
