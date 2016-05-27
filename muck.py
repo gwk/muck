@@ -500,6 +500,8 @@ def update_dependency(ctx: Ctx, target_path: str, force=False):
   '''
   target_ext = path_ext(target_path)
 
+  if not target_path.strip():
+    muck_failF(repr(target_path), 'invalid target name.')
   if target_path in reserved_names:
     muck_failF(target_path, 'target name is reserved; please rename the target.')
   if target_ext in reserved_exts:
