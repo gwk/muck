@@ -464,12 +464,12 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str, u
     muck_failF(target_path, 'build failed with code: {}', code)
   if use_std_out:
     if path_exists(prod_path_tmp):
-      noteF(target_path, 'source produced product file: {}', prod_path_tmp)
+      noteF(target_path, 'process wrote product file directly.')
       move_file(prod_path_tmp, prod_path)
       if file_size(prod_path_out) == 0:
         remove_file(prod_path_out)
     else:
-      noteF(target_path, 'source produced std output.')
+      noteF(target_path, 'process produced std output.')
       move_file(prod_path_out, prod_path)
   else: # not use_std_out.
     if path_exists(prod_path_tmp):
