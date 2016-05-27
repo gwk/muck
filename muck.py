@@ -348,9 +348,7 @@ def muck_clean(ctx, args):
   if not args:
     failF('muck clean error: clean command takes specific target arguments; use clean-all to remove all products.')
   for arg in args:
-    try:
-      info = ctx.info[arg]
-    except KeyError:
+    if arg not in ctx.info:
       errFL('muck clean note: {}: skipping unknown target.', arg)
       continue
     prod_path = product_path_for_target(arg)
