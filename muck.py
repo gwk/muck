@@ -92,7 +92,7 @@ def target_path_from_url(url):
   return path_join(parts.scheme, plus_encode(parts.netloc), name)
 
 
-def _fetch(url, timeout, headers):
+def _fetch(url, timeout, headers, expected_status_code):
   '''
   wrap the call to get with try/except that flattens any exception trace into an HTTPError.
   without this the backtrace due to a network failure is massive, involves multiple exceptions,
@@ -123,9 +123,9 @@ def fetch(url, path, ext='', expected_status_code=200, headers={}, timeout=4, de
     product_path = path
   else:
     product_path = product_path_for_target(path)
-  errFL('fetch: {}', product_path)
+  errFL('fetch: {}', url)
   if not path_exists(product_path):
-    r = _fetch(url, timeout, headers)
+    r = _fetch(url, timeout, headers, expected_status_code)
     make_dirs(path_dir(product_path))
     with open(product_path, 'wb') as f:
       f.write(r.content)
