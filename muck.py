@@ -259,28 +259,6 @@ def muck_failF(path, fmt, *items):
   failF(fmt, *items)
 
 
-def parse_patch_first_line(patch_path, patch_file=None, cmd=''):
-  'returns (is_empty, original_path, product_path).'
-  if patch_file is None:
-    patch_file = open(patch_path)
-  line = patch_file.readline()
-  patch_file.close()
-  words = line.split()
-  if len(words) != 4 or words[0] != 'diff' or (words[1] not in ('--git', '--muck')):
-    name = ' {} '.format(cmd) if cmd else ''
-    failF('''\
-muck {} error: {}: first line of patch file is invalid;
-  expected: 'diff (--git|--muck) [original_path] [product_path]\\n'
-  actual: {!r}''', name, patch_path, line)
-  return ((words[1] == '--muck'), words[2], words[3])
-
-
-def patch_dependencies(src_path, src_file, dir_names):
-  is_empty, orig_path, _ = parse_patch_first_line(src_path, src_file)
-  dep = orig_path[(len(build_dir) + 1):] if is_product_path(orig_path) else orig_path
-  return [dep]
-
-
 def py_dep_call(src_path, node):
   func = node.func
   if not isinstance(func, ast.Attribute): return
@@ -323,14 +301,14 @@ def tests_dependencies(src_path, src_file, dir_names):
 
 
 dependency_fns = {
-  '.patch' : patch_dependencies,
+  '.pat' : pat_dependencies,
   '.py' : py_dependencies,
   '.tests' : tests_dependencies,
   '.wu' : writeup_dependencies,
 }
 
 build_tools = {
-  '.patch' : ['muck', 'apply'],
+  '.pat' : ['pat', 'apply'],
   '.py' : ['python3'],
   '.tests' : ['true'],
   '.wu' : ['writeup']
@@ -366,28 +344,6 @@ def hash_for_path(path):
 
 # commands.
 
-def muck_apply(args):
-  if len(args) != 2:
-    failF('muck apply error: apply command takes two arguments: [patch_path] [product_path]')
-  patch_path, prod_path = args
-
-  def _failF(fmt, *items):
-    errF('muck apply error: {}: ', patch_path)
-    failF(fmt, *items)
-
-  if path_ext(patch_path) != '.patch':
-    _failF('argument does not specify a .patch file')
-  is_empty, orig_path, _ = parse_patch_first_line(patch_path, cmd='apply')
-
-  if is_empty: # patch command would fail, calling the patch garbage.
-      copy_file(orig_path, prod_path)
-  else:
-    cmd = ['patch', '-p0', '--input=' + patch_path, '--output=' + prod_path]
-    code = runC(cmd)
-    if code != 0:
-      _failF('patch command failed: {}', cmd)
-
-
 def muck_clean(ctx, args):
   if not args:
     failF('muck clean error: clean command takes specific target arguments; use clean-all to remove all products.')
@@ -416,16 +372,20 @@ muck patch error: patch command takes one or two arguments. usage:
   
   muck patch [original_target] [target]
     creates a new target by copying either the source or product of the original to _build/[target],
-    and then creates an empty [target].patch.
+    and then creates an empty [target].pat.
   
-  muck patch [target.patch]
+  muck patch [target.pat]
     update the patch file with the diff of the previously specified original and target.
 ''')
 
   if len(args) == 2: # create new patch.
     assert len(args) == 2
     orig_target_path, target_path = args
-    patch_path = target_path + '.patch'
+    if orig_target_path.endswith('.pat'):
+      errFL('muck patch error: original should not be a patch file: {}', orig_target_path)
+    if target_path.endswith('.pat'):
+      errFL('muck patch error: {} {}: target should not be a patch file: {}', target_path)
+    patch_path = target_path + '.pat'
     if path_exists(patch_path):
       failF('muck patch error: {}: patch already exists.', patch_path)
     update_dependency(ctx, orig_target_path)
@@ -439,28 +399,27 @@ muck patch error: patch command takes one or two arguments. usage:
 
   else: # update existing patch.
     patch_path = args[0]
-    if path_ext(patch_path) != '.patch':
-      failF('muck patch error: argument does not specify a .patch file: {!r}', patch_path)
-    is_empty, orig_path, prod_path = parse_patch_first_line(patch_path, cmd='patch')
+    if path_ext(patch_path) != '.pat':
+      failF('muck patch error: argument does not specify a .pat file: {!r}', patch_path)
+    deps = pat_dependencies(patch_path, open(patch_path), {})
+    orig_target_path = deps[0]
+    update_dependency(ctx, orig_target_path)
+    orig_actual_path = actual_path_for_target(orig_target_path)
+    target_path = path_stem(patch_path)
+    prod_path = product_path_for_target(target_path)
 
   # update patch (both cases).
-  cmd = ['git', 'diff', '--patch', '--histogram', '--exit-code',
-    '--no-index', '--no-prefix', '--no-color', '--no-renames',
-    orig_path, prod_path]
+  cmd = ['pat', 'diff', orig_actual_path, prod_path]
   with open(patch_path, 'wb') as f:
     code = runC(cmd, out=f)
-    if code == 0: # files are identical and nothing was output; need to write a no-op patch.
-      # the gnu patch tool does not like empty patches,
-      # so we are obliged to create our own format variant in order to specify the dependency.
-      # we follow the pattern established by git with 'diff --git {orig} {prod}'.
-      empty_patch = 'diff --muck {} {}\n'.format(orig_path, prod_path)
-      patch_bytes = empty_patch.encode()
-      f.write(patch_bytes)
 
+  if len(args) == 1: # updated existing patch.
+    # need to remove or update the target info to avoid the 'did you mean to patch?' safeguard.
+    # for now, just delete it to be safe; this makes the target looks stale.
+    del ctx.info[target_path]
 
 commands = {
   # values are (needs_ctx, fn).
-  'apply'     : (False, muck_apply),
   'clean'     : (True,  muck_clean),
   'clean-all' : (False, muck_clean_all),
   'patch'     : (True,  muck_patch),
