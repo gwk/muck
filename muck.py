@@ -402,12 +402,12 @@ muck patch error: patch command takes one or two arguments. usage:
     deps = pat_dependencies(patch_path, open(patch_path), {})
     orig_target_path = deps[0]
     update_dependency(ctx, orig_target_path)
-    orig_actual_path = actual_path_for_target(orig_target_path)
+    orig_path = actual_path_for_target(orig_target_path)
     target_path = path_stem(patch_path)
     prod_path = product_path_for_target(target_path)
 
   # update patch (both cases).
-  cmd = ['pat', 'diff', orig_actual_path, prod_path]
+  cmd = ['pat', 'diff', orig_path, prod_path]
   with open(patch_path, 'wb') as f:
     code = runC(cmd, out=f)
 
