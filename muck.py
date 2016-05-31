@@ -75,20 +75,86 @@ _source_dispatch = meta.dispatcher_for_names(prefix='_source_', default='default
 def source(target_path, ext=None, **kwargs):
   '''
   Open a dependency and parse it based on its file extension.
+  
+  Additional keyword arguments are passed to the specific source function matching ext:
+  - json, jsons: record_types.
+
   Muck's static analysis looks specifically for this function to infer dependencies;
   the target_path argument must be a string literal.
   '''
-  # TODO: optional open_fn argument.
+  # TODO: optional open_fn argument?
+
   path = actual_path_for_target(target_path)
   if ext is None:
     ext = path_ext(path)
   try:
-    return _source_dispatch(ext.lstrip('.'), path)
+    return _source_dispatch(ext.lstrip('.'), path, **kwargs)
   except FileNotFoundError:
     errFL('muck.source cannot open path: {}', path)
     if path != target_path:
       errFL('note: nor does a file exist at source path: {}', target_path)
     raise
+
+
+def _out_csv_row(record):
+  'output handler for csv data.'
+  raise NotImplementedError
+
+_out_fns = {
+  '.csv' : _out_csv_row,
+  '.jsons' : out_json,
+}
+
+
+def transform(source_target_path, ext=None, out_ext=None, **kwargs):
+  '''
+  Open a dependency, transform and output it based on its file extension,
+  and the set of per-record transform functions whose names begin with 'transform_'.
+  The transform functions are found by dynamically inspecting the caller's environment,
+  and sorted by name.
+  All transforms are applied, in order, to each record.
+  The output format is inferred from the file name.
+
+  Additional keyword arguments are passed to muck.source.
+
+  Muck's static analysis looks specifically for this function to infer dependencies;
+  the source_target_path argument must be a string literal.
+  '''
+  if out_ext is None:
+    out_ext = path_ext(path_stem(meta.main_file_path()))
+  try:
+    out_fn = _out_fns[out_ext]
+  except KeyError:
+    muck_failF(source_target_path, 'muck.transform does not support output for extension type: {}',
+      out_ext)
+
+  source_records = source(source_target_path, ext=ext, **kwargs)
+  transforms = sorted(meta.bindings_matching(prefix='transform_'))
+
+  if not transforms:
+    warnF(source_target_path, 'no transform functions found.')
+  else:
+    errSL('applying transforms:', *(name for name, _ in transforms))
+
+  logs = {}
+  def log_for_name(name):
+    try:
+      return logs[name]
+    except KeyError: pass
+    log_path = '{}.transform_{}.diff'.format(product_path_for_target(source_target_path), name)
+    f = open(log_path, 'w')
+    logs[name] = f
+    return f
+
+  for record in source_records:
+    for name, transform_fn in transforms:
+      tran = transform_fn(record)
+      if tran != record: # transformation occurred.
+        f = log_for_name(name)
+        writeF(f, '- {!r}\n+ {!r}\n\n', record, tran)
+        record = tran
+    out_fn(record)
+
 
 
 class HTTPError(Exception): pass
@@ -229,6 +295,7 @@ __all__ = [
   source,
   source_url,
   source_for_target,
+  transform,
 ]  
 
 
