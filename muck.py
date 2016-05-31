@@ -21,7 +21,6 @@ from http import HTTPStatus
 from itertools import repeat
 from bs4 import BeautifulSoup
 from pat import pat_dependencies
-from pithy import errFL
 from writeup import writeup_dependencies
 from pithy import *
 
