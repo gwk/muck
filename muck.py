@@ -243,7 +243,7 @@ def load_info():
 
 def save_info(info: dict):
   with open(info_path, 'w') as f:
-    json.dump(info, f, indent=2)
+    write_json(f, info)
 
 
 def noteF(path, fmt, *items):
