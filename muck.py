@@ -16,6 +16,7 @@ import urllib.parse
 
 import agate
 import requests
+import pithy.meta as meta
 
 from http import HTTPStatus
 from itertools import repeat
@@ -46,32 +47,34 @@ def actual_path_for_target(target_path):
     return target_path
   return product_path_for_target(target_path)
 
-def source_html(path):
+
+def _source_csv(path):
+  'source handler for csv.'
+  return agate.Table.from_csv(path)
+
+def _source_html(path):
   'source handler for html.'
   with open(path) as f:
     return BeautifulSoup(f, 'html.parser')
 
-def source_json(path):
+def _source_json(path):
   'source handler for json.'
   with open(path) as f:
     return json.load(f)
 
-source_dispatch = {
-  '.csv': agate.Table.from_csv,
-  '.html': source_html,
-  '.json': source_json,
-}
+def _source_default(path):
+  return open(path)
 
+_source_dispatch = meta.dispatcher_for_names(prefix='_source_', default='default')
 
 def source(target_path, ext=None):
-  'Muck API to open a dependency such that Muck can analyze dependencies statically.'
+  'Muck API: open a dependency such that Muck can analyze dependencies statically.'
   # TODO: optional open_fn argument.
   path = actual_path_for_target(target_path)
   if ext is None:
     ext = path_ext(path)
-  fn = source_dispatch.get(ext, open) # default to regular file open.
   try:
-    return fn(path)
+    return _source_dispatch(ext.lstrip('.'), path)
   except FileNotFoundError:
     errFL('muck.source cannot open path: {}', path)
     if path != target_path:
