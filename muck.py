@@ -203,6 +203,7 @@ def source_for_target(target_path, dir_names_cache=None):
     use_std_out = bool(path_ext(prod_name))
     src_stem = prod_name
   else: # fall back to sources that do not indicate output extension.
+    # TODO: decide if there is value to this feature; causes confusion when an extension is misspelled in a source file name.
     src_names = list(filter_source_names(src_dir_names, prod_stem))
     use_std_out = False
     src_stem = prod_stem
