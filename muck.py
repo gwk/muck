@@ -49,7 +49,7 @@ def actual_path_for_target(target_path):
 
 
 def _source_csv(path):
-  'source handler for csv.'
+  'source handler for csv (comma separated values) files.'
   return agate.Table.from_csv(path)
 
 def _source_html(path):
@@ -57,17 +57,22 @@ def _source_html(path):
   with open(path) as f:
     return BeautifulSoup(f, 'html.parser')
 
-def _source_json(path):
-  'source handler for json.'
+def _source_json(path, record_types=()):
+  'source handler for json files.'
   with open(path) as f:
-    return json.load(f)
+    return read_json(f, record_types=record_types)
+
+def _source_jsons(path, record_types=()):
+  'source handler for json (json stream) files.'
+  with open(path) as f:
+    return read_jsons(f, record_types=record_types)
 
 def _source_default(path):
   return open(path)
 
 _source_dispatch = meta.dispatcher_for_names(prefix='_source_', default='default')
 
-def source(target_path, ext=None):
+def source(target_path, ext=None, **kwargs):
   '''
   Open a dependency and parse it based on its file extension.
   Muck's static analysis looks specifically for this function to infer dependencies;
