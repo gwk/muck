@@ -68,7 +68,11 @@ def _source_default(path):
 _source_dispatch = meta.dispatcher_for_names(prefix='_source_', default='default')
 
 def source(target_path, ext=None):
-  'Muck API: open a dependency such that Muck can analyze dependencies statically.'
+  '''
+  Open a dependency and parse it based on its file extension.
+  Muck's static analysis looks specifically for this function to infer dependencies;
+  the target_path argument must be a string literal.
+  '''
   # TODO: optional open_fn argument.
   path = actual_path_for_target(target_path)
   if ext is None:
