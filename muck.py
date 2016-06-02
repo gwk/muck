@@ -23,6 +23,7 @@ from itertools import repeat
 from bs4 import BeautifulSoup
 from pat import pat_dependencies
 from writeup import writeup_dependencies
+from pithy.path_encode import path_for_url
 from pithy import *
 
 
@@ -67,10 +68,8 @@ def _source_jsons(path, record_types=()):
   with open(path) as f:
     return read_jsons(f, record_types=record_types)
 
-def _source_default(path):
-  return open(path)
 
-_source_dispatch = meta.dispatcher_for_names(prefix='_source_', default='default')
+_source_dispatch = meta.dispatcher_for_names(prefix='_source_', default_fn=open)
 
 def source(target_path, ext=None, **kwargs):
   '''
@@ -160,19 +159,10 @@ def transform(source_target_path, ext=None, out_ext=None, **kwargs):
 class HTTPError(Exception): pass
 
 
-def target_path_from_url(url):
-  '''
-  produce a local target path from a url.
-  '''
-  parts = urllib.parse.urlsplit(url) # returns five-element sequence.
-  name = plus_encode(''.join((parts.path, parts.query, parts.fragment)))
-  return path_join(parts.scheme, plus_encode(parts.netloc), name)
-
-
 def _fetch(url, timeout, headers, expected_status_code):
   '''
-  wrap the call to get with try/except that flattens any exception trace into an HTTPError.
-  without this the backtrace due to a network failure is massive, involves multiple exceptions,
+  wrap the call to `get` with try/except that flattens any exception trace into an HTTPError.
+  without this, a backtrace due to a network failure is massive, involves multiple exceptions,
   and is mostly irrelevant to the caller.
   '''
   try:
@@ -190,42 +180,34 @@ def _fetch(url, timeout, headers, expected_status_code):
   return r
 
 
-def fetch(url, path, ext='', expected_status_code=200, headers={}, timeout=4, delay=0, delay_range=0):
+def fetch(url, expected_status_code=200, headers={}, timeout=4, delay=0,
+  delay_range=0):
   'Muck API to fetch a url.'
-  # seems weird for the api to allow either target or product paths,
-  # but it makes sense to be more user-friendly here because they are essentially unambiguous.
-  # muck will pass the product path to tools,
-  # but users will prefer to type plain target paths into their code.
-  if is_product_path(path):
-    product_path = path
-  else:
-    product_path = product_path_for_target(path)
-  errFL('fetch: {}', url)
-  if not path_exists(product_path):
+  path = path_join('_fetch', path_for_url(url))
+  if not path_exists(path):
+    errFL('fetch: {}', url)
     r = _fetch(url, timeout, headers, expected_status_code)
-    make_dirs(path_dir(product_path))
-    with open(product_path, 'wb') as f:
+    make_dirs(path_dir(path))
+    with open(path, 'wb') as f:
       f.write(r.content)
     sleep_min = delay - delay_range * 0.5
     sleep_max = delay + delay_range * 0.5
     sleep_time = random.uniform(sleep_min, sleep_max)
     if sleep_time > 0:
       time.sleep(sleep_time)
-  return product_path
+  return path
 
 
-def source_url(url, target_path=None, ext='', expected_status_code=200, headers={},
- timeout=4, delay=0, delay_range=0):
+def source_url(url, ext=None, expected_status_code=200, headers={}, timeout=4, delay=0,
+  delay_range=0, **kwargs):
   # note: implementing uncached requests efficiently requires new versions of the source functions;
   # these will take a text argument instead of a path argument.
   # alternatively, the source functions could be reimplemented to take text strings,
   # or perhaps streams.
   # in the uncached case, muck would do the open and read.
-  if target_path is None:
-    target_path = target_path_from_url(url + ext)
-  fetch(url, path=target_path, ext=ext, expected_status_code=expected_status_code,
-    headers=headers, timeout=timeout, delay=delay, delay_range=delay_range)
-  return source(target_path)
+  path = fetch(url, expected_status_code=expected_status_code, headers=headers,
+    timeout=timeout, delay=delay, delay_range=delay_range)
+  return source(path, ext=ext, **kwargs)
 
 
 def list_dir_filtered(src_dir, cache=None):
