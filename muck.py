@@ -102,6 +102,7 @@ def _out_csv_row(record):
 _out_fns = {
   '.csv' : _out_csv_row,
   '.jsons' : out_json,
+  '.txt' : lambda line: stdout.write(line),
 }
 
 
