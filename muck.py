@@ -355,9 +355,10 @@ def py_dep_call(src_path, node):
   # TODO: dispatch to handlers for all known functions.
   # add handler for source_url;
   # this should check that repeated (url, target) pairs are consistent across entire project.
-  if (func.value.id, func.attr) != ('muck', 'source'): return None
-  if len(node.args) != 1 or not isinstance(node.args[0], ast.Str):
-    muck_failF('{}:{}:{}: muck.source argument must be a single string literal.',
+  if func.value.id != 'muck': return
+  if func.attr not in ('source', 'transform'): return
+  if len(node.args) < 1 or not isinstance(node.args[0], ast.Str):
+    muck_failF('{}:{}:{}: muck.source first argument must be a string literal.',
       src_path, node.lineno, node.col_offset)
   yield node.args[0].s # the string literal value from the ast.Str.
 
