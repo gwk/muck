@@ -106,12 +106,15 @@ _out_fns = {
 }
 
 
-def transform(source_target_path, ext=None, out_ext=None, **kwargs):
+def transform(source_target_path, ext=None, progress_frequency=0, **kwargs):
   '''
-  Open a dependency, transform and output it based on its file extension,
-  and the set of per-record transform functions whose names begin with 'transform_'.
-  The transform functions are found by dynamically inspecting the caller's environment,
-  and sorted by name.
+  Open a dependency, transform and output it based on its file extension.
+  The per-record transformation pipeline is determined dynamically searching for module functions
+  whose names begin with 'drop_' or 'edit_'. (TODO: implement 'replace_').
+  Drop functions should return a truth value; truthy values cause the record to be dropped.
+  Edit functions should return the original record, or a modified record.
+  All delete functions are performed first, sorted by name.
+  Then all edit functions are performed, sorted by name.
   All transforms are applied, in order, to each record.
   The output format is inferred from the file name.
 
@@ -120,8 +123,12 @@ def transform(source_target_path, ext=None, out_ext=None, **kwargs):
   Muck's static analysis looks specifically for this function to infer dependencies;
   the source_target_path argument must be a string literal.
   '''
-  if out_ext is None:
-    out_ext = path_ext(path_stem(meta.main_file_path()))
+
+  target_path = path_stem(meta.main_file_path())
+  out_ext = path_ext(target_path)
+  if not out_ext:
+    raise ValueError('target path inferred from source name has no extension: {}'.format(target_path))
+
   try:
     out_fn = _out_fns[out_ext]
   except KeyError:
@@ -129,38 +136,49 @@ def transform(source_target_path, ext=None, out_ext=None, **kwargs):
       out_ext)
 
   source_records = source(source_target_path, ext=ext, **kwargs)
-  transforms = sorted(meta.bindings_matching(prefix='transform_'))
 
-  if not transforms:
-    warnF(source_target_path, 'no transform functions found.')
+  drops = sorted(meta.bindings_matching(prefix='drop_', strip_prefix=False))
+  edits = sorted(meta.bindings_matching(prefix='edit_', strip_prefix=False))
+
+  if not drops and not edits:
+    warnF(source_target_path, "no transform functions found; "
+      "functions names must begin with 'drop_' or 'edit_'.")
   else:
-    errSL('applying transforms:', *(name for name, _ in transforms))
+    errSL('transform drops:', ', '.join(n for n, _ in drops))
+    errSL('transform edits:', ', '.join(n for n, _ in edits))
 
   logs = {}
   def log_for_name(name):
     try:
       return logs[name]
     except KeyError: pass
-    log_path = '{}.transform_{}.diff'.format(product_path_for_target(source_target_path), name)
+    log_path = '{}.{}.diff'.format(product_path_for_target(target_path), name)
     f = open(log_path, 'w')
     logs[name] = f
     return f
 
   counts = Counter()
 
-  for record in source_records:
-    for name, transform_fn in transforms:
-      tran = transform_fn(record)
+  for record in err_progress_iter(source_records, 'transform', 'records', frequency=progress_frequency):
+    is_dropped = False
+    for name, drop_fn in drops:
+      if drop_fn(record):
+        is_dropped = True
+        writeF(log_for_name(name), '- {!r}\n\n', record)
+        break
+    if is_dropped: continue
+
+    for name, edit_fn in edits:
+      tran = edit_fn(record)
       if tran != record: # transformation occurred.
         counts[name] += 1
-        f = log_for_name(name)
-        writeF(f, '- {!r}\n+ {!r}\n\n', record, tran)
+        writeF(log_for_name(name), '- {!r}\n+ {!r}\n\n', record, tran)
         record = tran
     out_fn(record)
 
   for f in logs.values():
     f.close()
-  
+
   for name, count in sorted(counts.items()):
     if count > 0:
       errFL('  {}: {}', name, count)
