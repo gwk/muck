@@ -146,15 +146,24 @@ def transform(source_target_path, ext=None, out_ext=None, **kwargs):
     logs[name] = f
     return f
 
+  counts = Counter()
+
   for record in source_records:
     for name, transform_fn in transforms:
       tran = transform_fn(record)
       if tran != record: # transformation occurred.
+        counts[name] += 1
         f = log_for_name(name)
         writeF(f, '- {!r}\n+ {!r}\n\n', record, tran)
         record = tran
     out_fn(record)
 
+  for f in logs.values():
+    f.close()
+  
+  for name, count in sorted(counts.items()):
+    if count > 0:
+      errFL('  {}: {}', name, count)
 
 
 class HTTPError(Exception): pass
