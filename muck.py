@@ -408,7 +408,7 @@ build_tools = {
 def calc_dependencies(path, dir_names):
   ext = path_ext(path)
   try:
-    dep_fn = dependency_fns.get(ext)
+    dep_fn = dependency_fns[ext]
   except KeyError:
     return []
   with open(path) as f:
