@@ -96,95 +96,6 @@ def source(target_path, ext=None, **kwargs):
     raise
 
 
-def _out_csv_row(record):
-  'output handler for csv data.'
-  raise NotImplementedError
-
-_out_fns = {
-  '.csv' : _out_csv_row,
-  '.jsons' : out_json,
-  '.txt' : lambda line: stdout.write(line),
-}
-
-
-def transform(source_target_path, ext=None, progress_frequency=0, **kwargs):
-  '''
-  Open a dependency, transform and output it based on its file extension.
-  The per-record transformation pipeline is determined dynamically searching for module functions
-  whose names begin with 'drop_' or 'edit_'. (TODO: implement 'replace_').
-  Drop functions should return a truth value; truthy values cause the record to be dropped.
-  Edit functions should return the original record, or a modified record.
-  All delete functions are performed first, sorted by name.
-  Then all edit functions are performed, sorted by name.
-  All transforms are applied, in order, to each record.
-  The output format is inferred from the file name.
-
-  Additional keyword arguments are passed to muck.source.
-
-  Muck's static analysis looks specifically for this function to infer dependencies;
-  the source_target_path argument must be a string literal.
-  '''
-
-  target_path = path_stem(meta.main_file_path())
-  out_ext = path_ext(target_path)
-  if not out_ext:
-    raise ValueError('target path inferred from source name has no extension: {}'.format(target_path))
-
-  try:
-    out_fn = _out_fns[out_ext]
-  except KeyError:
-    muck_failF(source_target_path, 'muck.transform does not support output for extension type: {}',
-      out_ext)
-
-  source_records = source(source_target_path, ext=ext, **kwargs)
-
-  drops = sorted(meta.bindings_matching(prefix='drop_', strip_prefix=False))
-  edits = sorted(meta.bindings_matching(prefix='edit_', strip_prefix=False))
-
-  if not drops and not edits:
-    warnF(source_target_path, "no transform functions found; "
-      "functions names must begin with 'drop_' or 'edit_'.")
-  else:
-    errSL('transform drops:', ', '.join(n for n, _ in drops))
-    errSL('transform edits:', ', '.join(n for n, _ in edits))
-
-  logs = {}
-  def log_for_name(name):
-    try:
-      return logs[name]
-    except KeyError: pass
-    log_path = '{}.{}.diff'.format(product_path_for_target(target_path), name)
-    f = open(log_path, 'w')
-    logs[name] = f
-    return f
-
-  counts = Counter()
-
-  for record in err_progress_iter(source_records, 'transform', 'records', frequency=progress_frequency):
-    is_dropped = False
-    for name, drop_fn in drops:
-      if drop_fn(record):
-        is_dropped = True
-        writeF(log_for_name(name), '- {!r}\n\n', record)
-        break
-    if is_dropped: continue
-
-    for name, edit_fn in edits:
-      tran = edit_fn(record)
-      if tran != record: # transformation occurred.
-        counts[name] += 1
-        writeF(log_for_name(name), '- {!r}\n+ {!r}\n\n', record, tran)
-        record = tran
-    out_fn(record)
-
-  for f in logs.values():
-    f.close()
-
-  for name, count in sorted(counts.items()):
-    if count > 0:
-      errFL('  {}: {}', name, count)
-
-
 class HTTPError(Exception): pass
 
 
@@ -302,11 +213,10 @@ def source_for_target(target_path, dir_names_cache=None):
 
 # module exports.
 __all__ = [
-  fetch,
-  source,
-  source_url,
-  source_for_target,
-  transform,
+  'fetch',
+  'source',
+  'source_url',
+  'source_for_target',
 ]  
 
 
@@ -357,7 +267,7 @@ def py_dep_call(src_path, node):
   # add handler for source_url;
   # this should check that repeated (url, target) pairs are consistent across entire project.
   if func.value.id != 'muck': return
-  if func.attr not in ('source', 'transform'): return
+  if func.attr != 'source': return
   if len(node.args) < 1 or not isinstance(node.args[0], ast.Str):
     muck_failF('{}:{}:{}: muck.source first argument must be a string literal.',
       src_path, node.lineno, node.col_offset)
