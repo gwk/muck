@@ -65,7 +65,7 @@ def _source_json(path, record_types=()):
     return read_json(f, record_types=record_types)
 
 def _source_jsons(path, record_types=()):
-  'source handler for json (json stream) files.'
+  'source handler for jsons (json stream) files.'
   with open(path) as f:
     return read_jsons(f, record_types=record_types)
 
