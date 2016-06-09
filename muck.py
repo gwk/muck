@@ -10,6 +10,7 @@ import json
 import os
 import random
 import re
+import shlex
 import sys
 import time
 import urllib.parse
@@ -498,6 +499,7 @@ muck patch error: patch command takes one or two arguments. usage:
 
   # update patch (both cases).
   cmd = ['pat', 'diff', orig_path, prod_path]
+  errFL('muck patch note: diffing: `{}`', ' '.join(shlex.quote(w) for w in cmd))
   with open(patch_path, 'wb') as f:
     code = runC(cmd, out=f)
 
@@ -546,7 +548,7 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str, u
   prod_dir = path_dir(prod_path)
   make_dirs(prod_dir)
   cmd = build_tool + [src_path, prod_path_tmp]
-  noteF(target_path, 'building: `{}`', ' '.join(cmd))
+  noteF(target_path, 'building: `{}`', ' '.join(shlex.quote(w) for w in cmd))
   out_file = open(prod_path_out, 'wb') if use_std_out else None
   time_start = time.time()
   code = runC(cmd, out=out_file)
@@ -572,7 +574,7 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str, u
     else:
       has_product = False
       noteF(target_path, 'no product.')
-  size_suffix = '; {:0.2f} MB'.format(file_size(prod_path) / 1000000) if has_product else ''
+  size_suffix = ('; ' + format_byte_count_dec(file_size(prod_path))) if has_product else ''
   noteF(target_path, 'finished: {:0.2f} seconds{}.', time_end - time_start, size_suffix)
   return has_product
 
