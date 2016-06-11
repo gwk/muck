@@ -4,7 +4,6 @@
 import sys
 assert sys.version_info.major == 3 # python 2 is not supported.
 
-import pickle
 import random
 import time
 
@@ -73,15 +72,6 @@ def _source_jsons(path, record_types=()):
   with open(path) as f:
     return read_jsons(f, record_types=record_types)
 
-def _source_pickle(path, fix_imports=True, encoding='ASCII', errors='strict'):
-  'source handler for pickle files.'
-  f = open(path, 'rb')
-  unpickler = pickle.Unpickler(f, fix_imports=fix_imports, encoding=encoding, errors=errors)
-  def unpickle_gen():
-    try:
-      yield unpickler.load()
-    except EOFError:
-      return
 
 _source_dispatch = meta.dispatcher_for_names(prefix='_source_', default_fn=open)
 
