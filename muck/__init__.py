@@ -72,15 +72,15 @@ def _source_html(path):
   with open(path) as f:
     return BeautifulSoup(f, 'html.parser')
 
-def _source_json(path, record_types=()):
+def _source_json(path, types=()):
   'source handler for json files.'
   with open(path) as f:
-    return read_json(f, record_types=record_types)
+    return read_json(f, types=types)
 
-def _source_jsons(path, record_types=()):
+def _source_jsons(path, types=()):
   'source handler for jsons (json stream) files.'
   with open(path) as f:
-    return read_jsons(f, record_types=record_types)
+    return read_jsons(f, types=types)
 
 
 _source_dispatch = meta.dispatcher_for_names(prefix='_source_', default_fn=open)
