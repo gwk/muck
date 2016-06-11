@@ -18,6 +18,16 @@ from pithy.io import out_json, read_json, read_jsons
 from pithy.fs import path_exists, path_join, split_dir_name, split_stem_ext, list_dir, path_ext
 
 
+# module exports.
+__all__ = [
+  'HTTPError',
+  'fetch',
+  'source',
+  'source_url',
+  'source_for_target',
+]
+
+
 build_dir = '_build'
 info_name = '_muck_info.json'
 
@@ -208,14 +218,3 @@ def source_for_target(target_path, dir_names_cache=None):
   src_path = path_join(src_dir, src_name)
   assert src_path != target_path
   return (src_path, use_std_out)
-
-
-# module exports.
-__all__ = [
-  'HTTPError',
-  'fetch',
-  'source',
-  'source_url',
-  'source_for_target',
-]  
-
