@@ -16,6 +16,7 @@ from bs4 import BeautifulSoup
 from pithy.path_encode import path_for_url
 from pithy.io import errF, failF, out_json, read_json, read_jsons
 from pithy.fs import path_exists, path_join, split_dir_name, split_stem_ext, list_dir, path_ext
+from pithy.transform import Transformer
 
 
 # module exports.
@@ -26,6 +27,7 @@ __all__ = [
   'source',
   'source_for_target',
   'source_url',
+  'transform',
 ]
 
 
@@ -95,8 +97,9 @@ def source(target_path, ext=None, **kwargs):
   '''
   Open a dependency and parse it based on its file extension.
   
-  Additional keyword arguments are passed to the specific source function matching ext:
-  - json, jsons: record_types.
+  Additional keyword arguments are passed to the specific source function matching `ext`:
+  - json: types.
+  - jsons: types.
 
   Muck's static analysis looks specifically for this function to infer dependencies;
   the target_path argument must be a string literal.
@@ -224,3 +227,17 @@ def source_for_target(target_path, dir_names_cache=None):
   src_path = path_join(src_dir, src_name)
   assert src_path != target_path
   return (src_path, use_std_out)
+
+
+def transform(target_path, ext=None, **kwargs):
+  '''
+  Open a dependency using muck.source and then transform it using pithy.Transformer.
+  
+  Additional keyword arguments are passed to the specific source function matching `ext`;
+  see muck.source for details.
+
+  Muck's static analysis looks specifically for this function to infer dependencies;
+  the target_path argument must be a string literal.
+  '''
+  seq = source(target_path, ext=None, **kwargs)
+  return Transformer(seq, log_stem=product_path_for_target(target_path) + '.')
