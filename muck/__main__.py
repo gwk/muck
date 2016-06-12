@@ -18,8 +18,8 @@ from pat import pat_dependencies
 from writeup import writeup_dependencies
 from pithy import *
 
-from muck import actual_path_for_target, build_dir, ignored_exts, info_name, reserved_exts, \
-  reserved_names, source_for_target
+from muck import actual_path_for_target, build_dir, ignored_exts, info_name, muck_failF, \
+reserved_exts, product_path_for_target, reserved_names, source_for_target
 
 
 
@@ -55,10 +55,6 @@ def noteF(path, fmt, *items):
 def warnF(path, fmt, *items):
   errF('muck WARNING: {}: ', path)
   errFL(fmt, *items)
-
-def muck_failF(path, fmt, *items):
-  errF('muck error: {}: ', path)
-  failF(fmt, *items)
 
 
 def py_dep_call(src_path, node):
