@@ -14,7 +14,7 @@ import pithy.meta as meta
 from http import HTTPStatus
 from bs4 import BeautifulSoup
 from pithy.path_encode import path_for_url
-from pithy.io import out_json, read_json, read_jsons
+from pithy.io import errF, failF, out_json, read_json, read_jsons
 from pithy.fs import path_exists, path_join, split_dir_name, split_stem_ext, list_dir, path_ext
 
 
@@ -22,9 +22,10 @@ from pithy.fs import path_exists, path_join, split_dir_name, split_stem_ext, lis
 __all__ = [
   'HTTPError',
   'fetch',
+  'muck_failF',
   'source',
-  'source_url',
   'source_for_target',
+  'source_url',
 ]
 
 
@@ -46,6 +47,11 @@ reserved_exts = {
 ignored_exts = {
   '.err', '.iot', '.out', # iotest extensions.
 }
+
+
+def muck_failF(path, fmt, *items):
+  errF('muck error: {}: ', path)
+  failF(fmt, *items)
 
 
 def is_product_path(path):
