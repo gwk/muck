@@ -124,7 +124,7 @@ def calc_dependencies(path, dir_names):
     return sorted(dep_fn(path, f, dir_names))
 
 
-def hash_for_path(path):
+def hash_for_path(path, max_chunks=sys.maxsize):
   '''
   return a hash string for the contents of the file at the given path.
   '''
@@ -133,8 +133,9 @@ def hash_for_path(path):
   except IsADirectoryError:
     muck_failF(path, 'expected a file but found a directory')
   h = hashlib.sha256()
-  chunk_size = 1 << 12
-  while True:
+  # a quick timing experiment suggested that chunk sizes larger than this are not faster.
+  chunk_size = 1 << 16
+  for i in range(max_chunks):
     chunk = f.read(chunk_size)
     if not chunk: break
     h.update(chunk)
