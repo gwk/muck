@@ -359,9 +359,8 @@ def update_dependency(ctx: Ctx, target_path: str, force=False):
   if is_product:
     if has_existing_actual and has_old_info:
       # existing product should not have been modified since info was stored.
-      act_hash = hash_for_path(actual_path)
-      if size != old_size or act_hash != old_hash:
-        ctx.dbgF(target_path, 'size: {} -> {}; hash: {} -> {}', old_size, file_size, old_hash, act_hash)
+      if size != old_size or (mtime != old_mtime and hash_for_path(actual_path) != old_hash):
+        ctx.dbgF(target_path, 'size: {} -> {}; mtime: {} -> {}', old_size, size, old_mtime, mtime)
         muck_failF(target_path, 'existing product has changed; did you mean to update a patch?\n'
           '  please save your changes if necessary and then delete the modified file.')
     src_path, use_std_out = source_for_target(target_path, ctx.dir_names)
@@ -376,8 +375,7 @@ def update_dependency(ctx: Ctx, target_path: str, force=False):
 
   else: # non-product source.
     assert has_existing_actual
-    file_hash = hash_for_path(actual_path)
-    is_changed = size != old_size or file_hash != old_hash
+    is_changed = size != old_size or hash_for_path(actual_path) != old_hash
     if is_changed:
       noteF(target_path, 'changed.')
     needs_update = needs_update or is_changed
