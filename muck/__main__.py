@@ -13,7 +13,6 @@ import os
 import shlex
 import time
 
-from itertools import repeat
 from pat import pat_dependencies
 from writeup import writeup_dependencies
 from pithy import *
@@ -21,6 +20,8 @@ from pithy import *
 from muck import actual_path_for_target, build_dir, ignored_exts, info_name, muck_failF, \
 reserved_exts, product_path_for_target, reserved_names, source_for_target
 
+
+TargetInfo = namedtuple('TargetInfo', 'size, mtime, hash, src_path deps')
 
 
 info_path = path_join(build_dir, info_name)
@@ -35,11 +36,11 @@ info_path = path_join(build_dir, info_name)
 def load_info():
   try:
     with open(info_path) as f:
-      return json.load(f)
+      return read_json(f, types=(TargetInfo,))
   except FileNotFoundError:
     return {}
   except json.JSONDecodeError as e:
-    warnF(info_path, 'JSON decode failed; ignoring build info cache ({}).', e)
+    warnF(info_path, 'JSON decode failed; ignoring build info ({}).', e)
     return {}
 
 
@@ -330,13 +331,11 @@ def update_dependency(ctx: Ctx, target_path: str, force=False):
     old_info = ctx.info[target_path]
   except KeyError: # no previous record.
     ctx.dbgF(target_path, 'no cached info')
-    old_size, old_mtime, old_hash, old_src_path = repeat(None, 4)
-    old_deps = []
+    old_size, old_mtime, old_hash, old_src_path, old_deps = (None, None, None, None, [])
     has_old_info = False
     needs_update = True
   else: # have previous record. must check that it is not stale.
-    old_size, old_mtime, old_hash, old_src_path = old_info[:4]
-    old_deps = old_info[4:]
+    old_size, old_mtime, old_hash, old_src_path, old_deps = old_info
     has_old_info = True
     ctx.dbgF(target_path, 'cached size: {}; mtime: {}; hash: {}; src: {}; deps: {}',
       old_size, old_mtime, old_hash, old_src_path, old_deps)
@@ -401,7 +400,7 @@ def update_dependency(ctx: Ctx, target_path: str, force=False):
       needs_update = (file_hash != old_hash) # result is unchanged.
 
   ctx.statuses[target_path] = needs_update # replace sentinal with final is_changed value.
-  ctx.info[target_path] = [size, mtime, file_hash, src_path] + deps
+  ctx.info[target_path] = TargetInfo(size, mtime, file_hash, src_path, deps)
   #if needs_update: noteF(target_path, 'updated')
   return needs_update
 
