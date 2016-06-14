@@ -28,10 +28,10 @@ info_path = path_join(build_dir, info_name)
 
 # info dictionary stores the persistent build information.
 # key: target path (not product paths prefixed with build_dir).
-# val: [file_hash, src_path, dependencies...]
-# src_path may be None for non-product sources.
+# val: TargetInfo.
+# src_path is None for non-product sources.
 # each dependency is a target path.
-# TODO: save info about muck version itself in the dict.
+# TODO: save info about muck version itself in the dict under reserved name 'muck'.
 
 def load_info():
   try:
