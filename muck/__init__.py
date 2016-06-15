@@ -15,7 +15,7 @@ from http import HTTPStatus
 from bs4 import BeautifulSoup
 from pithy.path_encode import path_for_url
 from pithy.io import errF, failF, out_json, read_json, read_jsons
-from pithy.fs import path_exists, path_join, split_dir_name, split_stem_ext, list_dir, path_ext
+from pithy.fs import path_exists, path_ext, path_join, path_stem, split_dir_name, split_stem_ext, list_dir
 from pithy.transform import Transformer
 
 
@@ -241,4 +241,4 @@ def transform(target_path, ext=None, **kwargs):
   the target_path argument must be a string literal.
   '''
   seq = source(target_path, ext=None, **kwargs)
-  return Transformer(seq, log_stem=product_path_for_target(target_path) + '.')
+  return Transformer(seq, log_stem=path_stem(sys.argv[1]) + '.')
