@@ -294,7 +294,7 @@ Ctx = namedtuple('Ctx', 'info statuses dir_names dbgF')
 # dbgF: debug printing function.
 
 
-def update_dependency(ctx: Ctx, target_path: str, force=False):
+def update_dependency(ctx: Ctx, target_path: str, force=False) -> bool:
   '''
   returns is_changed.
   '''
