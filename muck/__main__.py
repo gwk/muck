@@ -335,7 +335,7 @@ def update_dependency(ctx: Ctx, target_path: str, force=False) -> bool:
   try:
     old = ctx.info[target_path]
   except KeyError: # no previous record.
-    ctx.dbgF(target_path, 'no cached info')
+    ctx.dbgF(target_path, 'no old info.')
     old = TargetInfo(None, None, None, None, [])
     has_old_info = False
     is_changed = True
