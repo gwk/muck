@@ -321,85 +321,71 @@ def update_dependency(ctx: Ctx, target_path: str, force=False) -> bool:
   ctx.dbgF(target_path, 'examining...')
 
   is_product = not path_exists(target_path)
-  actual_path = actual_path_for_target(target_path)
+  actual_path = product_path_for_target(target_path) if is_product else target_path
+  size, mtime, old = calculate_info(ctx, target_path, actual_path)
+  has_old_file = (mtime is not None)
+  has_old_info = (old.mtime is not None)
+
+  is_changed = force or (not has_old_file) or (not has_old_info)
+
+  if has_old_info:
+    old_is_product = bool(old.src_path)
+    if is_product != old_is_product: # nature of the target changed.
+      noteF(target_path, 'target is {} a product.', 'now' if is_product else 'no longer')
+      is_changed = True
+    if not has_old_file and target_ext: # product was deleted and not a phony target.
+      noteF(target_path, 'old product was deleted.')
+
+  if is_product:
+    if has_old_file and has_old_info:
+      check_product_not_modified(ctx, target_path, actual_path, size, mtime, old)
+    return update_product(ctx, target_path, actual_path, is_changed, size, mtime, old)
+  else:
+    return update_non_product(ctx, target_path, is_changed, size, mtime, old)
+
+
+def calculate_info(ctx: Ctx, target_path: str, actual_path: str) -> tuple:
   try:
     size, mtime = file_size_and_mtime(actual_path)
-    has_existing_actual = True
   except FileNotFoundError:
-    size = None
-    mtime = None
-    has_existing_actual = False
-
-  is_changed = force or not has_existing_actual
+    size, mtime = None, None
+  ctx.dbgF(target_path, 'size: {}; mtime: {}', size, mtime)
 
   try:
     old = ctx.info[target_path]
   except KeyError: # no previous record.
     ctx.dbgF(target_path, 'no old info.')
     old = TargetInfo(None, None, None, None, [])
-    has_old_info = False
-    is_changed = True
   else: # have previous record. must check that it is not stale.
-    has_old_info = True
-    ctx.dbgF(target_path, 'old info:\n  {}', old)
-    old_is_product = bool(old.src_path)
-    if old_is_product != is_product: # nature of the target changed.
-      is_changed = True
-      noteF(target_path, 'target is {} a product', 'now' if is_product else 'no longer')
-    elif not has_existing_actual: # file was deleted.
-      assert is_product
-      is_changed = True
-      if target_ext: # definitely not a phony target, so show the message.
-        noteF(target_path, 'old product was deleted: {}', actual_path)
+    ctx.dbgF(target_path, 'has old info:\n  {}', old)
 
-  ctx.dbgF(target_path, 'is_changed: {}; is_product: {}; has_existing_actual: {};  has_old_info: {}',
-     is_changed, is_product, has_existing_actual, has_old_info)
+  return size, mtime, old
 
-  src_path = None # filled in for product.
 
-  if is_product:
-    file_hash = old.hash # will update with the new product later if necessary.
-    if has_existing_actual and has_old_info:
-      # existing product should not have been modified since info was stored.
-      # if the size changed then it was definitely modified.
-      # otherwise, if the mtime is unchanged, assume that the file is ok, for speed.
-      # if the mtime changed, check the hash;
-      # the user might have made an accidental edit and then reverted it,
-      # and we would rather compute the hash than report a false problem.
-      if size != old.size or (mtime != old.mtime and hash_for_path(actual_path) != old.hash):
-        ctx.dbgF(target_path, 'size: {} -> {}; mtime: {} -> {}', old.size, size, old.mtime, mtime)
-        muck_failF(target_path, 'existing product has changed; did you mean to update a patch?\n'
-          '  please save your changes if necessary and then delete the modified file.')
-    src_path, use_std_out = source_for_target(target_path, ctx.dir_names)
-    if old.src_path != src_path:
-      is_changed = True
-      if old.src_path:
-        noteF(target_path, 'source path of target product changed\n  was: {}\n  now: {}',
-          old.src_path, src_path)
-    is_src_changed = update_dependency(ctx, src_path)
-    is_changed |= is_src_changed
-    deps_path = src_path
+def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
+  # existing product should not have been modified since info was stored.
+  # if the size changed then it was definitely modified.
+  # otherwise, if the mtime is unchanged, assume that the file is ok, for speed.
+  # if the mtime changed, check the hash;
+  # the user might have made an accidental edit and then reverted it,
+  # and we would rather compute the hash than report a false problem.
+  if size != old.size or (mtime != old.mtime and hash_for_path(actual_path) != old.hash):
+    ctx.dbgF(target_path, 'size: {} -> {}; mtime: {} -> {}', old.size, size, old.mtime, mtime)
+    muck_failF(target_path, 'existing product has changed; did you mean to update a patch?\n'
+      '  please save your changes if necessary and then delete the modified file.')
 
-  else: # non-product source.
-    assert has_existing_actual
-    file_hash = hash_for_path(actual_path) # must be calculated in all cases.
-    deps_path = actual_path
-    if not is_changed: # at this point, this just means that existance and status as a source file has not changed.
-      is_changed = (size != old.size or hash_for_path(actual_path) != old.hash)
-      if is_changed:
-        noteF(target_path, 'source changed.')
 
-  if is_changed:
-    deps = calc_dependencies(deps_path, ctx.dir_names)
-  else:
-    deps = old.deps
-  for dep in deps:
-    is_dep_stale = update_dependency(ctx, dep)
-    is_changed |= is_dep_stale
+def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mtime, old) -> bool:
+  src_path, use_std_out = source_for_target(target_path, ctx.dir_names)
+  if old.src_path != src_path:
+    is_changed = True
+    if old.src_path:
+      noteF(target_path, 'source path of target product changed\n  was: {}\n  now: {}',
+        old.src_path, src_path)
+  is_changed |= update_dependency(ctx, src_path)
 
-  if is_product and is_changed: # must rebuild product.
-    # the source of this product might itself be a product.
-    actual_src_path = actual_path_for_target(src_path)
+  if is_changed: # must rebuild product.
+    actual_src_path = actual_path_for_target(src_path) # source might itself be a product.
     has_product = build_product(ctx.info, target_path, actual_src_path, actual_path, use_std_out)
     if has_product:
       size, mtime = file_size_and_mtime(actual_path)
@@ -408,12 +394,34 @@ def update_dependency(ctx: Ctx, target_path: str, force=False) -> bool:
       if not is_changed:
         noteF(target_path, 'product did not change (same size and hash).')
     else:
+      size, mtime, file_hash = None, None, None
       if force:
         noteF(target_path, 'no product.')
-        is_changed = True
-        size, mtime, file_hash = None, None, None
       else:
         muck_failF(target_path, 'no product.')
+  else:
+    file_hash = old.hash
+
+  return update_info(ctx, target_path, actual_path, is_changed, size, mtime, file_hash, src_path, old.deps)
+
+
+def update_non_product(ctx: Ctx, target_path: str, is_changed: bool, size, mtime, old) -> bool:
+  file_hash = hash_for_path(target_path) # must be calculated in all cases.
+  if not is_changed: # all we know is that it exists and status as a source has not changed.
+    is_changed = (size != old.size or file_hash != old.hash)
+    if is_changed: # this is more interesting; report.
+      noteF(target_path, 'source changed.')
+
+  return update_info(ctx, target_path, target_path, is_changed, size, mtime, file_hash, None, old.deps)
+
+
+def update_info(ctx, target_path: str, actual_path: str, is_changed, size, mtime, file_hash, src_path, old_deps) -> bool:
+  if is_changed:
+    deps = calc_dependencies(actual_path, ctx.dir_names)
+  else:
+    deps = old_deps
+  for dep in deps:
+    is_changed |= update_dependency(ctx, dep)
 
   ctx.statuses[target_path] = is_changed # replace sentinal with final value.
   info = TargetInfo(size, mtime, file_hash, src_path, deps)
