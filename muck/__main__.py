@@ -288,8 +288,10 @@ def file_size_and_mtime(path):
 
 
 Ctx = namedtuple('Ctx', 'info statuses dir_names dbgF')
-# statuses: target_path: str => is_changed: bool | None (the recursion sentinal).
-# dir_names: dir_path: str => names: [str].
+# info: dict (target_path: str => TargetInfo).
+# statuses: dict (target_path: str => is_changed: bool|Ellipsis).
+# dir_names: dict (dir_path: str => names: [str]).
+# dbgF: debug printing function.
 
 
 def update_dependency(ctx: Ctx, target_path: str, force=False):
