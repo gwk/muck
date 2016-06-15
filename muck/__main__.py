@@ -231,7 +231,7 @@ commands = {
 }
 
 
-def build_product(info: dict, target_path: str, src_path: str, prod_path: str, use_std_out: bool):
+def build_product(info: dict, target_path: str, src_path: str, prod_path: str, use_std_out: bool) -> bool:
   '''
   build a product from a source.
   ''' 
