@@ -208,14 +208,16 @@ muck patch error: patch command takes one or two arguments. usage:
     prod_path = product_path_for_target(target_path)
 
   # update patch (both cases).
+  patch_path_tmp = patch_path + '.tmp'
   cmd = ['pat', 'diff', orig_path, prod_path]
   errFL('muck patch note: diffing: `{}`', ' '.join(shlex.quote(w) for w in cmd))
-  with open(patch_path, 'wb') as f:
+  with open(patch_path_tmp, 'wb') as f:
     code = runC(cmd, out=f)
+  move_file(patch_path_tmp, patch_path, overwrite=True)
 
   if len(args) == 1: # updated existing patch.
     # need to remove or update the target info to avoid the 'did you mean to patch?' safeguard.
-    # for now, just delete it to be safe; this makes the target looks stale.
+    # for now, just delete it to be safe; this makes the target look stale.
     try:
       del ctx.info[target_path]
     except KeyError: pass
