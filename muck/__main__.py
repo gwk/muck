@@ -21,7 +21,7 @@ from muck import actual_path_for_target, build_dir, ignored_exts, info_name, muc
 reserved_exts, product_path_for_target, reserved_names, source_for_target
 
 
-TargetInfo = namedtuple('TargetInfo', 'size, mtime, hash, src_path deps')
+TargetInfo = namedtuple('TargetInfo', 'size mtime hash src_path deps')
 
 
 info_path = path_join(build_dir, info_name)
