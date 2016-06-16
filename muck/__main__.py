@@ -401,7 +401,7 @@ def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mt
   else:
     file_hash = old.hash
 
-  return update_info(ctx, target_path, actual_path, is_changed, size, mtime, file_hash, src_path, old.deps)
+  return update_deps_and_info(ctx, target_path, actual_path, is_changed, size, mtime, file_hash, src_path, old.deps)
 
 
 def update_non_product(ctx: Ctx, target_path: str, is_changed: bool, size, mtime, old) -> bool:
@@ -411,10 +411,10 @@ def update_non_product(ctx: Ctx, target_path: str, is_changed: bool, size, mtime
     if is_changed: # this is more interesting; report.
       noteF(target_path, 'source changed.')
 
-  return update_info(ctx, target_path, target_path, is_changed, size, mtime, file_hash, None, old.deps)
+  return update_deps_and_info(ctx, target_path, target_path, is_changed, size, mtime, file_hash, None, old.deps)
 
 
-def update_info(ctx, target_path: str, actual_path: str, is_changed, size, mtime, file_hash, src_path, old_deps) -> bool:
+def update_deps_and_info(ctx, target_path: str, actual_path: str, is_changed, size, mtime, file_hash, src_path, old_deps) -> bool:
   if is_changed:
     deps = calc_dependencies(actual_path, ctx.dir_names)
   else:
