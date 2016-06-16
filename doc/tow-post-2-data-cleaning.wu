@@ -1,0 +1,136 @@
+writeup v0
+
+
+# Data Cleaning with Muck
+
+Muck is a prototype tool for data analysis, inspired by the traditional unix tool Make. Projects built with Muck are structured as a collection of interdependent steps (a "dependency graph"); with a simple naming convention and a little magic, Muck is able to infer the dependencies between various source code and data files. This allows users to take an incremental, iterative approach to their work because Muck will automatically rebuild only those parts of the project whose dependencies have changed. Our goal is to provide an environment that encourages correctness and clarity of both code and data, while remaining pragmatic and ergonomic. The system is currently in development; this post describes a few early results, specifically facilities for patching text and transforming records.
+
+
+# Test Project: Webster's 1913 Dictionary
+
+Once we got the basic dependency calculations and build commands working, we needed a small test project that could help guide development in a practical direction. One ongoing experiment parses and analyzes the Project Gutenberg version of Webster's 1913 Unabridged Dictionary. The project (available at https://github.com/gwk/english-dictionary) is not yet finished, but the experience thus far has led to some interesting additions to Muck.
+
+The Webster's Dictionary text that we have been working with is quite messy. Its basic structure is straightforward, but we have encountered exceptions in the text at nearly every step of development. At over 100,000 entries, the dictionary is too large to correct by hand (it appears that there have been valiant efforts over the years, but a variety of problems remain), so getting good results is a real challenge.
+
+
+## Structural Problems
+
+The first, most glaring problem is that splitting the text into discrete elements (referred to as records throughout the project) fails in a few places. These flaws are easily understood, but the code to correct them ranges from straightforward to convoluted.
+
+
+## Ambiguous Escape Sequences
+
+The text contains a variety of obscure escape sequences (specific patterns of text intended to encode symbols or meaning that is not otherwise representable), some of which cannot be automatically parsed because the sequences also occur as legitimate, unescaped text. Simple find-and-replace operations using regular expressions yield lots of false positives.
+
+
+## Common and Rare Flaws
+
+Some flaws occur once or a handful of times, while others occur thousands of times. Time-efficient strategies for correcting rare versus common flaws tend to be quite different. Sadly, it seems that the only way to know whether it makes more sense to correct by hand or programmatically is to try both!
+
+
+## Structure and Information Loss
+
+One interesting thing about the English dictionary (for a programmer at least) is that the text is much more mechanical than prose, but still not so rigidly defined that it can be parsed like a programming language. The pronunciations, parts of speech descriptions, etymologies, and even the definitions themselves are written in a systematic style (although the early Webster's Dictionary is famous for its colorful definitions; the blog post at http://jsomers.net/blog/dictionary was our initial inspiration for the project). Nonetheless, there seems to be an exception to any syntactic rule that one might conceive, and like natural languages, some ambiguities can only be resolved by semantic understanding of the content. To make matters worse, crucial punctuation like matching parentheses and brackets are missing in some cases. Writing code to parse these various elements into structured data has been downright maddening.
+
+
+# Patching Data
+
+Data cleaning can be a challenging, time consuming process. The primary goal of Muck is to make it easy to create perfectly reproducible data projects; a curious reader should be able to check out a project from a source repository like Github, run the `muck` command, and reproduce all of the computations that create the analysis. Ideally, the various processes that go into the computation will be well organized and easily audited for correctness.
+
+Programming languages offer tremendous capabilities to automate such tasks, but bring with them a major risk of overcorrection. Sometimes it is easier (and less confusing) to make a correction by hand, rather than via code. However, simply altering the original source data is not a reproducible practice.
+
+A classic solution to this problem has been available in the Unix programming world for many years: the `diff` and `patch` tools. "Diffing" is the process of calculating a "diff" (also called a "delta" or "patch") from two versions of the same document: the diff shows the edits needed to transform the original version into the modified version. "Patching" is the process of applying a patch file to an original document, thereby producing the modified version. Traditionally, these tools have been used to track and communicate changes to program source files, and form the conceptual basis for modern version control systems. However, thanks to the Unix tradition of designing tools to operate on text, `diff` and `patch` are easily applied to text-based data formats as well.
+
+So, we added support for patch files. Muck treats them as just another source format, whose single data dependency is the "original" file, and whose output is the "modified" file. The benefit was immediately obvious, because patch files are meant to be read; for many use cases the intent of a patch could hardly be more obvious. However, the various traditional patch formats have some shortcomings for our purposes:
+- "Unified diff" (the standard modern patch format) hunks contain hard-to-read, hard-to-edit positional information at the top of each hunk; diffs produced by `git` are even worse, containing hash values and contextual "@" lines designed specifically for source code.
+- Empty Unix patch files are truly empty, ommitting the original file name needed by Muck for dependency inference.
+- The file paths in patch hunks often contain the build directory prefix, a minor but annoying detail.
+
+Of these, the most significant (and surprising) problem is that for some workflows, once a patch is created, it makes more sense to edit the patch directly rather than to edit the "modified" file and recompute the patch. This is especially true when reviewing a set of patches; occasionally we would find a typo or change our correction strategy part way through. Unix patch formats were not designed with hand-editing in mind. As an experiment, we created our own patch format and tool, called Pat. The pat format is similar to the traditional "unified diff" format, but addresses the above shortcomings directly, and provides us with a means of experimenting further with this sort of workflow. In particular we would like to add commenting syntax, escaping of control characters, line splitting, and intra-line highlighting for ease of use. Pat is still in early development, and currently lacks documentation, but the code can be found at https://github.com/gwk/pat.
+
+While the patching methodology in Muck needs some refinement, it has already proved useful. We believe patching is an important tool for encouraging reproducibility in real-world projects. However, it can also be overused; choosing the right strategy for a problem can require experimentation.
+
+
+# Cleaning and Verification
+
+Regardless of whether flaws are fixed by hand or via code, a fundamental challenge is to apply fixes without introducing new flaws. Often flaws are discovered in the course of implementing some end goal or feature, but are best fixed somewhere earlier in the data pipeline. The result is a disconnect between the logic that checks for a flaw and the process that fixes it.
+
+Once the fix is implemented, then the checking logic takes on a questionable role: either it issues a warning prior to the fix, or is applied afterwards and remains silent. In the former case, the programmer quickly learns to ignore the message, and it only serves to obscure more meaningful warnings. In the latter, the developer has three options:
+- remove it because it is slow, confusing or inconveniently located;
+- leave the check in place, where it no longer executes;
+- factor it out into some side branch of the computational graph.
+
+Removing the code is a undesirable, because we lose the most important evidence as to why the fix exists. At the same time, code that never executes is a notorious liability; as the project evolves, unexercised code tends to become incorrect.
+
+The broad question we need to address is this: what are good strategies for clarity and correctness when working with these sorts of checks and fixes? The last option, "factor out", helps in these regards, but how this code should be organized is still not so obvious.
+
+As a first step, we implemented a new file source type in Muck, '.tests', which is simply a list of scripts to execute. By creating a top-level 'test.tests' file with all of the checking scripts that have accumulated over the course of the project, we can simply run `muck test` and all of the checks will run.
+
+Standalone tests are useful, but by themselves they don't make the work much easier; at worst, they just become a dumping ground. What we want is a way to show how the flaws are related to the code. Ideally, we would be able to easily run the check on both the 'before' and 'after' data, so that reviewers can confirm that the fix behaves as intended. Furthermore, the intent of the code would be much clearer if check and fix logic were colocated in some fashion.
+
+All of this suggests a major limitation of the file-based perspective inherent to Muck: many operations apply on a per-record basis, rather than per-file. Thus, an emerging goal is to articulate and enable a per-record data cleaning strategy:
+- Identify a flaw and implement checks for it.
+- Implement a fix.
+- Preserve both the check and the fix in the codebase in a clear, coherent way.
+- Continually verify that the check and fix remain well behaved.
+
+
+# Auditable Data Transformations
+
+We want the check for a flaw, the application of a fix, and any reporting of the occurrence to be expressed together in a cohesive, clearly written unit. After some experimentation and quite a bit of supporting work, Muck now supports just such a workflow, via a function called `transform`. The technical description of how it works is more painful than using it, so we'll start with an example:
+
+| with muck.transform('input.txt') as t:
+| 
+|   @t.keep
+|   def non_empty_lines(line):
+|     'lines containing only whitespace are ommitted, without logging.'
+|     return bool(re.strip())
+| 
+|   @t.drop
+|   def vulgar(line):
+|     'profane lines are ommitted and logged.'
+|     return re.match(r'darn|gosh|shucks', line)
+| 
+|   @t.edit
+|   def (line):
+|     'all occurrences of the word "tweet" are replaced with "trumpet",'
+|     'preserving the leading capital; altered lines are logged.'
+|     return re.sub(r'([Tt])weet', r'\1rumpet', line)
+| 
+|   @t.conv
+|   def br_tags(line):
+|     'capitalize each line; no logging.'
+|     reutrn line.capitalize()
+| 
+|   @t.flag
+|   def big_words(line):
+|     'log lines with long words, but do not alter them.'
+|     return any(len(word) > 16 for word in line.split())
+| 
+|   @t.put
+|   def out(line):
+|     'write the final result line.'
+|     print(line, end='')
+
+It's worth admitting up front that `muck.transform` uses several advanced python features in combination - this makes it a bit tough to describe. `transform` is meant to be used at the top level of a python script, and just like `muck.source`, it takes the name of the input data as its first parameter. It returns a `Transformer` object (`t` in the example), which provides several methods that serve as function decorators. Each decorator indicates a different kind of transformation; when applied to a function, a decorator adds a new stage to the pipeline.
+
+All transformation functions must take a record as their sole parameter. Each kind of transformation has a different behavior:
+- `drop`: if the function returns True, the record is logged and dropped from subsequent processing.
+- `keep`: if the function returns False, the record is dropped; no logging takes place.
+- `edit`: the function returns a value to be passed to the next stage; if the returned value is not equal to the original value, then both are logged as a pair of -/+ lines.
+- `conv`: like `edit`, the function can return either the original or a new value; no logging takes place.
+- `flag`: if the function returns true, then the value is logged; the value is never altered.
+- `put`: the function is expected to write the output or otherwise consume the value; no logging occurs. Usually there is a single `put` at the end of the pipeline, but `transform` allows zero puts (perhaps for a script that just checks validity) or many puts (for example, if some intermediate output or multiple output formats are needed).
+
+All stages are applied to each record in the order in which they were decorated. For those modes that feature automatic logging, the complete effect of the transformation is reported in a dedicated file, without the user having written any reporting code. This leads to a much better verification experience for the user, because Muck's logging facilities are fancier and more organized than the typical debugging code the user would write. The logging feature also obviates the need for such clutter in project code.
+
+For the technically inclined: there is a `run` method that actually performs the transformation on the input sequence. Note that `run` is not called in our example; instead we use the `with` form to treat the `Transformer` `t` as a Python "context manager". The `__exit__` method of `Transformer`, which is automatically called at the end of the `with` scope, simply calls `run`. This usage pattern is optional and preferred purely as a convenience.
+
+
+# Conclusion
+
+Muck is not yet a mature tool, but our experience with it thus far has been promising. the framework it provides for data scripting tasks reduces clutter and boilerplate (an industry term for uninteresting, repetitive setup code), which lowers the effort required to create or alter steps in the project dependency graph. As a result, the conceptual clarity of our test project improved over time, as we gradually organized the code into small, meaningful pieces. This sort of progression stands in contrast to our prior experiences, in which monolithic analysis scripts became increasingly convoluted over time.
+
+The patch and transform techniques demonstrated here are conceptually simple, but they dramatically improve the development experience for certain kinds of tasks. As we develop Muck further, we hope to identify other classes of problems which can be made less painful with support from the build system. If you have any ideas, let us know!
+
+
