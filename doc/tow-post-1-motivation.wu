@@ -1,0 +1,76 @@
+writeup v0
+
+
+# Reducing barriers between programmers and non-programmers in the newsroom
+
+Muck, a research project sponsored by the Tow Center for Digital Journalism, seeks to design and prototype a system for authoring data-driven stories. The entire computational process behind producing a story should be clear, correct, and reproducible, for students and professionals alike. Build systems are a well-understood means of structuring such computations, and we wish to make this technique easy for data journalists. In so doing, we hope to expand the industry’s notion of what constitutes data journalism and reduce barriers between programmers and non-programmers in the newsroom.
+
+Last month, we invited several working data journalists to the Center to talk about their processes and challenges working with software, as well as the institutional barriers separating “documentary” and “data” journalists in newsrooms. The discussion revealed several priorities for us to focus on: story driven process, strong support for iterative (and often messy) data transformation, and reproducibility. Above all, the system must be comprehensible for both professional programmers and less technical participants.
+
+
+# Start With Questions, Not Datasets
+
+Data journalism exists to answer questions about the world that traditional journalistic techniques like interviewing and background research cannot resolve. But that does not mean that data alone makes a story. In fact, Noah Veltman of WNYC’s Data News Team warned against starting with a dataset:
+
+“There’s a lot of noise in a giant dataset on a subject. You need to attack it with a question. Otherwise, you can get lost in endlessly summing and averaging data, looking for something interesting. If you just go fishing, you end up wasting a lot of time.”
+
+Our guests agreed that their best data stories started with a question, often from reporters who don’t work on the data team. For example, ProPublica’s Olga Pierce explained that their Surgeon Scorecard story and app came to life because reporters covering medical mishaps wondered why surgeons seemed so unconcerned about accountability for their mistakes. When she looked, Pierce found that although some data on surgery outcomes existed, it was locked in proprietary datasets and obscure formats, making a more traditional investigation difficult.
+
+Similarly, The Guardian’s "The Counted" project on U.S. police killings and WNYC’s Mean Streets project on New York traffic fatalities came from reporters questioning discrepancies between their published stories and official government fatality counts. In both cases, subsequent investigations into the public data found that official reports drastically undercount deaths. Both projects eventually became important examples of modern data journalism.
+
+In all of these instances, documentary reporters came to their data teams when they ran into questions that traditional techniques could not answer. These examples encourage us to focus on helping journalists construct data analyses to answer their questions, rather than on tools for data exploration in the absence of questions. Often though, data journalists face major challenges before they can even begin an analysis.
+
+
+# Don’t Underestimate Data Manipulation
+
+Usually, the first problem is finding the data in the first place. According to Veltman, they often have to improvise:
+
+“A lot of the time you have to say, ‘Given the data we do have, we can’t answer the exact question, but what might be a reasonable proxy?’”
+
+For Surgeon Scorecard, Pierce found that the best proxy available was a proprietary dataset of Medicare outcomes that ProPublica purchased for the story. Once she had the data, she still had to reduce it to a usable set that would accurately illustrate the problem. Due to idiosyncrasies in the way Medicare reports outcomes, she chose to narrow the set down to two specific negative outcomes: did the patient die in the hospital or return within 30 days? Then, she further filtered the data to include results from only eight types of elective surgeries where a patient would be able to choose a surgeon in the first place. Thus, a large portion of the work revolved around preparing the data for statistical analysis.
+
+Further complicating this process, data journalists often use different tools to clean the data than those ultimately used to produce the story or app. This makes the analysis even less accessible to beginners, and can make it harder to stay focused on the larger story while analyzing data. To avoid this problem, Michael Keller of Al Jazeera advocated for using the same language to both analyze and output data:
+
+“I’ve had success using Node [a server programming environment based on Javascript] to do data analysis … If I can do sketches in the same format as the published version, it helps, because it collapses the cognitive distance between the analysis and the narrative.”
+
+Even if the journalist can use the same language to experiment as well as publish, the process still requires writing different pieces of code for each step, and steps may depend on each other in complicated ways. If a piece of code from an earlier step changes, developers often have to rewrite or at least manually re-run every subsequent step to incorporate those changes. This means that in practice, guaranteeing the validity of results is very challenging.
+
+
+# Remember Reproducibility and Auditability
+
+Several participants said that programming in a deadline-driven environment drags developers into a mentality of ‘just get it to work,’ rather than working well. Guardian developer Rich Harris put it most succinctly, describing the typical process as writing “spaghetti code until it works.”
+
+While “spaghetti code” (a programming term for poorly structured, tangled logic) may be the fastest way to meet a deadline, expediency often leads to practical problems with checking and verifying a story. By nature, most code is hard for anyone but the author to understand, and even experienced programmers admit to finding their own code inscrutable at times. Entire programming movements (literate programming is one of the more elaborate examples), have been developed to try to overcome this problem. In the newsroom, not only do programmers face deadline pressure, but an expectation that results, and by extension the integrity of the programs themselves, be verifiably accurate.
+
+Many of our participants mentioned strategies for verifying their results. WNYC performs formal sanity checks on their projects to look for red flags, but there is rarely time for comprehensive code reviews. Sarah Cohen of the New York Times Computer Assisted Reporting desk said that her team keeps a journal documenting how they arrive at a given result. With Surgeon Scorecard, ProPublica’s Pierce took this concept a step further by asking other colleagues on the interactive team to reproduce her work based on her journal, providing “checkpoints” along the way to help them stay on track.
+
+But in our discussion, two major shortcomings to these approaches emerged. The first is that editors outside of the data team rarely check conclusions, because the rest of the newsroom usually lacks the required analytical knowledge and/or the ability to read code. This disconnect between data journalists and traditional journalists makes verification expensive and time-consuming. For large, high-impact stories, WNYC performs full code reviews, and ProPublica brings in outside experts to validate conclusions. But as WNYC’s Veltman put it, “Deadlines usually leave no time for reviewing, much less refactoring code.”
+
+The second shortcoming is that unless the record of modifications to the data is perfect, auditing work from end to end is impossible. Small manual fixes to bad data are almost always necessary; these transformations take place in spreadsheets or live programming sessions, not in properly versioned (or otherwise archived) programs. Several participants expressed concerns with tracking and managing data. These problems are compounded by the need to pass data back and forth between various participants, whose technical abilities vary.
+
+Systems for sharing and versioning documents have existed for decades, but as the Times’ Cohen put it: “No matter what we do, at the end of a project the data is always in 30 versions of an Excel spreadsheet that got emailed back and forth, and the copy desk has to sort it all out…It’s what people know.”
+
+Cohen’s observation speaks to a common thread running through all of our discussion topics: newsrooms are incredibly challenging environments to write code in. Not only do programmers face pressure to complete projects on a deadline, but the credibility of both the author and the publication rests on the accuracy of the results.
+
+
+# Our Direction: Muck
+
+All of these themes have analogs within the broader software industry, and it is only natural to look for inspiration from accepted industry solutions. Broadly speaking, we characterize the basic process of data journalism as a transformation of input data into some output document.
+
+For clarity and reproducibility, such transformations should be decomposed into simple, logical steps. A whole project then can be described as a network of steps, or, more precisely, a directed acyclic graph. The notion of a dependency graph is well understood in computer science, and a whole class of tools called build systems exist to take advantage of this representation.
+
+Our approach is to create a build system for data journalism. We have designed simple conventions into Muck to make it easy for novices to start using; even non-programmers should be able to grasp the basic structure of Muck projects.
+
+Because our goal is to assist in telling narrative stories, projects using Muck typically revolve around English-language documents, written in a Markdown-like syntax that compiles to HTML. New users can start writing in these formats immediately, and quickly output documents ready to be put online or into a CMS.
+
+To manipulate data within the Muck framework, the programmer writes Python scripts that make their dependencies explicit to Muck. This relieves the programmer from having to worry about the complexities of dependencies, one of the more time-consuming and inscrutable parts of software projects. In contrast to traditional tools like Make, our system calculates the dependency relationships between files automatically. Moreover, it recognizes dependencies between source code and input data, so that as soon as any aspect of the project changes, it can rebuild just the affected parts.
+
+Ideally, Muck would allow the programmer to use any language or tool of their choice, but in practice we cannot add support for all languages directly into the build tool. Instead, we plan to add support for popular tools incrementally, and also allow the programmer to manually specify dependencies for any other tools they wish to use.
+
+To make projects easy for both programmers and non-programmers to understand, Muck operates through an interface familiar to nearly every computer user: the hierarchical file system. Each step of the overall computation is represented by a named file, and references to these names within files imply the overall dependency structure. This makes changing the structure as simple as renaming files, and encourages the programmer to choose descriptive names for each step. By using simple directory structures on the file system, the approach remains lightweight, flexible, and amenable to existing work habits, text editors, and industry standards.
+
+We want Muck to be easy to learn in an academic setting and to implement in a newsroom. It should solve common problems that journalists face without adding too much overhead. By starting with writing in English and compiling to HTML, Muck makes getting started with a daat journalism project easy.
+
+Build systems are goal-directed by nature, allowing the programmer to stay focused on the task at hand, while allowing them to add or rearrange goals at will as projects become more complex. Our tool is aware of a variety of file formats, allowing the author to easily switching between the narrative, analysis, and presentation aspects of the work. We hope that this fluidity will reduce the “cognitive distance” between tasks. We expect that once the process of creating discrete steps becomes second nature, the problem of reproducibility will disappear because any manual fixes to data will exist as just another step in the process.
+
+Above all, Muck encourages simple, direct structuring of projects to encourage clarity, correctness, and reproducibility. All too often, the barriers to understanding software begin with cryptic names and hidden relationships. We believe that by emphasizing clear naming as the binding glue between elements of software, it will become more easily understood by everyone.
