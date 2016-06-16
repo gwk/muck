@@ -178,7 +178,6 @@ muck patch error: patch command takes one or two arguments. usage:
 ''')
 
   if len(args) == 2: # create new patch.
-    assert len(args) == 2
     orig_target_path, target_path = args
     if orig_target_path.endswith('.pat'):
       errFL('muck patch error: original should not be a patch file: {}', orig_target_path)
