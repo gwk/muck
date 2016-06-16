@@ -378,7 +378,8 @@ def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
   if size != old.size or (mtime != old.mtime and hash_for_path(actual_path) != old.hash):
     ctx.dbgF(target_path, 'size: {} -> {}; mtime: {} -> {}', old.size, size, old.mtime, mtime)
     muck_failF(target_path, 'existing product has changed; did you mean to update a patch?\n'
-      '  please save your changes if necessary and then delete the modified file.')
+      '  please save your changes if necessary and then `muck clean {}`.',
+      target_path)
 
 
 def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mtime, old) -> bool:
@@ -401,10 +402,6 @@ def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mt
         noteF(target_path, 'product did not change (same size and hash).')
     else:
       size, mtime, file_hash = None, None, None
-      if force:
-        noteF(target_path, 'no product.')
-      else:
-        muck_failF(target_path, 'no product.')
   else:
     file_hash = old.hash
 
