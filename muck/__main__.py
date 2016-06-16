@@ -23,6 +23,12 @@ reserved_exts, product_path_for_target, reserved_names, source_for_target
 
 TargetInfo = namedtuple('TargetInfo', 'size mtime hash src_path deps')
 
+def target_info_all_deps(info):
+  if info.src_path is not None:
+    return [info.src_path] + info.deps
+  else:
+    return info.deps
+
 
 info_path = path_join(build_dir, info_name)
 
@@ -164,6 +170,47 @@ def muck_clean_all(args):
   remove_dir_contents(build_dir)
 
 
+def muck_deps(ctx, args):
+  set_args = set(args) # deduplicate arguments.
+  target_dependents = defaultdict(set)
+
+  def update_and_count_deps(target):
+    update_dependency(ctx, target)
+    deps = target_info_all_deps(ctx.info[target])
+    for dependency in deps:
+      target_dependents[dependency].add(target)
+      update_and_count_deps(dependency)
+
+  targets = sorted(set_args or ctx.info) # default to all known targets.
+  for target in targets:
+    update_and_count_deps(target)
+
+  roots = set_args.union(t for t, s in target_dependents.items() if len(s) > 1)
+
+  def visit(depth, target):
+    deps = target_info_all_deps(ctx.info[target])
+    dependents = target_dependents[target]
+    if depth == 0 and len(dependents) > 0:
+      suffix = ' (dependents: {}):\n'.format(' '.join(sorted(dependents)))
+    elif len(dependents) > 1:
+      suffix = '*\n'
+    elif len(deps) == 0:
+      suffix = '\n'
+    elif len(deps) == 1:
+      suffix = ':\n'
+    else:
+      suffix = ':\n'
+    indent = '  ' * depth
+    outZ(indent, target, suffix)
+    if depth > 0 and len(dependents) > 1: return
+    for dep in target_info_all_deps(ctx.info[target]):
+      visit(depth + 1, dep)
+
+  for root in sorted(roots):
+    outL()
+    visit(0, root)
+
+
 def muck_patch(ctx, args):
 
   if not len(args) in (1, 2):
@@ -228,6 +275,7 @@ commands = {
   # values are (needs_ctx, fn).
   'clean'     : (True,  muck_clean),
   'clean-all' : (False, muck_clean_all),
+  'deps'      : (True,  muck_deps),
   'patch'     : (True,  muck_patch),
 }
 
