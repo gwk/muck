@@ -155,6 +155,7 @@ def muck_clean(ctx, args):
     prod_path = product_path_for_target(arg)
     remove_file_if_exists(prod_path)
     del ctx.info[arg]
+  save_info(ctx.info)
 
 
 def muck_clean_all(args):
@@ -219,6 +220,7 @@ muck patch error: patch command takes one or two arguments. usage:
     # for now, just delete it to be safe; this makes the target look stale.
     try:
       del ctx.info[target_path]
+      save_info(ctx.info)
     except KeyError: pass
 
 
@@ -242,8 +244,6 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str, u
     muck_failF(target_path, 'unsupported source file extension: `{}`', src_ext)
   prod_path_out = prod_path + '.out'
   prod_path_tmp = prod_path + '.tmp'
-  info.pop(target_path, None) # delete metadata along with file.
-  remove_file_if_exists(prod_path)
   remove_file_if_exists(prod_path_out)
   remove_file_if_exists(prod_path_tmp)
   # TODO: if not use_std_out, then maybe we should remove all products with matching stem?
@@ -259,20 +259,27 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str, u
   has_product = True
   if code != 0:
     muck_failF(target_path, 'build failed with code: {}', code)
+
+  def move_to_prod(path):
+    info.pop(target_path, None) # delete metadata as we overwrite old file.
+    move_file(path, prod_path, overwrite=True)
+
   if use_std_out:
     if path_exists(prod_path_tmp):
       noteF(target_path, 'process wrote product file directly.')
-      move_file(prod_path_tmp, prod_path)
+      move_to_prod(prod_path_tmp)
       if file_size(prod_path_out) == 0:
         remove_file(prod_path_out)
+      else:
+        warnF(target_path, 'process also produced std output; captured in: {}', prod_path_out)
     else:
       noteF(target_path, 'process produced std output.')
-      move_file(prod_path_out, prod_path)
+      move_to_prod(prod_path_out)
   else: # not use_std_out.
     if path_exists(prod_path_tmp):
-      move_file(prod_path_tmp, prod_path)
+      move_to_prod(prod_path_tmp)
     elif path_ext(prod_path): # target is not bare (possibly phony) target.
-      muck_failF(target_path, 'build failed to produce product: {}', prod_path_tmp)
+      muck_failF(target_path, 'process failed to produce product: {}', prod_path_tmp)
     else:
       has_product = False
       noteF(target_path, 'no product.')
@@ -424,8 +431,11 @@ def update_deps_and_info(ctx, target_path: str, actual_path: str, is_changed, si
 
   ctx.statuses[target_path] = is_changed # replace sentinal with final value.
   info = TargetInfo(size, mtime, file_hash, src_path, deps)
-  ctx.info[target_path] = info
   ctx.dbgF(target_path, 'updated info:\n  {}', info)
+  ctx.info[target_path] = info
+  # writing the entire dict at every step will not scale well;
+  # at that point we should probably move to sqlite or similar anyway.
+  save_info(ctx.info)
   return is_changed
 
 
@@ -450,18 +460,12 @@ def main():
 
   ctx = Ctx(info=load_info(), statuses={}, dir_names={}, dbgF=dbgF)
 
-  try:
-    if command_fn:
-      assert command_needs_ctx
-      command_fn(ctx, args.targets[1:])
-    else: # no command; default behavior is to update each specified target.
-      for target in args.targets:
-        update_dependency(ctx, target, force=True)
-  except SystemExit:
-    save_info(ctx.info)
-    raise
-  else:
-    save_info(ctx.info)
+  if command_fn:
+    assert command_needs_ctx
+    command_fn(ctx, args.targets[1:])
+  else: # no command; default behavior is to update each specified target.
+    for target in args.targets:
+      update_dependency(ctx, target, force=True)
 
 
 if __name__ == '__main__':
