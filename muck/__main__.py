@@ -438,8 +438,7 @@ def main():
 
   if args.dbg:
     def dbgF(path, fmt, *items):
-      errF('muck dbg: {}: ', path)
-      errFL(fmt, *items)
+      errF('muck dbg: {}: ' + fmt, path, *items)
   else:
     def dbgF(path, fmt, *items): pass
 
