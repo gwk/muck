@@ -3,21 +3,29 @@ writeup v0
 
 # Data Cleaning with Muck
 
-Muck is a prototype tool for data analysis, with a particular focus on data journalism. Muck allows users to take an incremental, iterative approach to their work. By breaking programming tasks into smaller steps, journalists can better explore their data, develop stories and try new techniques, while at the same time making their work more transparent and reproducible. 
+Data journalism is a growing field, and as the practice becomes more sophisticated, data journalists are facing all the challenges of modern software development. In order to manage the increasingly complexity of data projects, journalists need sophisticated tools. Muck is a prototype tool for data analysis, with a particular focus on data journalism. It allows users to take an incremental, iterative approach to their work. By breaking programming tasks into smaller steps, journalists can better explore their data, develop stories and try new techniques, while at the same time making their work more transparent and reproducible. 
 
-Projects built with Muck are structured as a collection of interdependent steps (a "dependency graph"). With a simple naming convention and a little behind-the-scenes magic, Muck is able to infer the dependencies between source code and data files. With this information, Muck rebuilds only the parts of a project that have changed and their dependent parts. For large datasets, the time savings can be dramatic, allowing users to explore their data with little overhead. Our goal is to provide an environment that encourages correctness and clarity of both code and data, while remaining fast, pragmatic and ergonomic. This post describes a few early results, specifically facilities for patching text and transforming records.
+Projects built with Muck are structured as a collection of interdependent steps (we refer to this structure as the "dependency graph"). With a simple naming convention and a little behind-the-scenes magic, Muck is able to infer the dependencies between source code and data files. With this information, Muck rebuilds only the parts of a project that have changed, and their dependent parts. For large datasets, the time savings can be dramatic, allowing users to explore their data with little overhead. Our goal is to provide an environment that encourages correctness and clarity of both code and data, while remaining fast, pragmatic and ergonomic. This post describes a few early results, specifically facilities for patching text and transforming records.
+
+
+# Inspiration
+
+Muck fills a role similar to the traditional Unix tool Make [^make]. Make, first released in 1976 [^make-release-date], is a command-line tool for automatically building products (typically compiled executables) from source files in an incremental fashion; when asked to produce a particular product (or "target"), it will only rebuild relevant portions of the project that have changed since the last build. The process is directed by a "makefile", which specifies, for each target product to be built, the list of source files and products that the target depends on (the "dependencies"), as well as the commands to build the product (the "recipe"). Essentially, the developer explicitly writes out the project's dependency graph in the makefile, thus enabling Make to perform incremental builds.
+
+Muck improves on this paradigm by eliminating the need for the makefile; instead it examines the contents of source files whose names match those of the target products, and infers the dependency relationships. While Muck is certainly not the first system to boast this capability [^ocamlbuild], it is notable for supporting both source and data formats common to data journalism. 
+
 
 
 # Test Project: Webster's 1913 Dictionary
 
-Once we got the basic dependency calculations and build commands working, we began several test projects that could help guide development in a practical direction. One ongoing experiment parses and analyzes the Project Gutenberg version of Webster's 1913 Unabridged Dictionary. The work required a variety techniques that are fundamental to data journalism: web scraping, error correction, and text parsing. The project (available at https://github.com/gwk/english-dictionary) is not yet finished, but the experience thus far has led to some interesting additions to Muck.
+Once we got the basic dependency calculations and build commands working, we began several test projects that could help guide development in a practical direction. One ongoing experiment parses and analyzes the Project Gutenberg version of Webster's 1913 Unabridged Dictionary [https://www.gutenberg.org/files/660/660.txt]. The work required a variety techniques that are fundamental to data journalism: web scraping, error correction, and text parsing. The project (available at https://github.com/gwk/english-dictionary) is not yet finished, but the experience thus far has led to some interesting additions to Muck.
 
 The dictionary text that we have been working with is quite messy. Its basic structure is straightforward, but we have encountered exceptions in the text at nearly every step of development. At over 100,000 entries, the dictionary is too large to correct by hand (it appears that there have been valiant efforts over the years, but a variety of problems remain), so getting good results is a real challenge.
 
 
 ## Structural Problems
 
-The first, most glaring problem is that splitting the text into discrete elements (referred to as records throughout the project) fails in a few places. These flaws are easily understood, but the code to correct them ranges from straightforward to convoluted.
+The first, most glaring problem is that splitting the text into discrete records fails in a few places. These flaws are easily understood, but the code to correct them ranges from straightforward to convoluted.
 
 
 ## Ambiguous Escape Sequences
@@ -41,7 +49,7 @@ Data cleaning can be a challenging, time consuming process. The primary goal of 
 
 Programming languages offer tremendous capabilities to automate such tasks, but bring with them a major risk of overcorrection. Sometimes it is easier (and less confusing) to make a correction by hand, rather than via code. However, simply altering the original source data is not a reproducible practice, and too many hand corrections make it impossible to properly fact-check a data-driven story.
 
-A classic solution to this problem has been available in the Unix programming world for many years: the `diff` and `patch` tools. "Diffing" is the process of calculating a "diff" (also called a "delta" or "patch") from two versions of the same document: the diff shows the edits needed to transform the original version into the modified version. "Patching" is the process of applying a patch file to an original document to produce the modified result. Traditionally, these tools have been used to track and communicate changes to program source files, and form the conceptual basis for modern version control systems like Git. However, thanks to the Unix tradition of designing tools to operate on text, `diff` and `patch` are easily applied to text-based data formats as well.
+A classic solution to this problem has been available in the Unix programming world for many years: the `diff` [^diff] and `patch` [^patch] tools. "Diffing" is the process of calculating a "diff" (also called a "delta" or "patch") from two versions of the same document: the diff shows the edits needed to transform the original version into the modified version. "Patching" is the process of applying a patch file to an original document to produce the modified result. Traditionally, these tools have been used to track and communicate changes to program source files, and form the conceptual basis for modern version control systems like Git. However, thanks to the Unix tradition of designing tools to operate on text, `diff` and `patch` are easily applied to text-based data formats as well.
 
 So, we added support for patch files. Muck treats them as just another source format, with single data dependency (the "original" file) and output (the "modified" file). The benefit was immediately obvious: patch files are human-readable, allowing the patches to function as a reproducible version of the "data diary" that many data journalists use. However, the various traditional patch formats have some shortcomings for our purposes:
 - "Unified diff" (the standard modern patch format) hunks contain hard-to-read, hard-to-edit positional information at the top of each hunk; diffs produced by `git` are even worse, containing hash values and contextual "@" lines designed specifically for source code.
@@ -135,4 +143,15 @@ Muck is not yet a mature tool, but our experience with it thus far has been prom
 
 The patch and transform techniques demonstrated here are conceptually simple, but they dramatically improve the development experience for certain kinds of tasks common to data journalism. As we develop Muck further, we hope to identify other classes of problems which can be made less painful with support from the build system. If you have any ideas, let us know!
 
+
+
+^make: http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.39.7058, http://pubs.opengroup.org/onlinepubs/009695399/utilities/make.html
+
+^make-release-date: http://minnie.tuhs.org/cgi-bin/utree.pl?file=V7/usr/src/cmd/make/ident.c
+
+^ocamlbuild: https://github.com/ocaml/ocamlbuild/blob/master/manual/manual.adoc
+
+^diff: http://pubs.opengroup.org/onlinepubs/9699919799/utilities/diff.html
+
+^patch: http://pubs.opengroup.org/onlinepubs/9699919799/utilities/patch.html
 
