@@ -101,7 +101,7 @@ def py_dependencies(src_path, src_file, dir_names):
       yield from py_dep_import(src_path, node.module, dir_names)
 
 
-def tests_dependencies(src_path, src_file, dir_names):
+def list_dependencies(src_path, src_file, dir_names):
   lines = (line.strip() for line in src_file)
   return [l for l in lines if l and not l.startswith('#')]
 
@@ -109,14 +109,14 @@ def tests_dependencies(src_path, src_file, dir_names):
 dependency_fns = {
   '.pat' : pat_dependencies,
   '.py' : py_dependencies,
-  '.tests' : tests_dependencies,
+  '.list' : list_dependencies,
   '.wu' : writeup_dependencies,
 }
 
 build_tools = {
   '.pat' : ['pat', 'apply'],
   '.py' : ['python3'],
-  '.tests' : ['true'],
+  '.list' : ['true'],
   '.wu' : ['writeup']
 }
 
