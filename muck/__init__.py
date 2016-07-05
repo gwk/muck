@@ -14,8 +14,8 @@ import pithy.meta as meta
 from http import HTTPStatus
 from bs4 import BeautifulSoup
 from pithy.path_encode import path_for_url
-from pithy.io import errF, failF, out_json, read_json, read_jsons
-from pithy.fs import path_exists, path_ext, path_join, path_stem, split_dir_name, split_stem_ext, list_dir
+from pithy.io import errF, errFL, failF, out_json, read_json, read_jsons
+from pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, path_stem, split_dir_name, split_stem_ext, list_dir
 from pithy.transform import Transformer
 
 
