@@ -137,7 +137,7 @@ def _fetch(url, timeout, headers, expected_status_code):
   else:
     if r.status_code != expected_status_code:
       s = HTTPStatus(r.status_code)
-      msg = 'fetch failed with HTTP code: {}: {}; {}.'.format(s.code, s.phrase, s.description)
+      msg = 'fetch failed with HTTP code: {}: {}; {}.'.format(s.value, s.phrase, s.description)
   if msg is not None:
     raise HTTPError(msg)
   return r
