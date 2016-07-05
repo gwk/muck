@@ -14,7 +14,7 @@ import shlex
 import time
 
 from pat import pat_dependencies
-from writeup import writeup_dependencies
+from writeup.v0 import writeup_dependencies
 from pithy import *
 
 from muck import actual_path_for_target, build_dir, ignored_exts, info_name, muck_failF, \
