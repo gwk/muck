@@ -3,8 +3,8 @@
 # distutils setup script.
 # users should install with: `$ pip3 install muck`
 # developers can make a local install with: `$ pip3 install -e .`
-# upload to pypi test server with: `$ py3 setup.py sdist upload -r pypitest`
-# upload to pypi prod server with: `$ py3 setup.py sdist upload`
+# upload to pypi test server with: `$ python3 setup.py sdist upload -r pypitest`
+# upload to pypi prod server with: `$ python3 setup.py sdist upload`
 
 from setuptools import setup
 
