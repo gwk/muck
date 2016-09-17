@@ -216,11 +216,11 @@ def muck_patch(ctx, args):
   if not len(args) in (1, 2):
     failF('''\
 muck patch error: patch command takes one or two arguments. usage:
-  
+
   muck patch [original_target] [target]
     creates a new target by copying either the source or product of the original to _build/[target],
     and then creates an empty [target].pat.
-  
+
   muck patch [target.pat]
     update the patch file with the diff of the previously specified original and target.
 ''')
@@ -283,7 +283,7 @@ commands = {
 def build_product(info: dict, target_path: str, src_path: str, prod_path: str, use_std_out: bool) -> bool:
   '''
   build a product from a source.
-  ''' 
+  '''
   src_ext = path_ext(src_path)
   try:
     build_tool = build_tools[src_ext]
@@ -371,7 +371,7 @@ def update_dependency(ctx: Ctx, target_path: str, force=False) -> bool:
   except KeyError: pass
 
   ctx.statuses[target_path] = Ellipsis # recursion sentinal is replaced before return.
-  
+
   ctx.dbgF(target_path, 'examining...')
 
   is_product = not path_exists(target_path)
@@ -515,4 +515,4 @@ def main():
 
 if __name__ == '__main__':
   main()
-  
+
