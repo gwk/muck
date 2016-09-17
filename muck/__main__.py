@@ -122,7 +122,7 @@ dependency_fns = {
 build_tools = {
   '.pat' : ['pat', 'apply'],
   '.py' : ['python3'],
-  '.list' : ['true'],
+  '.list' : [], # no-op.
   '.wu' : ['writeup']
 }
 
@@ -301,6 +301,11 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str, u
   remove_file_if_exists(prod_path_out)
   remove_file_if_exists(prod_path_tmp)
   # TODO: if not use_std_out, then maybe we should remove all products with matching stem?
+
+  if not build_tool:
+    noteF(target_path, 'no op.')
+    return False # no product.
+
   prod_dir = path_dir(prod_path)
   make_dirs(prod_dir)
   cmd = build_tool + [src_path, prod_path_tmp]
@@ -318,27 +323,31 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str, u
     info.pop(target_path, None) # delete metadata as we overwrite old file.
     move_file(path, prod_path, overwrite=True)
 
+  via_msg = '.tmp'
   if use_std_out:
     if path_exists(prod_path_tmp):
-      noteF(target_path, 'process wrote product file directly.')
       move_to_prod(prod_path_tmp)
       if file_size(prod_path_out) == 0:
         remove_file(prod_path_out)
       else:
-        warnF(target_path, 'process also produced std output; captured in: {}', prod_path_out)
+        warnF(target_path, 'wrote data directly to `{}`;\n  ignoring output captured in `{}`',
+          prod_path_tmp, prod_path_out)
     else:
-      noteF(target_path, 'process produced std output.')
+      via_msg = 'stdout'
       move_to_prod(prod_path_out)
   else: # not use_std_out.
     if path_exists(prod_path_tmp):
       move_to_prod(prod_path_tmp)
-    elif path_ext(prod_path): # target is not bare (possibly phony) target.
+    elif path_ext(prod_path): # target is not bare (therefore assumed not phony) target.
       muck_failF(target_path, 'process failed to produce product: {}', prod_path_tmp)
     else:
       has_product = False
       noteF(target_path, 'no product.')
-  size_suffix = ('; ' + format_byte_count_dec(file_size(prod_path))) if has_product else ''
-  noteF(target_path, 'finished: {:0.2f} seconds{}.', time_end - time_start, size_suffix)
+  if has_product:
+    suffix = '; {} (via {})'.format(format_byte_count_dec(file_size(prod_path)), via_msg)
+  else:
+    suffix = ''
+  noteF(target_path, 'finished: {:0.2f} seconds{}.', time_end - time_start, suffix)
   return has_product
 
 
