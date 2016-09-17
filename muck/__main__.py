@@ -8,6 +8,7 @@ import ast
 import base64
 import json
 import os
+import re
 import shlex
 import time
 
@@ -85,7 +86,8 @@ def py_dep_call(src_path, node):
 
 def py_dep_import(src_path, module_name, dir_names):
   src_dir = path_dir(src_path)
-  module_parts = module_name.split('.')
+  leading_dots_count = re.match('\.*', module_name).end()
+  module_parts = ['..'] * leading_dots_count + module_name[leading_dots_count:].split('.')
   module_path = path_join(src_dir, *module_parts) + '.py'
   if is_file(module_path):
     yield module_path
