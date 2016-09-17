@@ -4,18 +4,22 @@
 import sys
 assert sys.version_info.major == 3 # python 2 is not supported.
 
-import argparse
 import ast
 import base64
-import hashlib
 import json
 import os
 import shlex
 import time
 
+from argparse import ArgumentParser
+from collections import namedtuple
+from hashlib import sha256
 from pat import pat_dependencies
 from writeup.v0 import writeup_dependencies
-from pithy import *
+from pithy.io import errF, errFL, failF, read_json, write_json
+from pithy.fs import file_size, is_file, make_dirs, move_file, path_dir, path_exists, path_ext, path_join, remove_dir_contents, remove_file, remove_file_if_exists
+from pithy.string_utils import format_byte_count_dec
+from pithy.task import runC
 
 from muck import actual_path_for_target, build_dir, ignored_exts, info_name, muck_failF, \
 reserved_exts, product_path_for_target, reserved_names, source_for_target
@@ -138,7 +142,7 @@ def hash_for_path(path, max_chunks=sys.maxsize):
     f = open(path, 'rb')
   except IsADirectoryError:
     muck_failF(path, 'expected a file but found a directory')
-  h = hashlib.sha256()
+  h = sha256()
   # a quick timing experiment suggested that chunk sizes larger than this are not faster.
   chunk_size = 1 << 16
   for i in range(max_chunks):
@@ -485,7 +489,7 @@ def update_deps_and_info(ctx, target_path: str, actual_path: str, is_changed, si
 
 
 def main():
-  arg_parser = argparse.ArgumentParser(description='muck around with dependencies.')
+  arg_parser = ArgumentParser(description='muck around with dependencies.')
   arg_parser.add_argument('targets', nargs='*', default=['index.html'], help='target file names.')
   arg_parser.add_argument('-dbg', action='store_true')
   args = arg_parser.parse_args()
