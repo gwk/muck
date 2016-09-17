@@ -13,11 +13,11 @@ import shlex
 import time
 
 from argparse import ArgumentParser
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from hashlib import sha256
 from pat import pat_dependencies
 from writeup.v0 import writeup_dependencies
-from pithy.io import errF, errFL, failF, read_json, write_json
+from pithy.io import errF, errFL, failF, outL, outZ, read_json, write_json
 from pithy.fs import file_size, is_file, make_dirs, move_file, path_dir, path_exists, path_ext, path_join, remove_dir_contents, remove_file, remove_file_if_exists
 from pithy.string_utils import format_byte_count_dec
 from pithy.task import runC
