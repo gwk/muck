@@ -121,7 +121,7 @@ dependency_fns = {
 
 build_tools = {
   '.pat' : ['pat', 'apply'],
-  '.py' : ['python3'],
+  '.py' : ['python{}.{}'.format(sys.version_info.major, sys.version_info.minor)], # use the same version of python that muck is running under.
   '.list' : [], # no-op.
   '.wu' : ['writeup']
 }
