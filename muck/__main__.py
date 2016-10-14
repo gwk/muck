@@ -69,6 +69,11 @@ def warnF(path, fmt, *items):
   errFL(fmt, *items)
 
 
+def list_dependencies(src_path, src_file, dir_names):
+  lines = (line.strip() for line in src_file)
+  return [l for l in lines if l and not l.startswith('#')]
+
+
 def py_dep_call(src_path, node):
   func = node.func
   if not isinstance(func, ast.Attribute): return
@@ -107,22 +112,17 @@ def py_dependencies(src_path, src_file, dir_names):
       yield from py_dep_import(src_path, node.module, dir_names)
 
 
-def list_dependencies(src_path, src_file, dir_names):
-  lines = (line.strip() for line in src_file)
-  return [l for l in lines if l and not l.startswith('#')]
-
-
 dependency_fns = {
+  '.list' : list_dependencies,
   '.pat' : pat_dependencies,
   '.py' : py_dependencies,
-  '.list' : list_dependencies,
   '.wu' : writeup_dependencies,
 }
 
 build_tools = {
+  '.list' : [], # no-op.
   '.pat' : ['pat', 'apply'],
   '.py' : ['python{}.{}'.format(sys.version_info.major, sys.version_info.minor)], # use the same version of python that muck is running under.
-  '.list' : [], # no-op.
   '.wu' : ['writeup']
 }
 
