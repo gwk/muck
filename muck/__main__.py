@@ -74,6 +74,13 @@ def list_dependencies(src_path, src_file, dir_names):
   return [l for l in lines if l and not l.startswith('#')]
 
 
+def mush_dependencies(src_path, src_file, dir_names):
+  for line in src_file:
+    for token in shlex.split(line):
+      if path_ext(token):
+        yield token
+
+
 def py_dep_call(src_path, node):
   func = node.func
   if not isinstance(func, ast.Attribute): return
@@ -114,6 +121,7 @@ def py_dependencies(src_path, src_file, dir_names):
 
 dependency_fns = {
   '.list' : list_dependencies,
+  '.mush' : mush_dependencies,
   '.pat' : pat_dependencies,
   '.py' : py_dependencies,
   '.wu' : writeup_dependencies,
@@ -121,9 +129,10 @@ dependency_fns = {
 
 build_tools = {
   '.list' : [], # no-op.
+  '.mush' : ['mush'],
   '.pat' : ['pat', 'apply'],
   '.py' : ['python{}.{}'.format(sys.version_info.major, sys.version_info.minor)], # use the same version of python that muck is running under.
-  '.wu' : ['writeup']
+  '.wu' : ['writeup'],
 }
 
 def calc_dependencies(path, dir_names):
