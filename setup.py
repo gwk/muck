@@ -22,7 +22,10 @@ setup(
   url='https://github.com/gwk/muck',
   description='Muck is a build tool that automatically calculates dependencies.',
   long_description=long_description,
-  install_requires=['pat-tool', 'pithy', 'writeup-tool'],
+  install_requires=[
+    'pithy',
+    'requests',
+  ],
   packages=['muck'],
   entry_points = { 'console_scripts': [
     'muck=muck.__main__:main',

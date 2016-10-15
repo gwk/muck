@@ -7,12 +7,10 @@ assert sys.version_info.major == 3 # python 2 is not supported.
 import random
 import time
 
-import agate
 import requests
 import pithy.meta as meta
 
 from http import HTTPStatus
-from bs4 import BeautifulSoup
 from pithy.path_encode import path_for_url
 from pithy.io import errF, errFL, failF, out_json, read_json, read_jsons
 from pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, path_stem, split_dir_name, split_stem_ext, list_dir
@@ -72,15 +70,6 @@ def actual_path_for_target(target_path):
   return product_path_for_target(target_path)
 
 
-def _source_csv(path):
-  'source handler for csv (comma separated values) files.'
-  return agate.Table.from_csv(path)
-
-def _source_html(path):
-  'source handler for html.'
-  with open(path) as f:
-    return BeautifulSoup(f, 'html.parser')
-
 def _source_json(path, types=()):
   'source handler for json files.'
   with open(path) as f:
@@ -97,7 +86,7 @@ _source_dispatch = meta.dispatcher_for_names(prefix='_source_', default_fn=open)
 def source(target_path, ext=None, **kwargs):
   '''
   Open a dependency and parse it based on its file extension.
-  
+
   Additional keyword arguments are passed to the specific source function matching `ext`:
   - json: types.
   - jsons: types.
@@ -233,7 +222,7 @@ def source_for_target(target_path, dir_names_cache=None):
 def transform(target_path, ext=None, **kwargs):
   '''
   Open a dependency using muck.source and then transform it using pithy.Transformer.
-  
+
   Additional keyword arguments are passed to the specific source function matching `ext`;
   see muck.source for details.
 
