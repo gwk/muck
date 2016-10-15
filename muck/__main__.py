@@ -15,8 +15,6 @@ import time
 from argparse import ArgumentParser
 from collections import defaultdict, namedtuple
 from hashlib import sha256
-from pat import pat_dependencies
-from writeup.v0 import writeup_dependencies
 from pithy.io import errF, errFL, failF, outL, outZ, read_json, write_json
 from pithy.fs import file_size, is_file, make_dirs, move_file, path_dir, path_exists, path_ext, path_join, path_stem, remove_dir_contents, remove_file, remove_file_if_exists
 from pithy.string_utils import format_byte_count_dec
@@ -79,6 +77,18 @@ def mush_dependencies(src_path, src_file, dir_names):
     for token in shlex.split(line):
       if path_ext(token):
         yield token
+
+
+try: from pat import pat_dependencies
+except ImportError:
+  def pat_dependencies(src_path, src_file, dir_names):
+    muck_failF('`pat` is not installed; run `pip install pat-tool`.')
+
+
+try: from writeup.v0 import writeup_dependencies
+except ImportError: pass
+  def pat_dependencies(src_path, src_file, dir_names):
+    muck_failF('`writeup` is not installed; run `pip install writeup-tool`.')
 
 
 def py_dep_call(src_path, node):
