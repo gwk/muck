@@ -10,21 +10,26 @@ import time
 import requests
 import pithy.meta as meta
 
+from csv import reader as csv_reader
 from http import HTTPStatus
+from sys import argv
 from pithy.path_encode import path_for_url
-from pithy.io import errF, errFL, failF, out_json, read_json, read_jsons
+from pithy.io import errF, errFL, failF
 from pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, path_stem, split_dir_name, split_stem_ext, list_dir
+from pithy.json_utils import load_json, load_jsons
 from pithy.transform import Transformer
 
 
 # module exports.
 __all__ = [
   'HTTPError',
+  'add_loader',
   'fetch',
+  'load',
+  'load_url',
   'muck_failF',
-  'source',
+  'open_dep',
   'source_for_target',
-  'source_url',
   'transform',
 ]
 
@@ -70,42 +75,56 @@ def actual_path_for_target(target_path):
   return product_path_for_target(target_path)
 
 
-def _source_json(path, types=()):
-  'source handler for json files.'
-  with open(path) as f:
-    return read_json(f, types=types)
-
-def _source_jsons(path, types=()):
-  'source handler for jsons (json stream) files.'
-  with open(path) as f:
-    return read_jsons(f, types=types)
-
-
-_source_dispatch = meta.dispatcher_for_names(prefix='_source_', default_fn=open)
-
-def source(target_path, ext=None, **kwargs):
+def open_dep(target_path, binary=False, buffering=-1, encoding=None, errors=None, newline=None):
   '''
-  Open a dependency and parse it based on its file extension.
-
-  Additional keyword arguments are passed to the specific source function matching `ext`:
-  - json: types.
-  - jsons: types.
+  Open a dependency for reading.
 
   Muck's static analysis looks specifically for this function to infer dependencies;
-  the target_path argument must be a string literal.
+  `target_path` must be a string literal.
   '''
-  # TODO: optional open_fn argument?
-
   path = actual_path_for_target(target_path)
-  if ext is None:
-    ext = path_ext(path)
   try:
-    return _source_dispatch(ext.lstrip('.'), path, **kwargs)
+    return open(path, mode=('rb' if binary else 'r'), buffering=buffering, encoding=encoding, errors=errors, newline=newline)
   except FileNotFoundError:
-    errFL('muck.source cannot open path: {}', path)
+    errFL('muck.open_dep cannot open path: {}', path)
     if path != target_path:
       errFL('note: nor does a file exist at source path: {}', target_path)
     raise
+
+
+_loaders = {
+  '.csv' : (csv_reader, {'newlines': ''}),
+  '.json' : (load_json, {}),
+  '.jsons' : (load_jsons, {}),
+}
+
+def add_loader(ext, fn, **open_args):
+  if not ext.startswith('.'):
+    raise ValueError("file extension does not start with '.': {!r}".format(ext))
+  _loaders[ext] = (fn, open_args)
+
+
+_unspecified = object()
+def load(target_path, ext=_unspecified, **kwargs):
+  '''
+  Select an appropriate loader based on the file extension, or `ext` if specified.
+  If not loader has been registered for the extension, or (`ext` is specified as `None`),
+  then the file is opened with `kwargs` passed to `open_dep`.
+  If a loader is found, then `open_dep` is called with the registered `open_args`,
+  and the loader is called with `kwargs`.
+
+  Muck's static analysis looks specifically for this function to infer dependencies;
+  `target_path` must be a string literal.
+  '''
+  if ext is _unspecified:
+    ext = path_ext(target_path)
+  try: load_fn, open_args = _loaders[ext]
+  except KeyError: pass
+  else:
+    file = open_dep(target_path, open_args)
+    return load_fn(file, **kwargs)
+  # default.
+  return open_dep(target_path, **kwargs)
 
 
 class HTTPError(Exception): pass
@@ -132,9 +151,8 @@ def _fetch(url, timeout, headers, expected_status_code):
   return r
 
 
-def fetch(url, expected_status_code=200, headers={}, timeout=4, delay=0,
-  delay_range=0):
-  'Muck API to fetch a url.'
+def fetch(url, expected_status_code=200, headers={}, timeout=4, delay=0, delay_range=0):
+  "Fetch the data at `url` and save it to a path in the '_fetch' directory derived from the URL."
   path = path_join('_fetch', path_for_url(url))
   if not path_exists(path):
     errFL('fetch: {}', url)
@@ -150,8 +168,8 @@ def fetch(url, expected_status_code=200, headers={}, timeout=4, delay=0,
   return path
 
 
-def source_url(url, ext=None, expected_status_code=200, headers={}, timeout=4, delay=0,
-  delay_range=0, **kwargs):
+def load_url(url, ext=_unspecified, expected_status_code=200, headers={}, timeout=4, delay=0, delay_range=0, **kwargs):
+  'Fetch the data at `url` and then load using `muck.load`.'
   # note: implementing uncached requests efficiently requires new versions of the source functions;
   # these will take a text argument instead of a path argument.
   # alternatively, the source functions could be reimplemented to take text strings,
@@ -159,7 +177,7 @@ def source_url(url, ext=None, expected_status_code=200, headers={}, timeout=4, d
   # in the uncached case, muck would do the open and read.
   path = fetch(url, expected_status_code=expected_status_code, headers=headers,
     timeout=timeout, delay=delay, delay_range=delay_range)
-  return source(path, ext=ext, **kwargs)
+  return load(path, ext=ext, **kwargs)
 
 
 def list_dir_filtered(src_dir, cache=None):
@@ -219,15 +237,15 @@ def source_for_target(target_path, dir_names_cache=None):
   return (src_path, use_std_out)
 
 
-def transform(target_path, ext=None, **kwargs):
+def transform(target_path, ext=_unspecified, **kwargs):
   '''
-  Open a dependency using muck.source and then transform it using pithy.Transformer.
+  Open a dependency using muck.load and then transform it using pithy.Transformer.
 
-  Additional keyword arguments are passed to the specific source function matching `ext`;
-  see muck.source for details.
+  Additional keyword arguments are passed to the specific load function matching `ext`;
+  see muck.load for details.
 
   Muck's static analysis looks specifically for this function to infer dependencies;
-  the target_path argument must be a string literal.
+  `target_path` must be a string literal.
   '''
-  seq = source(target_path, ext=None, **kwargs)
-  return Transformer(seq, log_stem=path_stem(sys.argv[1]) + '.')
+  seq = load(target_path, ext=ext, **kwargs)
+  return Transformer(seq, log_stem=path_stem(argv[1]) + '.')

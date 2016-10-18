@@ -15,13 +15,16 @@ import time
 from argparse import ArgumentParser
 from collections import defaultdict, namedtuple
 from hashlib import sha256
-from pithy.io import errF, errFL, failF, outL, outZ, read_json, write_json
-from pithy.fs import file_size, is_file, make_dirs, move_file, path_dir, path_exists, path_ext, path_join, path_stem, remove_dir_contents, remove_file, remove_file_if_exists
+from pithy.fs import (file_size, is_file, make_dirs, move_file,
+  path_dir, path_exists, path_ext, path_join, path_stem,
+  remove_dir_contents, remove_file, remove_file_if_exists)
+from pithy.io import errF, errFL, failF, outL, outZ
+from pithy.json_utils import load_json, write_json
 from pithy.string_utils import format_byte_count_dec
 from pithy.task import runC
 
-from muck import actual_path_for_target, build_dir, ignored_exts, info_name, muck_failF, \
-reserved_exts, product_path_for_target, reserved_names, source_for_target
+from muck import (actual_path_for_target, build_dir, ignored_exts, info_name, muck_failF,
+reserved_exts, product_path_for_target, reserved_names, source_for_target)
 
 
 TargetInfo = namedtuple('TargetInfo', 'size mtime hash src_path deps')
@@ -45,7 +48,7 @@ info_path = path_join(build_dir, info_name)
 def load_info():
   try:
     with open(info_path) as f:
-      return read_json(f, types=(TargetInfo,))
+      return load_json(f, types=(TargetInfo,))
   except FileNotFoundError:
     return {}
   except json.JSONDecodeError as e:
@@ -55,7 +58,7 @@ def load_info():
 
 def save_info(info: dict):
   with open(info_path, 'w') as f:
-    write_json(f, info)
+    write_json(f, { k: target_info._asdict() for k, target_info in info.items() })
 
 
 def noteF(path, fmt, *items):
@@ -82,13 +85,13 @@ def mush_dependencies(src_path, src_file, dir_names):
 try: from pat import pat_dependencies
 except ImportError:
   def pat_dependencies(src_path, src_file, dir_names):
-    muck_failF('`pat` is not installed; run `pip install pat-tool`.')
+    muck_failF(src_path, '`pat` is not installed; run `pip install pat-tool`.')
 
 
 try: from writeup.v0 import writeup_dependencies
-except ImportError: pass
+except ImportError:
   def pat_dependencies(src_path, src_file, dir_names):
-    muck_failF('`writeup` is not installed; run `pip install writeup-tool`.')
+    muck_failF(src_path, '`writeup` is not installed; run `pip install writeup-tool`.')
 
 
 def py_dep_call(src_path, node):
@@ -96,13 +99,12 @@ def py_dep_call(src_path, node):
   if not isinstance(func, ast.Attribute): return
   if not isinstance(func.value, ast.Name): return
   # TODO: dispatch to handlers for all known functions.
-  # add handler for source_url;
-  # this should check that repeated (url, target) pairs are consistent across entire project.
+  # add handler for source_url to check that repeated (url, target) pairs are consistent across entire project.
   if func.value.id != 'muck': return
-  if func.attr not in ('source', 'transform'): return
+  if func.attr not in ('open_dep', 'load', 'transform'): return
   if len(node.args) < 1 or not isinstance(node.args[0], ast.Str):
-    muck_failF('{}:{}:{}: muck.{}: first argument must be a string literal.',
-      src_path, node.lineno, node.col_offset, func.attr)
+    muck_failF(src_path, '{}:{}: muck.{}: first argument must be a string literal.',
+      node.lineno, node.col_offset, func.attr)
   yield node.args[0].s # the string literal value from the ast.Str.
 
 
@@ -445,7 +447,7 @@ def calculate_info(ctx: Ctx, target_path: str, actual_path: str) -> tuple:
     ctx.dbgF(target_path, 'no old info.')
     old = TargetInfo(None, None, None, None, [])
   else: # have previous record. must check that it is not stale.
-    ctx.dbgF(target_path, 'has old info:\n  {}', old)
+    ctx.dbgF(target_path, 'has old info: {}', old)
 
   return size, mtime, old
 
@@ -526,7 +528,7 @@ def main():
 
   if args.dbg:
     def dbgF(path, fmt, *items):
-      errF('muck dbg: {}: ' + fmt, path, *items)
+      errFL('muck dbg: {}: ' + fmt, path, *items)
   else:
     def dbgF(path, fmt, *items): pass
 
