@@ -1,0 +1,5 @@
+writeup v0
+
+# Support and use virtualenv.
+
+## Use requirements.txt and virtualenv to track library dependencies.
