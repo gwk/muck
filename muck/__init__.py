@@ -16,7 +16,7 @@ from sys import argv
 from pithy.path_encode import path_for_url
 from pithy.io import errF, errFL, failF
 from pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, path_stem, split_dir_name, split_stem_ext, list_dir
-from pithy.json_utils import load_json, load_jsons
+from pithy.json_utils import load_json, load_jsonl, load_jsons
 from pithy.transform import Transformer
 
 
@@ -95,6 +95,7 @@ def open_dep(target_path, binary=False, buffering=-1, encoding=None, errors=None
 _loaders = {
   '.csv' : (csv_reader, {'newlines': ''}),
   '.json' : (load_json, {}),
+  '.jsonl' : (load_jsonl, {}),
   '.jsons' : (load_jsons, {}),
 }
 
