@@ -15,7 +15,7 @@ import time
 from argparse import ArgumentParser
 from collections import defaultdict, namedtuple
 from hashlib import sha256
-from pithy.fs import (file_size, is_file, make_dirs, move_file,
+from pithy.fs import (current_dir, file_size, is_file, make_dirs, move_file,
   path_dir, path_exists, path_ext, path_join, path_stem,
   remove_dir_contents, remove_file, remove_file_if_exists)
 from pithy.io import errF, errFL, failF, outL, outZ
@@ -146,6 +146,15 @@ build_tools = {
   '.py' : ['python{}.{}'.format(sys.version_info.major, sys.version_info.minor)], # use the same version of python that muck is running under.
   '.wu' : ['writeup'],
 }
+
+
+def py_env():
+  return { 'PYTHONPATH' : current_dir() }
+
+build_tool_env_fns = {
+  '.py' : py_env
+}
+
 
 def calc_dependencies(path, dir_names):
   ext = path_ext(path)
@@ -330,10 +339,18 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str, u
   prod_dir = path_dir(prod_path)
   make_dirs(prod_dir)
   cmd = build_tool + [src_path, prod_path_tmp]
+
+  try: env_fn = build_tool_env_fns[src_ext]
+  except KeyError: env = None
+  else:
+    env = os.environ.copy()
+    custom_env = env_fn()
+    env.update(custom_env)
+
   noteF(target_path, 'building: `{}`', ' '.join(shlex.quote(w) for w in cmd))
   out_file = open(prod_path_out, 'wb') if use_std_out else None
   time_start = time.time()
-  code = runC(cmd, out=out_file)
+  code = runC(cmd, env=env, out=out_file)
   time_end = time.time()
   if out_file: out_file.close()
   has_product = True
