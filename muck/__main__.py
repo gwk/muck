@@ -29,7 +29,8 @@ reserved_exts, product_path_for_target, reserved_names, source_for_target)
 
 TargetInfo = namedtuple('TargetInfo', 'size mtime hash src_path deps')
 
-def target_info_all_deps(info):
+def all_deps_for_target(ctx, target):
+  info = ctx.info[target]
   if info.src_path is not None:
     return [info.src_path] + info.deps
   else:
@@ -212,8 +213,7 @@ def muck_deps(ctx, args):
 
   def update_and_count_deps(target):
     update_dependency(ctx, target)
-    deps = target_info_all_deps(ctx.info[target])
-    for dependency in deps:
+    for dependency in all_deps_for_target(ctx, target):
       target_dependents[dependency].add(target)
       update_and_count_deps(dependency)
 
@@ -224,7 +224,7 @@ def muck_deps(ctx, args):
   roots = set_args.union(t for t, s in target_dependents.items() if len(s) > 1)
 
   def visit(depth, target):
-    deps = target_info_all_deps(ctx.info[target])
+    deps = all_deps_for_target(ctx, target)
     dependents = target_dependents[target]
     if depth == 0 and len(dependents) > 0:
       suffix = ' (dependents: {}):\n'.format(' '.join(sorted(dependents)))
@@ -239,7 +239,7 @@ def muck_deps(ctx, args):
     indent = '  ' * depth
     outZ(indent, target, suffix)
     if depth > 0 and len(dependents) > 1: return
-    for dep in target_info_all_deps(ctx.info[target]):
+    for dep in deps:
       visit(depth + 1, dep)
 
   for root in sorted(roots):
