@@ -105,8 +105,7 @@ def add_loader(ext, fn, **open_args):
   _loaders[ext] = (fn, open_args)
 
 
-_unspecified = object()
-def load(target_path, ext=_unspecified, **kwargs):
+def load(target_path, ext=None, **kwargs):
   '''
   Select an appropriate loader based on the file extension, or `ext` if specified.
   If not loader has been registered for the extension, or (`ext` is specified as `None`),
@@ -117,8 +116,9 @@ def load(target_path, ext=_unspecified, **kwargs):
   Muck's static analysis looks specifically for this function to infer dependencies;
   `target_path` must be a string literal.
   '''
-  if ext is _unspecified:
+  if ext is None:
     ext = path_ext(target_path)
+  elif not isinstance(ext, str): raise TypeError(ext)
   try: load_fn, open_args = _loaders[ext]
   except KeyError: pass
   else:
@@ -169,7 +169,7 @@ def fetch(url, expected_status_code=200, headers={}, timeout=4, delay=0, delay_r
   return path
 
 
-def load_url(url, ext=_unspecified, expected_status_code=200, headers={}, timeout=4, delay=0, delay_range=0, **kwargs):
+def load_url(url, ext=None, expected_status_code=200, headers={}, timeout=4, delay=0, delay_range=0, **kwargs):
   'Fetch the data at `url` and then load using `muck.load`.'
   # note: implementing uncached requests efficiently requires new versions of the source functions;
   # these will take a text argument instead of a path argument.
@@ -238,7 +238,7 @@ def source_for_target(target_path, dir_names_cache=None):
   return (src_path, use_std_out)
 
 
-def transform(target_path, ext=_unspecified, **kwargs):
+def transform(target_path, ext=None, **kwargs):
   '''
   Open a dependency using muck.load and then transform it using pithy.Transformer.
 
