@@ -217,7 +217,11 @@ def muck_clean_all(args):
 
 
 def muck_deps(ctx, args):
-  set_args = set(args) # deduplicate arguments.
+  '''
+  `muck deps` command: print dependency information.
+  '''
+  args = frozenset(args) # deduplicate arguments.
+  targets = args or frozenset(ctx.info); # default to all known targets.
   target_dependents = defaultdict(set)
 
   def update_and_count_deps(target):
@@ -226,11 +230,11 @@ def muck_deps(ctx, args):
       target_dependents[dependency].add(target)
       update_and_count_deps(dependency)
 
-  targets = sorted(set_args or ctx.info) # default to all known targets.
-  for target in targets:
+  for target in sorted(targets):
     update_and_count_deps(target)
 
-  roots = set_args.union(t for t, s in target_dependents.items() if len(s) > 1)
+  roots = set(args) or { t for t in targets if t not in target_dependents }
+  roots.update(t for t, s in target_dependents.items() if len(s) > 1)
 
   def visit(depth, target):
     deps = all_deps_for_target(ctx, target)
