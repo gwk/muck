@@ -158,6 +158,9 @@ build_tool_env_fns = {
 
 
 def calc_dependencies(path, dir_names):
+  '''
+  Infer the dependencies for the file at `path`.
+  '''
   ext = path_ext(path)
   try:
     dep_fn = dependency_fns[ext]
@@ -189,6 +192,9 @@ def hash_for_path(path, max_chunks=sys.maxsize):
 # commands.
 
 def muck_clean(ctx, args):
+  '''
+  `muck clean` command.
+  '''
   if not args:
     failF('muck clean error: clean command takes specific target arguments; use clean-all to remove all products.')
   for arg in args:
@@ -202,6 +208,9 @@ def muck_clean(ctx, args):
 
 
 def muck_clean_all(args):
+  '''
+  `muck clean-all` command.
+  '''
   if args:
     failF('muck clean-all error: clean-all command no arguments; use clean to remove individual products.')
   remove_dir_contents(build_dir)
