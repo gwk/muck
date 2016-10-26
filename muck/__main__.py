@@ -27,6 +27,48 @@ from muck import (actual_path_for_target, build_dir, ignored_exts, info_name, mu
 reserved_exts, product_path_for_target, reserved_names, source_for_target)
 
 
+def main():
+  arg_parser = ArgumentParser(description='muck around with dependencies.')
+  arg_parser.add_argument('targets', nargs='*', default=['index.html'], help='target file names.')
+  arg_parser.add_argument('-dbg', action='store_true')
+  args = arg_parser.parse_args()
+
+  if args.dbg:
+    def dbgF(path, fmt, *items):
+      errFL('muck dbg: {}: ' + fmt, path, *items)
+  else:
+    def dbgF(path, fmt, *items): pass
+
+  command_needs_ctx, command_fn = commands.get(args.targets[0], (None, None))
+
+  if command_fn and not command_needs_ctx:
+    return command_fn(args.targets[1:])
+
+  make_dirs(build_dir) # required for load_info.
+
+  ctx = Ctx(info=load_info(), statuses={}, dir_names={}, dbgF=dbgF)
+
+  if command_fn:
+    assert command_needs_ctx
+    command_fn(ctx, args.targets[1:])
+  else: # no command; default behavior is to update each specified target.
+    for target in args.targets:
+      update_dependency(ctx, target, force=True)
+
+
+
+Ctx = namedtuple('Ctx', 'info statuses dir_names dbgF')
+# info: dict (target_path: str => TargetInfo).
+# statuses: dict (target_path: str => is_changed: bool|Ellipsis).
+# dir_names: dict (dir_path: str => names: [str]).
+# dbgF: debug printing function.
+
+
+# Build info.
+
+# Muck stores build information in a single json file within the build directory.
+info_path = path_join(build_dir, info_name)
+
 TargetInfo = namedtuple('TargetInfo', 'size mtime hash src_path deps')
 
 def all_deps_for_target(ctx, target):
@@ -37,13 +79,11 @@ def all_deps_for_target(ctx, target):
     return info.deps
 
 
-info_path = path_join(build_dir, info_name)
-
-# info dictionary stores the persistent build information.
+# The info dictionary stores the persistent build information.
 # key: target path (not product paths prefixed with build_dir).
 # val: TargetInfo.
 # src_path is None for non-product sources.
-# each dependency is a target path.
+# Each dependency is a target path.
 # TODO: save info about muck version itself in the dict under reserved name 'muck'.
 
 def load_info():
@@ -62,134 +102,8 @@ def save_info(info: dict):
     write_json(f, { k: target_info._asdict() for k, target_info in info.items() })
 
 
-def noteF(path, fmt, *items):
-  errF('muck note: {}: ', path)
-  errFL(fmt, *items)
+# Commands.
 
-def warnF(path, fmt, *items):
-  errF('muck WARNING: {}: ', path)
-  errFL(fmt, *items)
-
-
-def list_dependencies(src_path, src_file, dir_names):
-  lines = (line.strip() for line in src_file)
-  return [l for l in lines if l and not l.startswith('#')]
-
-
-def mush_dependencies(src_path, src_file, dir_names):
-  for line in src_file:
-    for token in shlex.split(line):
-      if path_ext(token):
-        yield token
-
-
-try: from pat import pat_dependencies
-except ImportError:
-  def pat_dependencies(src_path, src_file, dir_names):
-    muck_failF(src_path, '`pat` is not installed; run `pip install pat-tool`.')
-
-
-try: from writeup.v0 import writeup_dependencies
-except ImportError:
-  def pat_dependencies(src_path, src_file, dir_names):
-    muck_failF(src_path, '`writeup` is not installed; run `pip install writeup-tool`.')
-
-
-def py_dep_call(src_path, node):
-  func = node.func
-  if not isinstance(func, ast.Attribute): return
-  if not isinstance(func.value, ast.Name): return
-  # TODO: dispatch to handlers for all known functions.
-  # add handler for source_url to check that repeated (url, target) pairs are consistent across entire project.
-  if func.value.id != 'muck': return
-  if func.attr not in ('open_dep', 'load', 'transform'): return
-  if len(node.args) < 1 or not isinstance(node.args[0], ast.Str):
-    muck_failF(src_path, '{}:{}: muck.{}: first argument must be a string literal.',
-      node.lineno, node.col_offset, func.attr)
-  yield node.args[0].s # the string literal value from the ast.Str.
-
-
-def py_dep_import(src_path, module_name, dir_names):
-  src_dir = path_dir(src_path)
-  leading_dots_count = re.match('\.*', module_name).end()
-  module_parts = ['..'] * leading_dots_count + module_name[leading_dots_count:].split('.')
-  module_path = path_join(src_dir, *module_parts) + '.py'
-  if is_file(module_path):
-    yield module_path
-
-
-def py_dependencies(src_path, src_file, dir_names):
-  'Calculate dependencies of a python3 source file.'
-  src_text = src_file.read()
-  tree = ast.parse(src_text, src_path)
-  for node in ast.walk(tree):
-    if isinstance(node, ast.Call):
-      yield from py_dep_call(src_path, node)
-    elif isinstance(node, ast.Import):
-      for alias in node.names:
-        yield from py_dep_import(src_path, alias.name, dir_names)
-    elif isinstance(node, ast.ImportFrom):
-      yield from py_dep_import(src_path, node.module, dir_names)
-
-
-dependency_fns = {
-  '.list' : list_dependencies,
-  '.mush' : mush_dependencies,
-  '.pat' : pat_dependencies,
-  '.py' : py_dependencies,
-  '.wu' : writeup_dependencies,
-}
-
-build_tools = {
-  '.list' : [], # no-op.
-  '.mush' : ['mush'],
-  '.pat' : ['pat', 'apply'],
-  '.py' : ['python{}.{}'.format(sys.version_info.major, sys.version_info.minor)], # use the same version of python that muck is running under.
-  '.wu' : ['writeup'],
-}
-
-
-def py_env():
-  return { 'PYTHONPATH' : current_dir() }
-
-build_tool_env_fns = {
-  '.py' : py_env
-}
-
-
-def calc_dependencies(path, dir_names):
-  '''
-  Infer the dependencies for the file at `path`.
-  '''
-  ext = path_ext(path)
-  try:
-    dep_fn = dependency_fns[ext]
-  except KeyError:
-    return []
-  with open(path) as f:
-    return sorted(dep_fn(path, f, dir_names))
-
-
-def hash_for_path(path, max_chunks=sys.maxsize):
-  '''
-  return a hash string for the contents of the file at the given path.
-  '''
-  try:
-    f = open(path, 'rb')
-  except IsADirectoryError:
-    muck_failF(path, 'expected a file but found a directory')
-  h = sha256()
-  # a quick timing experiment suggested that chunk sizes larger than this are not faster.
-  chunk_size = 1 << 16
-  for i in range(max_chunks):
-    chunk = f.read(chunk_size)
-    if not chunk: break
-    h.update(chunk)
-  d = h.digest()
-  return base64.urlsafe_b64encode(d).decode()
-
-
-# commands.
 
 def muck_clean(ctx, args):
   '''
@@ -323,6 +237,177 @@ commands = {
 }
 
 
+# Default update functionality.
+
+
+def update_dependency(ctx: Ctx, target_path: str, force=False) -> bool:
+  '''
+  returns is_changed.
+  '''
+  target_ext = path_ext(target_path)
+
+  if not target_path.strip():
+    muck_failF(repr(target_path), 'invalid target name.')
+  if target_path in reserved_names:
+    muck_failF(target_path, 'target name is reserved; please rename the target.')
+  if target_ext in reserved_exts:
+    muck_failF(target_path, 'target name has reserved extension; please rename the target.')
+
+  try: # if in ctx.statuses, this path has already been visited on this run.
+    status = ctx.statuses[target_path]
+    if status is Ellipsis: # recursion sentinal.
+      involved_paths = sorted(path for path, status in ctx.statuses.items() if status is Ellipsis)
+      muck_failF(target_path, 'target has circular dependency; involved paths:\n  {}',
+        '\n  '.join(involved_paths))
+    return status
+  except KeyError: pass
+
+  ctx.statuses[target_path] = Ellipsis # recursion sentinal is replaced before return.
+
+  ctx.dbgF(target_path, 'examining...')
+
+  is_product = not path_exists(target_path)
+  actual_path = product_path_for_target(target_path) if is_product else target_path
+  size, mtime, old = calculate_info(ctx, target_path, actual_path)
+  has_old_file = (mtime is not None)
+  has_old_info = (old.mtime is not None)
+
+  is_changed = force or (not has_old_file) or (not has_old_info)
+
+  if has_old_info:
+    old_is_product = bool(old.src_path)
+    if is_product != old_is_product: # nature of the target changed.
+      noteF(target_path, 'target is {} a product.', 'now' if is_product else 'no longer')
+      is_changed = True
+    if not has_old_file and target_ext: # product was deleted and not a phony target.
+      noteF(target_path, 'old product was deleted.')
+
+  if is_product:
+    if has_old_file and has_old_info:
+      check_product_not_modified(ctx, target_path, actual_path, size, mtime, old)
+    return update_product(ctx, target_path, actual_path, is_changed, size, mtime, old)
+  else:
+    return update_non_product(ctx, target_path, is_changed, size, mtime, old)
+
+
+def list_dependencies(src_path, src_file, dir_names):
+  lines = (line.strip() for line in src_file)
+  return [l for l in lines if l and not l.startswith('#')]
+
+
+def mush_dependencies(src_path, src_file, dir_names):
+  for line in src_file:
+    for token in shlex.split(line):
+      if path_ext(token):
+        yield token
+
+
+try: from pat import pat_dependencies
+except ImportError:
+  def pat_dependencies(src_path, src_file, dir_names):
+    muck_failF(src_path, '`pat` is not installed; run `pip install pat-tool`.')
+
+
+try: from writeup.v0 import writeup_dependencies
+except ImportError:
+  def pat_dependencies(src_path, src_file, dir_names):
+    muck_failF(src_path, '`writeup` is not installed; run `pip install writeup-tool`.')
+
+
+def py_dep_call(src_path, node):
+  func = node.func
+  if not isinstance(func, ast.Attribute): return
+  if not isinstance(func.value, ast.Name): return
+  # TODO: dispatch to handlers for all known functions.
+  # add handler for source_url to check that repeated (url, target) pairs are consistent across entire project.
+  if func.value.id != 'muck': return
+  if func.attr not in ('open_dep', 'load', 'transform'): return
+  if len(node.args) < 1 or not isinstance(node.args[0], ast.Str):
+    muck_failF(src_path, '{}:{}: muck.{}: first argument must be a string literal.',
+      node.lineno, node.col_offset, func.attr)
+  yield node.args[0].s # the string literal value from the ast.Str.
+
+
+def py_dep_import(src_path, module_name, dir_names):
+  src_dir = path_dir(src_path)
+  leading_dots_count = re.match('\.*', module_name).end()
+  module_parts = ['..'] * leading_dots_count + module_name[leading_dots_count:].split('.')
+  module_path = path_join(src_dir, *module_parts) + '.py'
+  if is_file(module_path):
+    yield module_path
+
+
+def py_dependencies(src_path, src_file, dir_names):
+  'Calculate dependencies of a python3 source file.'
+  src_text = src_file.read()
+  tree = ast.parse(src_text, src_path)
+  for node in ast.walk(tree):
+    if isinstance(node, ast.Call):
+      yield from py_dep_call(src_path, node)
+    elif isinstance(node, ast.Import):
+      for alias in node.names:
+        yield from py_dep_import(src_path, alias.name, dir_names)
+    elif isinstance(node, ast.ImportFrom):
+      yield from py_dep_import(src_path, node.module, dir_names)
+
+
+dependency_fns = {
+  '.list' : list_dependencies,
+  '.mush' : mush_dependencies,
+  '.pat' : pat_dependencies,
+  '.py' : py_dependencies,
+  '.wu' : writeup_dependencies,
+}
+
+build_tools = {
+  '.list' : [], # no-op.
+  '.mush' : ['mush'],
+  '.pat' : ['pat', 'apply'],
+  '.py' : ['python{}.{}'.format(sys.version_info.major, sys.version_info.minor)], # use the same version of python that muck is running under.
+  '.wu' : ['writeup'],
+}
+
+
+def py_env():
+  return { 'PYTHONPATH' : current_dir() }
+
+build_tool_env_fns = {
+  '.py' : py_env
+}
+
+
+def calc_dependencies(path, dir_names):
+  '''
+  Infer the dependencies for the file at `path`.
+  '''
+  ext = path_ext(path)
+  try:
+    dep_fn = dependency_fns[ext]
+  except KeyError:
+    return []
+  with open(path) as f:
+    return sorted(dep_fn(path, f, dir_names))
+
+
+def hash_for_path(path, max_chunks=sys.maxsize):
+  '''
+  return a hash string for the contents of the file at the given path.
+  '''
+  try:
+    f = open(path, 'rb')
+  except IsADirectoryError:
+    muck_failF(path, 'expected a file but found a directory')
+  h = sha256()
+  # a quick timing experiment suggested that chunk sizes larger than this are not faster.
+  chunk_size = 1 << 16
+  for i in range(max_chunks):
+    chunk = f.read(chunk_size)
+    if not chunk: break
+    h.update(chunk)
+  d = h.digest()
+  return base64.urlsafe_b64encode(d).decode()
+
+
 def build_product(info: dict, target_path: str, src_path: str, prod_path: str, use_std_out: bool) -> bool:
   '''
   build a product from a source.
@@ -399,63 +484,6 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str, u
 def file_size_and_mtime(path):
   stats = os.stat(path)
   return (stats.st_size, stats.st_mtime)
-
-
-Ctx = namedtuple('Ctx', 'info statuses dir_names dbgF')
-# info: dict (target_path: str => TargetInfo).
-# statuses: dict (target_path: str => is_changed: bool|Ellipsis).
-# dir_names: dict (dir_path: str => names: [str]).
-# dbgF: debug printing function.
-
-
-def update_dependency(ctx: Ctx, target_path: str, force=False) -> bool:
-  '''
-  returns is_changed.
-  '''
-  target_ext = path_ext(target_path)
-
-  if not target_path.strip():
-    muck_failF(repr(target_path), 'invalid target name.')
-  if target_path in reserved_names:
-    muck_failF(target_path, 'target name is reserved; please rename the target.')
-  if target_ext in reserved_exts:
-    muck_failF(target_path, 'target name has reserved extension; please rename the target.')
-
-  try: # if in ctx.statuses, this path has already been visited on this run.
-    status = ctx.statuses[target_path]
-    if status is Ellipsis: # recursion sentinal.
-      involved_paths = sorted(path for path, status in ctx.statuses.items() if status is Ellipsis)
-      muck_failF(target_path, 'target has circular dependency; involved paths:\n  {}',
-        '\n  '.join(involved_paths))
-    return status
-  except KeyError: pass
-
-  ctx.statuses[target_path] = Ellipsis # recursion sentinal is replaced before return.
-
-  ctx.dbgF(target_path, 'examining...')
-
-  is_product = not path_exists(target_path)
-  actual_path = product_path_for_target(target_path) if is_product else target_path
-  size, mtime, old = calculate_info(ctx, target_path, actual_path)
-  has_old_file = (mtime is not None)
-  has_old_info = (old.mtime is not None)
-
-  is_changed = force or (not has_old_file) or (not has_old_info)
-
-  if has_old_info:
-    old_is_product = bool(old.src_path)
-    if is_product != old_is_product: # nature of the target changed.
-      noteF(target_path, 'target is {} a product.', 'now' if is_product else 'no longer')
-      is_changed = True
-    if not has_old_file and target_ext: # product was deleted and not a phony target.
-      noteF(target_path, 'old product was deleted.')
-
-  if is_product:
-    if has_old_file and has_old_info:
-      check_product_not_modified(ctx, target_path, actual_path, size, mtime, old)
-    return update_product(ctx, target_path, actual_path, is_changed, size, mtime, old)
-  else:
-    return update_non_product(ctx, target_path, is_changed, size, mtime, old)
 
 
 def calculate_info(ctx: Ctx, target_path: str, actual_path: str) -> tuple:
@@ -544,35 +572,14 @@ def update_deps_and_info(ctx, target_path: str, actual_path: str, is_changed, si
   return is_changed
 
 
-def main():
-  arg_parser = ArgumentParser(description='muck around with dependencies.')
-  arg_parser.add_argument('targets', nargs='*', default=['index.html'], help='target file names.')
-  arg_parser.add_argument('-dbg', action='store_true')
-  args = arg_parser.parse_args()
+def noteF(path, fmt, *items):
+  errF('muck note: {}: ', path)
+  errFL(fmt, *items)
 
-  if args.dbg:
-    def dbgF(path, fmt, *items):
-      errFL('muck dbg: {}: ' + fmt, path, *items)
-  else:
-    def dbgF(path, fmt, *items): pass
-
-  command_needs_ctx, command_fn = commands.get(args.targets[0], (None, None))
-
-  if command_fn and not command_needs_ctx:
-    return command_fn(args.targets[1:])
-
-  make_dirs(build_dir) # required for load_info.
-
-  ctx = Ctx(info=load_info(), statuses={}, dir_names={}, dbgF=dbgF)
-
-  if command_fn:
-    assert command_needs_ctx
-    command_fn(ctx, args.targets[1:])
-  else: # no command; default behavior is to update each specified target.
-    for target in args.targets:
-      update_dependency(ctx, target, force=True)
+def warnF(path, fmt, *items):
+  errF('muck WARNING: {}: ', path)
+  errFL(fmt, *items)
 
 
-if __name__ == '__main__':
-  main()
+if __name__ == '__main__': main()
 
