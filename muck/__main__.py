@@ -15,16 +15,17 @@ import time
 from argparse import ArgumentParser
 from collections import defaultdict, namedtuple
 from hashlib import sha256
-from pithy.fs import (current_dir, file_size, is_file, make_dirs, move_file,
+from pithy.fs import (current_dir, file_size, is_file, list_dir, make_dirs, move_file,
   path_dir, path_exists, path_ext, path_join, path_stem,
-  remove_dir_contents, remove_file, remove_file_if_exists)
+  remove_dir_contents, remove_file, remove_file_if_exists, split_dir_name, split_stem_ext)
 from pithy.io import errF, errFL, failF, outL, outZ
 from pithy.json_utils import load_json, write_json
 from pithy.string_utils import format_byte_count_dec
 from pithy.task import runC
+from typing import Optional
 
-from muck import (actual_path_for_target, build_dir, ignored_exts, info_name, muck_failF,
-reserved_exts, product_path_for_target, reserved_names, source_for_target)
+from muck import (actual_path_for_target, build_dir, ignored_exts, info_name,
+reserved_exts, product_path_for_target, reserved_names)
 
 
 def main():
@@ -247,17 +248,17 @@ def update_dependency(ctx: Ctx, target_path: str, force=False) -> bool:
   target_ext = path_ext(target_path)
 
   if not target_path.strip():
-    muck_failF(repr(target_path), 'invalid target name.')
+    failF(repr(target_path), 'invalid target name.')
   if target_path in reserved_names:
-    muck_failF(target_path, 'target name is reserved; please rename the target.')
+    failF(target_path, 'target name is reserved; please rename the target.')
   if target_ext in reserved_exts:
-    muck_failF(target_path, 'target name has reserved extension; please rename the target.')
+    failF(target_path, 'target name has reserved extension; please rename the target.')
 
   try: # if in ctx.statuses, this path has already been visited on this run.
     status = ctx.statuses[target_path]
     if status is Ellipsis: # recursion sentinal.
       involved_paths = sorted(path for path, status in ctx.statuses.items() if status is Ellipsis)
-      muck_failF(target_path, 'target has circular dependency; involved paths:\n  {}',
+      failF(target_path, 'target has circular dependency; involved paths:\n  {}',
         '\n  '.join(involved_paths))
     return status
   except KeyError: pass
@@ -307,13 +308,13 @@ def mush_dependencies(src_path, src_file, dir_names):
 try: from pat import pat_dependencies
 except ImportError:
   def pat_dependencies(src_path, src_file, dir_names):
-    muck_failF(src_path, '`pat` is not installed; run `pip install pat-tool`.')
+    failF(src_path, '`pat` is not installed; run `pip install pat-tool`.')
 
 
 try: from writeup.v0 import writeup_dependencies
 except ImportError:
-  def pat_dependencies(src_path, src_file, dir_names):
-    muck_failF(src_path, '`writeup` is not installed; run `pip install writeup-tool`.')
+  def writeup_dependencies(src_path, src_file, dir_names):
+    failF(src_path, '`writeup` is not installed; run `pip install writeup-tool`.')
 
 
 def py_dep_call(src_path, node):
@@ -326,7 +327,7 @@ def py_dep_call(src_path, node):
   if func.value.id != 'muck': return
   if func.attr not in ('open_dep', 'load', 'transform'): return
   if len(node.args) < 1 or not isinstance(node.args[0], ast.Str):
-    muck_failF(src_path, '{}:{}: muck.{}: first argument must be a string literal.',
+    failF(src_path, '{}:{}: muck.{}: first argument must be a string literal.',
       node.lineno, node.col_offset, func.attr)
   yield node.args[0].s # the string literal value from the ast.Str.
 
@@ -400,7 +401,7 @@ def hash_for_path(path, max_chunks=sys.maxsize):
   try:
     f = open(path, 'rb')
   except IsADirectoryError:
-    muck_failF(path, 'expected a file but found a directory')
+    failF(path, 'expected a file but found a directory')
   h = sha256()
   # a quick timing experiment suggested that chunk sizes larger than this are not faster.
   chunk_size = 1 << 16
@@ -421,7 +422,7 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str, u
     build_tool = build_tools[src_ext]
   except KeyError:
     # TODO: fall back to generic .deps file.
-    muck_failF(target_path, 'unsupported source file extension: `{}`', src_ext)
+    failF(target_path, 'unsupported source file extension: `{}`', src_ext)
   prod_path_out = prod_path + '.out'
   prod_path_tmp = prod_path + '.tmp'
   remove_file_if_exists(prod_path_out)
@@ -451,7 +452,7 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str, u
   if out_file: out_file.close()
   has_product = True
   if code != 0:
-    muck_failF(target_path, 'build failed with code: {}', code)
+    failF(target_path, 'build failed with code: {}', code)
 
   def move_to_prod(path):
     info.pop(target_path, None) # delete metadata as we overwrite old file.
@@ -473,7 +474,7 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str, u
     if path_exists(prod_path_tmp):
       move_to_prod(prod_path_tmp)
     elif path_ext(prod_path): # target is not bare (therefore assumed not phony) target.
-      muck_failF(target_path, 'process failed to produce product: {}', prod_path_tmp)
+      failF(target_path, 'process failed to produce product: {}', prod_path_tmp)
     else:
       has_product = False
       noteF(target_path, 'no product.')
@@ -517,7 +518,7 @@ def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
   # and we would rather compute the hash than report a false problem.
   if size != old.size or (mtime != old.mtime and hash_for_path(actual_path) != old.hash):
     ctx.dbgF(target_path, 'size: {} -> {}; mtime: {} -> {}', old.size, size, old.mtime, mtime)
-    muck_failF(target_path, 'existing product has changed; did you mean to update a patch?\n'
+    failF(target_path, 'existing product has changed; did you mean to update a patch?\n'
       '  please save your changes if necessary and then `muck clean {}`.',
       target_path)
 
@@ -576,6 +577,63 @@ def update_deps_and_info(ctx, target_path: str, actual_path: str, is_changed, si
   return is_changed
 
 
+def source_for_target(target_path, dir_names_cache=None):
+  '''
+  assumes target_path does not exist.
+  returns (source_path: string, use_std_out: bool).
+  '''
+  src_dir, prod_name = split_dir_name(target_path)
+  prod_stem, prod_ext = split_stem_ext(prod_name)
+  src_dir_names = list_dir_filtered(src_dir or '.', cache=dir_names_cache)
+  # if a source file stem contains the complete target name, including extension, prefer that.
+  src_names = list(filter_source_names(src_dir_names, prod_name))
+  if src_names:
+    # only use stdout for targets with extensions;
+    # extensionless targets are typically either phony or binary programs.
+    use_std_out = bool(path_ext(prod_name))
+    src_stem = prod_name
+  else: # fall back to sources that do not indicate output extension.
+    # TODO: decide if there is value to this feature; causes confusion when an extension is misspelled in a source file name.
+    src_names = list(filter_source_names(src_dir_names, prod_stem))
+    use_std_out = False
+    src_stem = prod_stem
+  if len(src_names) == 0:
+    failF('TODO', 'no source candidates matching `{}`', src_stem)
+  if len(src_names) != 1:
+    failF('TODO', 'multiple source candidates matching `{}`: {}', src_stem, src_names)
+  ultimate_src_name = src_names[0]
+  src_name = immediate_source_name(ultimate_src_name, src_stem)
+  src_path = path_join(src_dir, src_name)
+  assert src_path != target_path
+  return (src_path, use_std_out)
+
+
+def list_dir_filtered(src_dir, cache=None):
+  'caches and returns the list of names in a source directory that might be source files.'
+  try:
+    if cache is not None:
+      return cache[src_dir]
+  except KeyError: pass
+  names = [n for n in list_dir(src_dir) if n not in reserved_names and not n.startswith('.')]
+  if cache is not None:
+    cache[dir] = names
+  return names
+
+
+def filter_source_names(names, prod_name):
+  l = len(prod_name)
+  for name in names:
+    if name.startswith(prod_name) and len(name) > l and name[l] == '.' \
+    and path_ext(name) not in ignored_exts:
+      yield name
+
+
+def immediate_source_name(name, src_stem):
+  i = name.find('.', len(src_stem) + 2) # skip the stem and the first extension dot.
+  if i == -1: return name
+  return name[:i] # omit all extensions but the first.
+
+
 def noteF(path, fmt, *items):
   errF('muck note: {}: ', path)
   errFL(fmt, *items)
@@ -583,6 +641,11 @@ def noteF(path, fmt, *items):
 def warnF(path, fmt, *items):
   errF('muck WARNING: {}: ', path)
   errFL(fmt, *items)
+
+def failF(path, fmt, *items):
+  errF('muck error: {}: ', path)
+  errFL(fmt, *items)
+  exit(1)
 
 
 if __name__ == '__main__': main()

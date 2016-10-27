@@ -15,7 +15,7 @@ from http import HTTPStatus
 from sys import argv
 from pithy.path_encode import path_for_url
 from pithy.io import errF, errFL, failF
-from pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, path_stem, split_dir_name, split_stem_ext, list_dir
+from pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, path_stem
 from pithy.json_utils import load_json, load_jsonl, load_jsons
 from pithy.transform import Transformer
 
@@ -27,9 +27,7 @@ __all__ = [
   'fetch',
   'load',
   'load_url',
-  'muck_failF',
   'open_dep',
-  'source_for_target',
   'transform',
 ]
 
@@ -53,11 +51,6 @@ reserved_exts = {
 ignored_exts = {
   '.err', '.iot', '.out', # iotest extensions.
 }
-
-
-def muck_failF(path, fmt, *items):
-  errF('muck error: {}: ', path)
-  failF(fmt, *items)
 
 
 def is_product_path(path):
@@ -177,63 +170,6 @@ def load_url(url, ext=None, expected_status_code=200, headers={}, timeout=4, del
   path = fetch(url, expected_status_code=expected_status_code, headers=headers,
     timeout=timeout, delay=delay, delay_range=delay_range)
   return load(path, ext=ext, **kwargs)
-
-
-def list_dir_filtered(src_dir, cache=None):
-  'caches and returns the list of names in a source directory that might be source files.'
-  try:
-    if cache is not None:
-      return cache[src_dir]
-  except KeyError: pass
-  names = [n for n in list_dir(src_dir) if n not in reserved_names and not n.startswith('.')]
-  if cache is not None:
-    cache[dir] = names
-  return names
-
-
-def filter_source_names(names, prod_name):
-  l = len(prod_name)
-  for name in names:
-    if name.startswith(prod_name) and len(name) > l and name[l] == '.' \
-    and path_ext(name) not in ignored_exts:
-      yield name
-
-
-def immediate_source_name(name, src_stem):
-  i = name.find('.', len(src_stem) + 2) # skip the stem and the first extension dot.
-  if i == -1: return name
-  return name[:i] # omit all extensions but the first.
-
-
-def source_for_target(target_path, dir_names_cache=None):
-  '''
-  assumes target_path does not exist.
-  returns (source_path: string, use_std_out: bool).
-  '''
-  src_dir, prod_name = split_dir_name(target_path)
-  prod_stem, prod_ext = split_stem_ext(prod_name)
-  src_dir_names = list_dir_filtered(src_dir or '.', cache=dir_names_cache)
-  # if a source file stem contains the complete target name, including extension, prefer that.
-  src_names = list(filter_source_names(src_dir_names, prod_name))
-  if src_names:
-    # only use stdout for targets with extensions;
-    # extensionless targets are typically either phony or binary programs.
-    use_std_out = bool(path_ext(prod_name))
-    src_stem = prod_name
-  else: # fall back to sources that do not indicate output extension.
-    # TODO: decide if there is value to this feature; causes confusion when an extension is misspelled in a source file name.
-    src_names = list(filter_source_names(src_dir_names, prod_stem))
-    use_std_out = False
-    src_stem = prod_stem
-  if len(src_names) == 0:
-    muck_failF(target_path, 'no source candidates matching `{}`'.format(src_stem))
-  if len(src_names) != 1:
-    muck_failF(target_path, 'multiple source candidates matching `{}`: {}'.format(src_stem, src_names))
-  ultimate_src_name = src_names[0]
-  src_name = immediate_source_name(ultimate_src_name, src_stem)
-  src_path = path_join(src_dir, src_name)
-  assert src_path != target_path
-  return (src_path, use_std_out)
 
 
 def transform(target_path, ext=None, **kwargs):
