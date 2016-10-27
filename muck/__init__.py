@@ -108,10 +108,9 @@ def add_loader(ext, fn, **open_args):
 def load(target_path, ext=None, **kwargs):
   '''
   Select an appropriate loader based on the file extension, or `ext` if specified.
-  If not loader has been registered for the extension, or (`ext` is specified as `None`),
-  then the file is opened with `kwargs` passed to `open_dep`.
   If a loader is found, then `open_dep` is called with the registered `open_args`,
   and the loader is called with `kwargs`.
+  If no loader is found, raise an error.
 
   Muck's static analysis looks specifically for this function to infer dependencies;
   `target_path` must be a string literal.
@@ -120,12 +119,11 @@ def load(target_path, ext=None, **kwargs):
     ext = path_ext(target_path)
   elif not isinstance(ext, str): raise TypeError(ext)
   try: load_fn, open_args = _loaders[ext]
-  except KeyError: pass
-  else:
-    file = open_dep(target_path, open_args)
-    return load_fn(file, **kwargs)
-  # default.
-  return open_dep(target_path, **kwargs)
+  except KeyError:
+    errFL('No loader found for target: {!r}', target_path)
+    raise
+  file = open_dep(target_path, open_args)
+  return load_fn(file, **kwargs)
 
 
 class HTTPError(Exception): pass
