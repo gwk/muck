@@ -287,6 +287,92 @@ def update_dependency(ctx: Ctx, target_path: str, dependent: Optional[str], forc
     return update_non_product(ctx, target_path, is_changed, size, mtime, old)
 
 
+def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
+  # existing product should not have been modified since info was stored.
+  # if the size changed then it was definitely modified.
+  # otherwise, if the mtime is unchanged, assume that the file is ok, for speed.
+  # if the mtime changed, check the hash;
+  # the user might have made an accidental edit and then reverted it,
+  # and we would rather compute the hash than report a false problem.
+  if size != old.size or (mtime != old.mtime and hash_for_path(actual_path) != old.hash):
+    ctx.dbgF(target_path, 'size: {} -> {}; mtime: {} -> {}', old.size, size, old.mtime, mtime)
+    failF(target_path, 'existing product has changed; did you mean to update a patch?\n'
+      '  please save your changes if necessary and then `muck clean {}`.',
+      target_path)
+
+
+def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mtime, old) -> bool:
+  ctx.dbgF(target_path, 'update_product')
+  src_path, use_std_out = source_for_target(ctx, target_path, ctx.dir_names)
+  if old.src_path != src_path:
+    is_changed = True
+    if old.src_path:
+      noteF(target_path, 'source path of target product changed\n  was: {}\n  now: {}',
+        old.src_path, src_path)
+  is_changed |= update_dependency(ctx, src_path, dependent=target_path)
+
+  if is_changed: # must rebuild product.
+    actual_src_path = actual_path_for_target(src_path) # source might itself be a product.
+    has_product = build_product(ctx.info, target_path, actual_src_path, actual_path, use_std_out)
+    if has_product:
+      size, mtime = file_size_and_mtime(actual_path)
+      file_hash = hash_for_path(actual_path)
+      is_changed = (size != old.size or file_hash != old.hash)
+      if not is_changed:
+        noteF(target_path, 'product did not change (same size and hash).')
+    else:
+      size, mtime, file_hash = None, None, None
+  else:
+    file_hash = old.hash
+
+  return update_deps_and_info(ctx, target_path, actual_path, is_changed, size, mtime, file_hash, src_path, old.deps)
+
+
+def update_non_product(ctx: Ctx, target_path: str, is_changed: bool, size, mtime, old) -> bool:
+  ctx.dbgF(target_path, 'update_non_product')
+  file_hash = hash_for_path(target_path) # must be calculated in all cases.
+  if not is_changed: # all we know is that it exists and status as a source has not changed.
+    is_changed = (size != old.size or file_hash != old.hash)
+    if is_changed: # this is more interesting; report.
+      noteF(target_path, 'source changed.')
+
+  return update_deps_and_info(ctx, target_path, target_path, is_changed, size, mtime, file_hash, None, old.deps)
+
+
+def update_deps_and_info(ctx, target_path: str, actual_path: str, is_changed, size, mtime, file_hash, src_path, old_deps) -> bool:
+  ctx.dbgF(target_path, 'update_deps_and_info')
+  if is_changed:
+    deps = calc_dependencies(actual_path, ctx.dir_names)
+  else:
+    deps = old_deps
+  for dep in deps:
+    is_changed |= update_dependency(ctx, dep, dependent=target_path)
+
+  ctx.statuses[target_path] = is_changed # replace sentinal with final value.
+  info = TargetInfo(size, mtime, file_hash, src_path, deps)
+  ctx.dbgF(target_path, 'updated info:\n  {}', info)
+  ctx.info[target_path] = info
+  # writing the entire dict at every step will not scale well;
+  # at that point we should probably move to sqlite or similar anyway.
+  save_info(ctx.info)
+  return is_changed
+
+
+# Dependency calculation.
+
+def calc_dependencies(path, dir_names):
+  '''
+  Infer the dependencies for the file at `path`.
+  '''
+  ext = path_ext(path)
+  try:
+    dep_fn = dependency_fns[ext]
+  except KeyError:
+    return []
+  with open(path) as f:
+    return sorted(dep_fn(path, f, dir_names))
+
+
 def list_dependencies(src_path, src_file, dir_names):
   'Calculate dependencies for .list files.'
   lines = (line.strip() for line in src_file)
@@ -360,53 +446,8 @@ dependency_fns = {
   '.wu' : writeup_dependencies,
 }
 
-build_tools = {
-  '.list' : [], # no-op.
-  '.mush' : ['mush'],
-  '.pat' : ['pat', 'apply'],
-  '.py' : ['python{}.{}'.format(sys.version_info.major, sys.version_info.minor)], # use the same version of python that muck is running under.
-  '.wu' : ['writeup'],
-}
 
-
-def py_env():
-  return { 'PYTHONPATH' : current_dir() }
-
-build_tool_env_fns = {
-  '.py' : py_env
-}
-
-
-def calc_dependencies(path, dir_names):
-  '''
-  Infer the dependencies for the file at `path`.
-  '''
-  ext = path_ext(path)
-  try:
-    dep_fn = dependency_fns[ext]
-  except KeyError:
-    return []
-  with open(path) as f:
-    return sorted(dep_fn(path, f, dir_names))
-
-
-def hash_for_path(path, max_chunks=sys.maxsize):
-  '''
-  return a hash string for the contents of the file at the given path.
-  '''
-  try:
-    f = open(path, 'rb')
-  except IsADirectoryError:
-    failF(path, 'expected a file but found a directory')
-  h = sha256()
-  # a quick timing experiment suggested that chunk sizes larger than this are not faster.
-  chunk_size = 1 << 16
-  for i in range(max_chunks):
-    chunk = f.read(chunk_size)
-    if not chunk: break
-    h.update(chunk)
-  d = h.digest()
-  return base64.urlsafe_b64encode(d).decode()
+# Build.
 
 
 def build_product(info: dict, target_path: str, src_path: str, prod_path: str, use_std_out: bool) -> bool:
@@ -482,9 +523,43 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str, u
   return has_product
 
 
-def file_size_and_mtime(path):
-  stats = os.stat(path)
-  return (stats.st_size, stats.st_mtime)
+build_tools = {
+  '.list' : [], # no-op.
+  '.mush' : ['mush'],
+  '.pat' : ['pat', 'apply'],
+  '.py' : ['python{}.{}'.format(sys.version_info.major, sys.version_info.minor)], # use the same version of python that muck is running under.
+  '.wu' : ['writeup'],
+}
+
+
+def py_env():
+  return { 'PYTHONPATH' : current_dir() }
+
+build_tool_env_fns = {
+  '.py' : py_env
+}
+
+
+# Utilities.
+
+
+def hash_for_path(path, max_chunks=sys.maxsize):
+  '''
+  return a hash string for the contents of the file at the given path.
+  '''
+  try:
+    f = open(path, 'rb')
+  except IsADirectoryError:
+    failF(path, 'expected a file but found a directory')
+  h = sha256()
+  # a quick timing experiment suggested that chunk sizes larger than this are not faster.
+  chunk_size = 1 << 16
+  for i in range(max_chunks):
+    chunk = f.read(chunk_size)
+    if not chunk: break
+    h.update(chunk)
+  d = h.digest()
+  return base64.urlsafe_b64encode(d).decode()
 
 
 def calculate_info(ctx: Ctx, target_path: str, actual_path: str) -> tuple:
@@ -505,75 +580,9 @@ def calculate_info(ctx: Ctx, target_path: str, actual_path: str) -> tuple:
   return size, mtime, old
 
 
-def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
-  # existing product should not have been modified since info was stored.
-  # if the size changed then it was definitely modified.
-  # otherwise, if the mtime is unchanged, assume that the file is ok, for speed.
-  # if the mtime changed, check the hash;
-  # the user might have made an accidental edit and then reverted it,
-  # and we would rather compute the hash than report a false problem.
-  if size != old.size or (mtime != old.mtime and hash_for_path(actual_path) != old.hash):
-    ctx.dbgF(target_path, 'size: {} -> {}; mtime: {} -> {}', old.size, size, old.mtime, mtime)
-    failF(target_path, 'existing product has changed; did you mean to update a patch?\n'
-      '  please save your changes if necessary and then `muck clean {}`.',
-      target_path)
-
-
-def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mtime, old) -> bool:
-  ctx.dbgF(target_path, 'update_product')
-  src_path, use_std_out = source_for_target(ctx, target_path, ctx.dir_names)
-  if old.src_path != src_path:
-    is_changed = True
-    if old.src_path:
-      noteF(target_path, 'source path of target product changed\n  was: {}\n  now: {}',
-        old.src_path, src_path)
-  is_changed |= update_dependency(ctx, src_path, dependent=target_path)
-
-  if is_changed: # must rebuild product.
-    actual_src_path = actual_path_for_target(src_path) # source might itself be a product.
-    has_product = build_product(ctx.info, target_path, actual_src_path, actual_path, use_std_out)
-    if has_product:
-      size, mtime = file_size_and_mtime(actual_path)
-      file_hash = hash_for_path(actual_path)
-      is_changed = (size != old.size or file_hash != old.hash)
-      if not is_changed:
-        noteF(target_path, 'product did not change (same size and hash).')
-    else:
-      size, mtime, file_hash = None, None, None
-  else:
-    file_hash = old.hash
-
-  return update_deps_and_info(ctx, target_path, actual_path, is_changed, size, mtime, file_hash, src_path, old.deps)
-
-
-def update_non_product(ctx: Ctx, target_path: str, is_changed: bool, size, mtime, old) -> bool:
-  ctx.dbgF(target_path, 'update_non_product')
-  file_hash = hash_for_path(target_path) # must be calculated in all cases.
-  if not is_changed: # all we know is that it exists and status as a source has not changed.
-    is_changed = (size != old.size or file_hash != old.hash)
-    if is_changed: # this is more interesting; report.
-      noteF(target_path, 'source changed.')
-
-  return update_deps_and_info(ctx, target_path, target_path, is_changed, size, mtime, file_hash, None, old.deps)
-
-
-def update_deps_and_info(ctx, target_path: str, actual_path: str, is_changed, size, mtime, file_hash, src_path, old_deps) -> bool:
-  ctx.dbgF(target_path, 'update_deps_and_info')
-  if is_changed:
-    deps = calc_dependencies(actual_path, ctx.dir_names)
-  else:
-    deps = old_deps
-  for dep in deps:
-    is_changed |= update_dependency(ctx, dep, dependent=target_path)
-
-  ctx.statuses[target_path] = is_changed # replace sentinal with final value.
-  info = TargetInfo(size, mtime, file_hash, src_path, deps)
-  ctx.dbgF(target_path, 'updated info:\n  {}', info)
-  ctx.info[target_path] = info
-  # writing the entire dict at every step will not scale well;
-  # at that point we should probably move to sqlite or similar anyway.
-  save_info(ctx.info)
-  return is_changed
+def file_size_and_mtime(path):
+  stats = os.stat(path)
+  return (stats.st_size, stats.st_mtime)
 
 
 def source_for_target(ctx, target_path, dir_names_cache=None):
