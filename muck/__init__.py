@@ -18,6 +18,7 @@ from pithy.io import errF, errFL, failF
 from pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, path_stem
 from pithy.json_utils import load_json, load_jsonl, load_jsons
 from pithy.transform import Transformer
+from typing import Optional
 
 
 # module exports.
@@ -68,6 +69,8 @@ def actual_path_for_target(target_path):
   return product_path_for_target(target_path)
 
 
+_open_deps_parameters = { 'binary', 'buffering', 'encoding', 'errors', 'newline' }
+
 def open_dep(target_path, binary=False, buffering=-1, encoding=None, errors=None, newline=None):
   '''
   Open a dependency for reading.
@@ -85,24 +88,48 @@ def open_dep(target_path, binary=False, buffering=-1, encoding=None, errors=None
     raise
 
 
-_loaders = {
-  '.csv' : (csv_reader, {'newlines': ''}),
-  '.json' : (load_json, {}),
-  '.jsonl' : (load_jsonl, {}),
-  '.jsons' : (load_jsons, {}),
-}
+_loaders = {}
 
-def add_loader(ext, fn, **open_args):
+def add_loader(ext, fn, **open_dep_kwargs):
+  '''
+  Register a loader function, which will be called by `muck.load` for matching `ext`.
+  Any keyword arguments passed here will be used as defaults when calling `open_dep`,
+  and will determine which keyword arguments passed to `muck.load` will be passed to open_dep;
+  all other keyword arguments will be passed to `fn`.
+  '''
   if not ext.startswith('.'):
     raise ValueError("file extension does not start with '.': {!r}".format(ext))
-  _loaders[ext] = (fn, open_args)
+  if ext not in _default_loaders:
+    try: existing_fn, _ = _loaders[ext]
+    except KeyError: pass
+    else: raise Exception('add_loader: extension previously registered: {!r}; fn: {!r}'.format(ext, existing_fn))
+  for k, v in sorted(open_dep_kwargs.items()):
+    if k not in _open_deps_parameters: raise KeyError(k)
+  _loaders[ext] = (fn, open_dep_kwargs)
 
+
+def load_txt(f): return f
+
+_default_loaders = (
+  ('.csv',   csv_reader, dict(newline='')),
+  ('.json',  load_json, dict(encoding=None)),
+  ('.jsonl', load_jsonl, dict(encoding=None)),
+  ('.jsons', load_jsons, dict(encoding=None)),
+  ('.txt',   load_txt, dict(binary=False, buffering=-1, encoding=None, errors=None, newline=None)),
+)
+
+for ext, fn, args in _default_loaders:
+  add_loader(ext, fn, **args)
 
 def load(target_path, ext=None, **kwargs):
   '''
   Select an appropriate loader based on the file extension, or `ext` if specified.
-  If a loader is found, then `open_dep` is called with the registered `open_args`,
-  and the loader is called with `kwargs`.
+
+  If a loader is found, then `open_dep` is called with the default `open_dep_kwargs` registered by `add_loader`,
+  except updated by any values with matching keys in `kwargs`.
+  The remaining `kwargs` are passed to the loader function registered by `add_loader`.
+  Thus, keyword arguments passed to `load` get divvied up between `open_dep` and the custom load function.
+
   If no loader is found, raise an error.
 
   Muck's static analysis looks specifically for this function to infer dependencies;
@@ -111,11 +138,18 @@ def load(target_path, ext=None, **kwargs):
   if ext is None:
     ext = path_ext(target_path)
   elif not isinstance(ext, str): raise TypeError(ext)
-  try: load_fn, open_args = _loaders[ext]
+  try: load_fn, std_open_args = _loaders[ext]
   except KeyError:
     errFL('No loader found for target: {!r}', target_path)
     raise
-  file = open_dep(target_path, open_args)
+  open_args = std_open_args.copy()
+  # transfer all matching kwargs to open_args.
+  for k in std_open_args:
+    try: v = kwargs[k]
+    except KeyError: continue
+    open_args[k] = v
+    del kwargs[k] # only pass this arg to open_deps; del is safe because kwargs has local lifetime.
+  file = open_dep(target_path, **open_args)
   return load_fn(file, **kwargs)
 
 
