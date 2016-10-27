@@ -154,7 +154,7 @@ def muck_deps(ctx, args):
     deps = all_deps_for_target(ctx, target)
     dependents = target_dependents[target]
     if depth == 0 and len(dependents) > 0:
-      suffix = ' (dependents: {}):\n'.format(' '.join(sorted(dependents)))
+      suffix = ' (dependents: {}):'.format(' '.join(sorted(dependents)))
     elif len(dependents) > 1: suffix = '*'
     elif len(deps) == 0:      suffix = ''
     else:                     suffix = ':'
