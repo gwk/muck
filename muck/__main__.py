@@ -47,18 +47,18 @@ def main():
 
   make_dirs(build_dir) # required for load_info.
 
-  ctx = Ctx(info=load_info(), statuses={}, dir_names={}, dbgF=dbgF)
+  ctx = Ctx(info=load_info(), statuses={}, dir_names={}, dependents=defaultdict(set), dbgF=dbgF)
 
   if command_fn:
     assert command_needs_ctx
     command_fn(ctx, args.targets[1:])
   else: # no command; default behavior is to update each specified target.
     for target in args.targets:
-      update_dependency(ctx, target, force=True)
+      update_dependency(ctx, target, dependent=None, force=True)
 
 
 
-Ctx = namedtuple('Ctx', 'info statuses dir_names dbgF')
+Ctx = namedtuple('Ctx', 'info statuses dir_names dependents dbgF')
 # info: dict (target_path: str => TargetInfo).
 # statuses: dict (target_path: str => is_changed: bool|Ellipsis).
 # dir_names: dict (dir_path: str => names: [str]).
@@ -137,23 +137,16 @@ def muck_deps(ctx, args):
   '''
   args = frozenset(args) # deduplicate arguments.
   targets = args or frozenset(ctx.info); # default to all known targets.
-  target_dependents = defaultdict(set)
-
-  def update_and_count_deps(target):
-    update_dependency(ctx, target)
-    for dependency in all_deps_for_target(ctx, target):
-      target_dependents[dependency].add(target)
-      update_and_count_deps(dependency)
 
   for target in sorted(targets):
-    update_and_count_deps(target)
+    update_dependency(ctx, target, dependent=None)
 
-  roots = set(args) or { t for t in targets if t not in target_dependents }
-  roots.update(t for t, s in target_dependents.items() if len(s) > 1)
+  roots = set(args) or { t for t in targets if t not in ctx.dependents }
+  roots.update(t for t, s in ctx.dependents.items() if len(s) > 1)
 
   def visit(depth, target):
     deps = all_deps_for_target(ctx, target)
-    dependents = target_dependents[target]
+    dependents = ctx.dependents[target]
     if depth == 0 and len(dependents) > 0:
       suffix = ' (dependents: {}):'.format(' '.join(sorted(dependents)))
     elif len(dependents) > 1: suffix = '*'
@@ -192,7 +185,7 @@ muck patch error: patch command takes one or two arguments. usage:
     patch_path = target_path + '.pat'
     if path_exists(patch_path):
       failF('muck patch error: {}: patch already exists.', patch_path)
-    update_dependency(ctx, orig_target_path)
+    update_dependency(ctx, orig_target_path, dependent=None)
     orig_path = actual_path_for_target(orig_target_path)
     prod_path = product_path_for_target(target_path)
     if path_exists(prod_path):
@@ -207,7 +200,7 @@ muck patch error: patch command takes one or two arguments. usage:
       failF('muck patch error: argument does not specify a .pat file: {!r}', patch_path)
     deps = pat_dependencies(patch_path, open(patch_path), {})
     orig_target_path = deps[0]
-    update_dependency(ctx, orig_target_path)
+    update_dependency(ctx, orig_target_path, dependent=None)
     orig_path = actual_path_for_target(orig_target_path)
     target_path = path_stem(patch_path)
     prod_path = product_path_for_target(target_path)
@@ -241,7 +234,7 @@ commands = {
 # Default update functionality.
 
 
-def update_dependency(ctx: Ctx, target_path: str, force=False) -> bool:
+def update_dependency(ctx: Ctx, target_path: str, dependent: Optional[str], force=False) -> bool:
   '''
   returns is_changed.
   '''
@@ -254,6 +247,9 @@ def update_dependency(ctx: Ctx, target_path: str, force=False) -> bool:
   if target_ext in reserved_exts:
     failF(target_path, 'target name has reserved extension; please rename the target.')
 
+  if dependent is not None:
+    ctx.dependents[target_path].add(dependent)
+
   try: # if in ctx.statuses, this path has already been visited on this run.
     status = ctx.statuses[target_path]
     if status is Ellipsis: # recursion sentinal.
@@ -265,7 +261,7 @@ def update_dependency(ctx: Ctx, target_path: str, force=False) -> bool:
 
   ctx.statuses[target_path] = Ellipsis # recursion sentinal is replaced before return.
 
-  ctx.dbgF(target_path, 'examining...')
+  ctx.dbgF(target_path, 'examining... (dependent={})', dependent)
 
   is_product = not path_exists(target_path)
   actual_path = product_path_for_target(target_path) if is_product else target_path
@@ -524,13 +520,14 @@ def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
 
 
 def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mtime, old) -> bool:
-  src_path, use_std_out = source_for_target(target_path, ctx.dir_names)
+  ctx.dbgF(target_path, 'update_product')
+  src_path, use_std_out = source_for_target(ctx, target_path, ctx.dir_names)
   if old.src_path != src_path:
     is_changed = True
     if old.src_path:
       noteF(target_path, 'source path of target product changed\n  was: {}\n  now: {}',
         old.src_path, src_path)
-  is_changed |= update_dependency(ctx, src_path)
+  is_changed |= update_dependency(ctx, src_path, dependent=target_path)
 
   if is_changed: # must rebuild product.
     actual_src_path = actual_path_for_target(src_path) # source might itself be a product.
@@ -550,6 +547,7 @@ def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mt
 
 
 def update_non_product(ctx: Ctx, target_path: str, is_changed: bool, size, mtime, old) -> bool:
+  ctx.dbgF(target_path, 'update_non_product')
   file_hash = hash_for_path(target_path) # must be calculated in all cases.
   if not is_changed: # all we know is that it exists and status as a source has not changed.
     is_changed = (size != old.size or file_hash != old.hash)
@@ -560,12 +558,13 @@ def update_non_product(ctx: Ctx, target_path: str, is_changed: bool, size, mtime
 
 
 def update_deps_and_info(ctx, target_path: str, actual_path: str, is_changed, size, mtime, file_hash, src_path, old_deps) -> bool:
+  ctx.dbgF(target_path, 'update_deps_and_info')
   if is_changed:
     deps = calc_dependencies(actual_path, ctx.dir_names)
   else:
     deps = old_deps
   for dep in deps:
-    is_changed |= update_dependency(ctx, dep)
+    is_changed |= update_dependency(ctx, dep, dependent=target_path)
 
   ctx.statuses[target_path] = is_changed # replace sentinal with final value.
   info = TargetInfo(size, mtime, file_hash, src_path, deps)
@@ -577,7 +576,7 @@ def update_deps_and_info(ctx, target_path: str, actual_path: str, is_changed, si
   return is_changed
 
 
-def source_for_target(target_path, dir_names_cache=None):
+def source_for_target(ctx, target_path, dir_names_cache=None):
   '''
   assumes target_path does not exist.
   returns (source_path: string, use_std_out: bool).
@@ -598,9 +597,9 @@ def source_for_target(target_path, dir_names_cache=None):
     use_std_out = False
     src_stem = prod_stem
   if len(src_names) == 0:
-    failF('TODO', 'no source candidates matching `{}`', src_stem)
+    failF(', '.join(sorted(ctx.dependents[target_path])), 'no source candidates matching `{}`', src_stem)
   if len(src_names) != 1:
-    failF('TODO', 'multiple source candidates matching `{}`: {}', src_stem, src_names)
+    failF(', '.join(sorted(ctx.dependents[target_path])), 'multiple source candidates matching `{}`: {}', src_stem, src_names)
   ultimate_src_name = src_names[0]
   src_name = immediate_source_name(ultimate_src_name, src_stem)
   src_path = path_join(src_dir, src_name)
