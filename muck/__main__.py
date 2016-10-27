@@ -291,11 +291,13 @@ def update_dependency(ctx: Ctx, target_path: str, force=False) -> bool:
 
 
 def list_dependencies(src_path, src_file, dir_names):
+  'Calculate dependencies for .list files.'
   lines = (line.strip() for line in src_file)
   return [l for l in lines if l and not l.startswith('#')]
 
 
 def mush_dependencies(src_path, src_file, dir_names):
+  'Calculate dependencies for .mush files.'
   for line in src_file:
     for token in shlex.split(line):
       if path_ext(token):
@@ -315,6 +317,7 @@ except ImportError:
 
 
 def py_dep_call(src_path, node):
+  'Calculate dependencies for a Python ast.Call node.'
   func = node.func
   if not isinstance(func, ast.Attribute): return
   if not isinstance(func.value, ast.Name): return
@@ -329,6 +332,7 @@ def py_dep_call(src_path, node):
 
 
 def py_dep_import(src_path, module_name, dir_names):
+  'Calculate dependencies for a Python ast.Import or ast.ImportFrom node.'
   src_dir = path_dir(src_path)
   leading_dots_count = re.match('\.*', module_name).end()
   module_parts = ['..'] * leading_dots_count + module_name[leading_dots_count:].split('.')
@@ -338,7 +342,7 @@ def py_dep_import(src_path, module_name, dir_names):
 
 
 def py_dependencies(src_path, src_file, dir_names):
-  'Calculate dependencies of a python3 source file.'
+  'Calculate dependencies for a .py (python3 source) file.'
   src_text = src_file.read()
   tree = ast.parse(src_text, src_path)
   for node in ast.walk(tree):
