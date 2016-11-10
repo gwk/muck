@@ -6,5 +6,6 @@
 
 # muck.
 _build/
+_fetch/
 _misc/
 muck.egg-info
