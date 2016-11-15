@@ -144,7 +144,7 @@ def load(target_path, ext=None, **kwargs):
     raise
   open_args = std_open_args.copy()
   # transfer all matching kwargs to open_args.
-  for k in std_open_args:
+  for k in _open_deps_parameters:
     try: v = kwargs[k]
     except KeyError: continue
     open_args[k] = v
