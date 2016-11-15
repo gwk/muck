@@ -527,7 +527,8 @@ build_tools = {
   '.list' : [], # no-op.
   '.mush' : ['mush'],
   '.pat' : ['pat', 'apply'],
-  '.py' : ['python{}.{}'.format(sys.version_info.major, sys.version_info.minor)], # use the same version of python that muck is running under.
+  '.py' : ['python{}.{}'.format(sys.version_info.major, sys.version_info.minor)],
+    # use the same version of python that muck is running under.
   '.wu' : ['writeup'],
 }
 
