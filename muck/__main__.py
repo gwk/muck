@@ -303,7 +303,7 @@ def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
 
 def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mtime, old) -> bool:
   ctx.dbgF(target_path, 'update_product')
-  src_path, use_std_out = source_for_target(ctx, target_path, ctx.dir_names)
+  src_path, use_std_out = source_for_target(ctx, target_path)
   if old.src_path != src_path:
     is_changed = True
     if old.src_path:
@@ -586,42 +586,39 @@ def file_size_and_mtime(path):
   return (stats.st_size, stats.st_mtime)
 
 
-def source_for_target(ctx, target_path, dir_names_cache=None):
+def source_for_target(ctx, target_path):
   '''
   assumes target_path does not exist.
   returns (source_path: string, use_std_out: bool).
   '''
   src_dir, prod_name = split_dir_name(target_path)
-  prod_stem, prod_ext = split_stem_ext(prod_name)
-  src_dir_names = list_dir_filtered(src_dir or '.', cache=dir_names_cache)
-  # if a source file stem contains the complete target name, including extension, prefer that.
-  src_names = list(filter_source_names(src_dir_names, prod_name))
-  if src_names:
-    # only use stdout for targets with extensions;
-    # extensionless targets are typically either phony or binary programs.
-    use_std_out = bool(path_ext(prod_name))
-    src_stem = prod_name
-  else: # fall back to sources that do not indicate output extension.
-    # TODO: decide if there is value to this feature; causes confusion when an extension is misspelled in a source file name.
-    src_names = list(filter_source_names(src_dir_names, prod_stem))
-    use_std_out = False
-    src_stem = prod_stem
-  if len(src_names) == 0:
-    failF(', '.join(sorted(ctx.dependents[target_path])), 'no source candidates matching `{}`', src_stem)
-  if len(src_names) != 1:
-    failF(', '.join(sorted(ctx.dependents[target_path])), 'multiple source candidates matching `{}`: {}', src_stem, src_names)
-  ultimate_src_name = src_names[0]
-  src_name = immediate_source_name(ultimate_src_name, src_stem)
+  src_name, matched_ext = source_candidate(ctx, target_path, src_dir, prod_name)
   src_path = path_join(src_dir, src_name)
   assert src_path != target_path
+  # only use stdout for targets with extensions; extensionless targets are typically either phony or binary programs.
+  use_std_out = matched_ext and bool(path_ext(prod_name))
   return (src_path, use_std_out)
 
 
-def list_dir_filtered(src_dir, cache=None):
-  'caches and returns the list of names in a source directory that might be source files.'
-  try:
-    if cache is not None:
-      return cache[src_dir]
+def source_candidate(ctx, target_path, src_dir, prod_name):
+  src_dir_names = list_dir_filtered(src_dir or '.', cache=ctx.dir_names)
+  src_candidates = list(filter_source_names(src_dir_names, prod_name))
+  if len(src_candidates) == 1:
+    return src_candidates[0]
+  # error.
+  deps = ', '.join(sorted(ctx.dependents[target_path])) or target_path
+  if len(src_candidates) == 0:
+    failF(deps, 'no source candidates matching `{}`', target_path)
+  else:
+    failF(deps, 'multiple source candidates matching `{}`: {}', target_path, [p[0] for p in src_names])
+
+
+def list_dir_filtered(src_dir, cache):
+  '''
+  Given src_dir, Cache and return the list of names that might be source files.
+  TODO: eventually this should be replaced by using os.scandir.
+  '''
+  try: return cache[src_dir]
   except KeyError: pass
   names = [n for n in list_dir(src_dir) if n not in reserved_names and not n.startswith('.')]
   if cache is not None:
@@ -630,17 +627,42 @@ def list_dir_filtered(src_dir, cache=None):
 
 
 def filter_source_names(names, prod_name):
-  l = len(prod_name)
-  for name in names:
-    if name.startswith(prod_name) and len(name) > l and name[l] == '.' \
-    and path_ext(name) not in ignored_exts:
-      yield name
+  '''
+  given product name "x.txt", match all of the following:
+  * x.txt.py
+  * x.py
+  * %.txt.py
+  * %.py
+
+  There are several concerns that make this matching complex.
+  * For a product name stem.ext, we allow a match of just the stem, e.g. stem.py.
+    This allows stem.py to produce more than one output, differentiated by extension.
+    (TODO: the dependency manager does not yet correctly handle this).
+    Such extensionless scripts cannot use stdout for output.
+  * Muck allows wildcards in script names.
+    This allows a single script to produce many targets for corresponding sources;
+    see muck.target_var().
+  * Lastly, a source might itself be the product of another source.
+  '''
+  prod = prod_name.split('.')
+  for src_name in names:
+    src = src_name.split('.')
+    if len(prod) == 2: # normal `stem.ext` name. allow matching of stem only.
+      if len(src) < 2: continue
+      # If src is simply src.ext, then we are satisfied if just the stems match.
+      if not match_comp(src[0], prod[0]): continue
+      ext_matches = bool(match_comp(src[1], prod[1]))
+      yield '.'.join(src[:3]), ext_matches # note: include the second extension src has it.
+    else: # For products with multiple extensions (produced sources), match the entire product name.
+      if len(src) <= len(prod): continue
+      if all(match_comp(*p) for p in zip(src, prod)): # zip stops when src is exhausted.
+        yield '.'.join(src[:len(src)+1]), True
 
 
-def immediate_source_name(name, src_stem):
-  i = name.find('.', len(src_stem) + 2) # skip the stem and the first extension dot.
-  if i == -1: return name
-  return name[:i] # omit all extensions but the first.
+def match_comp(src, prod):
+  src_chunks = src.split('%') # split by the muck wildcard character, chosen because bash treats it as a plain char.
+  src_pattern = '.+'.join(re.escape(chunk) for chunk in src_chunks)
+  return re.fullmatch(src_pattern, prod)
 
 
 def noteF(path, fmt, *items):
