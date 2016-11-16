@@ -25,7 +25,7 @@ from pithy.task import runC
 from typing import Optional
 
 from muck import (actual_path_for_target, build_dir, ignored_exts, info_name,
-reserved_exts, product_path_for_target, reserved_names)
+reserved_exts, product_path_for_target, reserved_names, regex_for_wildcard_path)
 
 
 def main():
@@ -660,9 +660,8 @@ def filter_source_names(names, prod_name):
 
 
 def match_comp(src, prod):
-  src_chunks = src.split('%') # split by the muck wildcard character, chosen because bash treats it as a plain char.
-  src_pattern = '.+'.join(re.escape(chunk) for chunk in src_chunks)
-  return re.fullmatch(src_pattern, prod)
+  r = regex_for_wildcard_path(src)
+  return r.fullmatch(prod)
 
 
 def noteF(path, fmt, *items):
