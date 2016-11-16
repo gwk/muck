@@ -6,7 +6,7 @@ assert sys.version_info.major == 3 # python 2 is not supported.
 
 import random
 import time
-
+import re
 import requests
 import pithy.meta as meta
 
@@ -30,6 +30,9 @@ __all__ = [
   'load',
   'load_url',
   'open_dep',
+  'regex_for_wildcard_path',
+  'target_var',
+  'target_vars',
   'transform',
 ]
 
@@ -53,6 +56,30 @@ reserved_exts = {
 ignored_exts = {
   '.err', '.iot', '.out', # iotest extensions.
 }
+
+
+_wildcard_re = re.compile(r'(%+)')
+
+def regex_for_wildcard_path(path):
+  '''
+  Split by the muck wildcard character, '%'.
+  This character was chosen because bash treats it as a plain char.
+  Consecutive wildcards indicate required padding.
+  '''
+  chunks = _wildcard_re.split(path)
+  pattern = ''.join('({}+)'.format('.' * len(s)) if s.startswith('%') else re.escape(s) for s in chunks)
+  return re.compile(pattern)
+
+
+def target_vars():
+  script_path, output_path = argv
+  script_stem = path_stem(script_path)
+  r = regex_for_wildcard_path(path_join(build_dir, script_stem))
+  m = r.match(output_path)
+  return m.groups()
+
+
+def target_var(): return target_vars()[0]
 
 
 def dst_path(): return argv[1]
