@@ -25,6 +25,7 @@ from typing import Optional
 __all__ = [
   'HTTPError',
   'add_loader',
+  'dst_path',
   'fetch',
   'load',
   'load_url',
@@ -52,6 +53,9 @@ reserved_exts = {
 ignored_exts = {
   '.err', '.iot', '.out', # iotest extensions.
 }
+
+
+def dst_path(): return argv[1]
 
 
 def is_product_path(path):
