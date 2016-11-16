@@ -304,7 +304,7 @@ def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
 
 def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mtime, old) -> bool:
   ctx.dbgF(target_path, 'update_product')
-  src_path, use_std_out = source_for_target(ctx, target_path)
+  src_path = source_for_target(ctx, target_path)
   if old.src_path != src_path:
     is_changed = True
     if old.src_path:
@@ -314,7 +314,7 @@ def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mt
 
   if is_changed: # must rebuild product.
     actual_src_path = actual_path_for_target(src_path) # source might itself be a product.
-    has_product = build_product(ctx.info, target_path, actual_src_path, actual_path, use_std_out)
+    has_product = build_product(ctx.info, target_path, actual_src_path, actual_path)
     if has_product:
       size, mtime = file_size_and_mtime(actual_path)
       file_hash = hash_for_path(actual_path)
@@ -451,7 +451,7 @@ dependency_fns = {
 # Build.
 
 
-def build_product(info: dict, target_path: str, src_path: str, prod_path: str, use_std_out: bool) -> bool:
+def build_product(info: dict, target_path: str, src_path: str, prod_path: str) -> bool:
   '''
   build a product from a source.
   '''
@@ -465,7 +465,6 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str, u
   prod_path_tmp = prod_path + '.tmp'
   remove_file_if_exists(prod_path_out)
   remove_file_if_exists(prod_path_tmp)
-  # TODO: if not use_std_out, then maybe we should remove all products with matching stem?
 
   if not build_tool:
     noteF(target_path, 'no op.')
@@ -482,13 +481,16 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str, u
     custom_env = env_fn()
     env.update(custom_env)
 
-  noteF(target_path, 'building: `{}` ({} stdout)',
-    ' '.join(shlex.quote(w) for w in cmd), ('capturing' if use_std_out else 'ignoring'))
-  out_file = open(prod_path_out, 'wb') if use_std_out else None
+  is_bare_target = not path_ext(target_path)
+  has_wildcards = ('%' in src_path)
+  allow_empty = (is_bare_target and has_wildcards)
+
+  noteF(target_path, 'building: `{}`', ' '.join(shlex.quote(w) for w in cmd))
+  out_file = open(prod_path_out, 'wb')
   time_start = time.time()
   code = runC(cmd, env=env, out=out_file)
   time_end = time.time()
-  if out_file: out_file.close()
+  out_file.close()
   has_product = True
   if code != 0:
     failF(target_path, 'build failed with code: {}', code)
@@ -498,25 +500,22 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str, u
     move_file(path, prod_path, overwrite=True)
 
   via_msg = '.tmp'
-  if use_std_out:
-    if path_exists(prod_path_tmp):
-      move_to_prod(prod_path_tmp)
-      if file_size(prod_path_out) == 0:
-        remove_file(prod_path_out)
-      else:
-        warnF(target_path, 'wrote data directly to `{}`;\n  ignoring output captured in `{}`',
-          prod_path_tmp, prod_path_out)
+  if path_exists(prod_path_tmp):
+    move_to_prod(prod_path_tmp)
+    if file_size(prod_path_out) == 0:
+      remove_file(prod_path_out)
     else:
-      via_msg = 'stdout'
-      move_to_prod(prod_path_out)
-  else: # not use_std_out.
-    if path_exists(prod_path_tmp):
-      move_to_prod(prod_path_tmp)
-    elif path_ext(prod_path): # target is not bare (therefore assumed not phony) target.
-      failF(target_path, 'process failed to produce product: {}', prod_path_tmp)
-    else:
+      warnF(target_path, 'wrote data directly to `{}`;\n  ignoring output captured in `{}`',
+        prod_path_tmp, prod_path_out)
+  else:
+    via_msg = 'stdout'
+    if allow_empty and file_size(prod_path_out) == 0:
       has_product = False
       noteF(target_path, 'no product.')
+      remove_file(prod_path_out)
+    else:
+      move_to_prod(prod_path_out)
+
   if has_product:
     suffix = '; {} (via {})'.format(format_byte_count_dec(file_size(prod_path)), via_msg)
   else:
@@ -590,19 +589,13 @@ def file_size_and_mtime(path):
 
 def source_for_target(ctx, target_path):
   '''
-  assumes target_path does not exist.
-  returns (source_path: string, use_std_out: bool).
+  Find the unique source path to whose name matches `target_path`, or else error.
   '''
   src_dir, prod_name = split_dir_name(target_path)
   src_name = source_candidate(ctx, target_path, src_dir, prod_name)
   src_path = path_join(src_dir, src_name)
   assert src_path != target_path
-  # only use stdout for targets with explicit extensions.
-  # extensionless targets are typically either phony or binary programs;
-  # wildcard extensions indicate that the script produces more than one output.
-  src_ext = path_ext(src_path)
-  use_std_out = bool(src_ext) and '%' not in src_ext
-  return (src_path, use_std_out)
+  return src_path
 
 
 def source_candidate(ctx, target_path, src_dir, prod_name):
