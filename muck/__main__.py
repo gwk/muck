@@ -481,7 +481,8 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str, u
     custom_env = env_fn()
     env.update(custom_env)
 
-  noteF(target_path, 'building: `{}`', ' '.join(shlex.quote(w) for w in cmd))
+  noteF(target_path, 'building: `{}` ({} stdout)',
+    ' '.join(shlex.quote(w) for w in cmd), ('capturing' if use_std_out else 'ignoring'))
   out_file = open(prod_path_out, 'wb') if use_std_out else None
   time_start = time.time()
   code = runC(cmd, env=env, out=out_file)
@@ -592,25 +593,28 @@ def source_for_target(ctx, target_path):
   returns (source_path: string, use_std_out: bool).
   '''
   src_dir, prod_name = split_dir_name(target_path)
-  src_name, matched_ext = source_candidate(ctx, target_path, src_dir, prod_name)
+  src_name = source_candidate(ctx, target_path, src_dir, prod_name)
   src_path = path_join(src_dir, src_name)
   assert src_path != target_path
-  # only use stdout for targets with extensions; extensionless targets are typically either phony or binary programs.
-  use_std_out = matched_ext and bool(path_ext(prod_name))
+  # only use stdout for targets with explicit extensions.
+  # extensionless targets are typically either phony or binary programs;
+  # wildcard extensions indicate that the script produces more than one output.
+  src_ext = path_ext(src_path)
+  use_std_out = bool(src_ext) and '%' not in src_ext
   return (src_path, use_std_out)
 
 
 def source_candidate(ctx, target_path, src_dir, prod_name):
   src_dir_names = list_dir_filtered(src_dir or '.', cache=ctx.dir_names)
-  src_candidates = list(filter_source_names(src_dir_names, prod_name))
-  if len(src_candidates) == 1:
-    return src_candidates[0]
+  candidates = list(filter_source_names(src_dir_names, prod_name))
+  if len(candidates) == 1:
+    return candidates[0]
   # error.
   deps = ', '.join(sorted(ctx.dependents[target_path])) or target_path
-  if len(src_candidates) == 0:
+  if len(candidates) == 0:
     failF(deps, 'no source candidates matching `{}`', target_path)
   else:
-    failF(deps, 'multiple source candidates matching `{}`: {}', target_path, [p[0] for p in src_names])
+    failF(deps, 'multiple source candidates matching `{}`: {}', target_path, candidates)
 
 
 def list_dir_filtered(src_dir, cache):
@@ -635,28 +639,17 @@ def filter_source_names(names, prod_name):
   * %.py
 
   There are several concerns that make this matching complex.
-  * For a product name stem.ext, we allow a match of just the stem, e.g. stem.py.
-    This allows stem.py to produce more than one output, differentiated by extension.
-    (TODO: the dependency manager does not yet correctly handle this).
-    Such extensionless scripts cannot use stdout for output.
   * Muck allows wildcards in script names.
     This allows a single script to produce many targets for corresponding sources;
     see muck.target_var().
-  * Lastly, a source might itself be the product of another source.
+  * A source might itself be the product of another source.
   '''
   prod = prod_name.split('.')
   for src_name in names:
     src = src_name.split('.')
-    if len(prod) == 2: # normal `stem.ext` name. allow matching of stem only.
-      if len(src) < 2: continue
-      # If src is simply src.ext, then we are satisfied if just the stems match.
-      if not match_comp(src[0], prod[0]): continue
-      ext_matches = bool(match_comp(src[1], prod[1]))
-      yield '.'.join(src[:3]), ext_matches # note: include the second extension src has it.
-    else: # For products with multiple extensions (produced sources), match the entire product name.
-      if len(src) <= len(prod): continue
-      if all(match_comp(*p) for p in zip(src, prod)): # zip stops when src is exhausted.
-        yield '.'.join(src[:len(src)+1]), True
+    if len(src) <= len(prod): continue
+    if all(match_comp(*p) for p in zip(src, prod)): # zip stops when src is exhausted.
+      yield '.'.join(src[:len(src)+1]) # the immediate source name has just one extension added.
 
 
 def match_comp(src, prod):
