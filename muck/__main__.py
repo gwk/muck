@@ -24,7 +24,7 @@ from pithy.string_utils import format_byte_count_dec
 from pithy.task import runC
 from typing import Optional
 
-from muck import (actual_path_for_target, build_dir, ignored_exts, info_name,
+from muck import (actual_path_for_target, build_dir, build_dir_slash, ignored_exts, is_product_path, info_name,
 reserved_exts, product_path_for_target, reserved_names, regex_for_wildcard_path)
 
 
@@ -71,6 +71,7 @@ Ctx = namedtuple('Ctx', 'info statuses dir_names dependents dbgF')
 info_path = path_join(build_dir, info_name)
 
 TargetInfo = namedtuple('TargetInfo', 'size mtime hash src_path deps')
+empty_info = TargetInfo(None, None, None, None, ())
 
 def all_deps_for_target(ctx, target):
   info = ctx.info[target]
@@ -265,7 +266,7 @@ def update_dependency(ctx: Ctx, target_path: str, dependent: Optional[str], forc
 
   is_product = not path_exists(target_path)
   actual_path = product_path_for_target(target_path) if is_product else target_path
-  size, mtime, old = calculate_info(ctx, target_path, actual_path)
+  size, mtime, old = calc_size_mtime_old(ctx, target_path, actual_path)
   has_old_file = (mtime is not None)
   has_old_info = (old.mtime is not None)
 
@@ -314,19 +315,34 @@ def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mt
 
   if is_changed: # must rebuild product.
     actual_src_path = actual_path_for_target(src_path) # source might itself be a product.
-    has_product = build_product(ctx.info, target_path, actual_src_path, actual_path)
-    if has_product:
-      size, mtime = file_size_and_mtime(actual_path)
-      file_hash = hash_for_path(actual_path)
-      is_changed = (size != old.size or file_hash != old.hash)
-      if not is_changed:
-        noteF(target_path, 'product did not change (same size and hash).')
-    else:
-      size, mtime, file_hash = None, None, None
-  else:
+    tmp_paths = build_product(ctx, target_path, actual_src_path, actual_path)
+    ctx.dbgF(target_path, 'tmp_paths: {}', tmp_paths)
+    if tmp_paths:
+      is_changed = False # now determine if any product has actually changed.
+      for tmp_path in tmp_paths:
+        is_changed |= update_product_with_tmp(ctx, src_path, tmp_path)
+      return is_changed
+    size, mtime, file_hash = None, None, None # no product.
+  else: # not is_changed.
     file_hash = old.hash
-
   return update_deps_and_info(ctx, target_path, actual_path, is_changed, size, mtime, file_hash, src_path, old.deps)
+
+
+def update_product_with_tmp(ctx: Ctx, src_path: str, tmp_path: str):
+  product_path, ext = split_stem_ext(tmp_path)
+  if ext not in ('.tmp', '.out'):
+    failF(tmp_path, 'product output path has unexpected extension: {!r}', ext)
+  if not is_product_path(product_path):
+     failF(product_path, 'product path is not in build dir.')
+  target_path = product_path[len(build_dir_slash):]
+  size, mtime, old = calc_size_mtime_old(ctx, target_path, tmp_path)
+  ctx.info.pop(target_path, None) # delete metadata if it exists, just before overwrite.
+  move_file(tmp_path, product_path, overwrite=True)
+  file_hash = hash_for_path(product_path)
+  is_changed = (size != old.size or file_hash != old.hash)
+  if not is_changed:
+    noteF(target_path, 'product did not change (same size and hash).')
+  return update_deps_and_info(ctx, target_path, product_path, is_changed, size, mtime, file_hash, src_path, old.deps)
 
 
 def update_non_product(ctx: Ctx, target_path: str, is_changed: bool, size, mtime, old) -> bool:
@@ -451,9 +467,10 @@ dependency_fns = {
 # Build.
 
 
-def build_product(info: dict, target_path: str, src_path: str, prod_path: str) -> bool:
+def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
   '''
-  build a product from a source.
+  Run a source file, producing zero or more products.
+  Return a list of produced product paths.
   '''
   src_ext = path_ext(src_path)
   try:
@@ -483,7 +500,6 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str) -
 
   is_bare_target = not path_ext(target_path)
   has_wildcards = ('%' in src_path)
-  allow_empty = (is_bare_target and has_wildcards)
 
   noteF(target_path, 'building: `{}`', ' '.join(shlex.quote(w) for w in cmd))
   out_file = open(prod_path_out, 'wb')
@@ -491,37 +507,35 @@ def build_product(info: dict, target_path: str, src_path: str, prod_path: str) -
   code = runC(cmd, env=env, out=out_file)
   time_end = time.time()
   out_file.close()
-  has_product = True
   if code != 0:
     failF(target_path, 'build failed with code: {}', code)
 
-  def move_to_prod(path):
-    info.pop(target_path, None) # delete metadata as we overwrite old file.
-    move_file(path, prod_path, overwrite=True)
-
-  via_msg = '.tmp'
-  if path_exists(prod_path_tmp):
-    move_to_prod(prod_path_tmp)
+  def cleanup_out():
     if file_size(prod_path_out) == 0:
       remove_file(prod_path_out)
     else:
-      warnF(target_path, 'wrote data directly to `{}`;\n  ignoring output captured in `{}`',
-        prod_path_tmp, prod_path_out)
-  else:
-    via_msg = 'stdout'
-    if allow_empty and file_size(prod_path_out) == 0:
-      has_product = False
-      noteF(target_path, 'no product.')
-      remove_file(prod_path_out)
-    else:
-      move_to_prod(prod_path_out)
+      warnF(target_path, 'wrote data directly to `{}`;\n  ignoring output captured in `{}`', prod_path_tmp, prod_path_out)
 
-  if has_product:
-    suffix = '; {} (via {})'.format(format_byte_count_dec(file_size(prod_path)), via_msg)
-  else:
-    suffix = ''
-  noteF(target_path, 'finished: {:0.2f} seconds{}.', time_end - time_start, suffix)
-  return has_product
+  def note_results(suffix):
+    noteF(target_path, 'finished: {:0.2f} seconds; {}.', time_end - time_start, suffix)
+
+  tmp_list_path = prod_path_tmp + '_list'
+  try: f = open(tmp_list_path)
+  except FileNotFoundError: # no list.
+    if not path_exists(prod_path_tmp): # stdout.
+      tmp_paths = [prod_path_out]
+      note_results('{} (via stdout)'.format(format_byte_count_dec(file_size(prod_path_out))))
+    else: # tmp.
+      tmp_paths = [prod_path_tmp]
+      cleanup_out()
+      note_results('{} (via tmp)'.format(format_byte_count_dec(file_size(prod_path_tmp))))
+  else: # list.
+    tmp_paths = f.readlines()
+    if prod_path_tmp not in tmp_paths:
+      failF(target_path, 'manifest of outputs does not contain target: {}', tmp_paths)
+    cleanup_out()
+    note_results('{} tmp files.', len(tmp_list))
+  return tmp_paths
 
 
 build_tools = {
@@ -564,21 +578,13 @@ def hash_for_path(path, max_chunks=sys.maxsize):
   return base64.urlsafe_b64encode(d).decode()
 
 
-def calculate_info(ctx: Ctx, target_path: str, actual_path: str) -> tuple:
+def calc_size_mtime_old(ctx: Ctx, target_path: str, actual_path: str) -> tuple:
   try:
     size, mtime = file_size_and_mtime(actual_path)
   except FileNotFoundError:
     size, mtime = None, None
   ctx.dbgF(target_path, 'size: {}; mtime: {}', size, mtime)
-
-  try:
-    old = ctx.info[target_path]
-  except KeyError: # no previous record.
-    ctx.dbgF(target_path, 'no old info.')
-    old = TargetInfo(None, None, None, None, [])
-  else: # have previous record. must check that it is not stale.
-    ctx.dbgF(target_path, 'has old info: {}', old)
-
+  old = ctx.info.get(target_path, empty_info)
   return size, mtime, old
 
 
