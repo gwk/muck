@@ -332,7 +332,7 @@ def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mt
 def update_non_product(ctx: Ctx, target_path: str, is_changed: bool, size, mtime, old) -> bool:
   ctx.dbgF(target_path, 'update_non_product')
   file_hash = hash_for_path(target_path) # must be calculated in all cases.
-  if not is_changed: # all we know is that it exists and status as a source has not changed.
+  if not is_changed: # all we know so far is that it exists and status as a source has not changed.
     is_changed = (size != old.size or file_hash != old.hash)
     if is_changed: # this is more interesting; report.
       noteF(target_path, 'source changed.')
