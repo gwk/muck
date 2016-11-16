@@ -296,8 +296,9 @@ def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
   # and we would rather compute the hash than report a false problem.
   if size != old.size or (mtime != old.mtime and hash_for_path(actual_path) != old.hash):
     ctx.dbgF(target_path, 'size: {} -> {}; mtime: {} -> {}', old.size, size, old.mtime, mtime)
+    # TODO: change language depending on whether product is derived from a patch?
     failF(target_path, 'existing product has changed; did you mean to update a patch?\n'
-      '  please save your changes if necessary and then `muck clean {}`.',
+      '  Otherwise, save your changes if necessary and then `muck clean {}`.',
       target_path)
 
 
