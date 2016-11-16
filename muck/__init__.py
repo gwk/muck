@@ -38,6 +38,7 @@ __all__ = [
 
 
 build_dir = '_build'
+build_dir_slash = build_dir + '/'
 info_name = '_muck_info.json'
 
 reserved_names = {
@@ -86,10 +87,10 @@ def dst_path(): return argv[1]
 
 
 def is_product_path(path):
-  return path == build_dir or path.startswith(build_dir + '/')
+  return path.startswith(build_dir_slash)
 
 def product_path_for_target(target_path):
-  if is_product_path(target_path):
+  if target_path == build_dir or is_product_path(target_path):
     raise ValueError('provided target path is prefixed with build dir: {}'.format(target_path))
   return path_join(build_dir, target_path)
 
