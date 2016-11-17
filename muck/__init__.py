@@ -25,14 +25,11 @@ from typing import Optional
 __all__ = [
   'HTTPError',
   'add_loader',
-  'dst_path',
+  'dst_file',
   'fetch',
   'load',
   'load_url',
   'open_dep',
-  'regex_for_wildcard_path',
-  'target_var',
-  'target_vars',
   'transform',
 ]
 
@@ -61,29 +58,71 @@ ignored_exts = {
 
 _wildcard_re = re.compile(r'(%+)')
 
-def regex_for_wildcard_path(path):
+def match_wildcards(wildcard_path, string):
   '''
   Split by the muck wildcard character, '%'.
   This character was chosen because bash treats it as a plain char.
   Consecutive wildcards indicate required padding.
   '''
-  chunks = _wildcard_re.split(path)
-  pattern = ''.join('({}+)'.format('.' * len(s)) if s.startswith('%') else re.escape(s) for s in chunks)
-  return re.compile(pattern)
+  chunks = _wildcard_re.split(wildcard_path)
+  pattern = ''.join('({}+)'.format('.' * len(s)) if is_wild(s) else re.escape(s) for s in chunks)
+  return re.fullmatch(pattern, string)
 
 
-def target_vars():
-  script_path, output_path = argv
-  script_stem = path_stem(script_path)
-  r = regex_for_wildcard_path(path_join(build_dir, script_stem))
-  m = r.match(output_path)
-  return m.groups()
+def is_wild(string): return isinstance(string, str) and string.startswith('%')
+
+def keep_wildcards(seq): return [el for el in seq if is_wild(el)]
 
 
-def target_var(): return target_vars()[0]
+def dst_path(argv, vars, strict=True):
+  src = argv[0]
+  args = argv[1:]
+
+  class Error(Exception):
+    def __init__(self, fmt, *items):
+      super().__init__(('source: {}; args: {}; vars: {}; ' + fmt).format(src, args, vars, *items))
+
+  if len(vars) != len(args):
+    raise Error('expected {} vars; received {}.', len(args), len(vars))
+
+  pairs = iter(enumerate(zip(args, vars), 1))
+  chunks = _wildcard_re.split(product_path_for_source(src))
+  parts = []
+  for c in chunks:
+    if is_wild(c): # replace chunk with either arg or var.
+      i, (a, v) = next(pairs)
+      if is_wild(v):
+        if strict and is_wild(a): raise Error('arg {}: both arg and var are wildcards.', i)
+        x = a
+      else:
+        x = v
+      parts.append('{:{pad}>{width}}'.format(x, pad=('0' if isinstance(x, int) else '_'), width=len(c)))
+    else:
+      parts.append(c)
+  return ''.join(parts) + '.tmp'
 
 
-def dst_path(): return argv[1]
+def manifest_path(argv):
+  return dst_path(argv, argv[1:], strict=False) + '_manifest'
+
+
+_dst_vars_opened = set()
+_manifest_file = None
+
+def dst_file(*vars, binary=False):
+  global _manifest_file
+  if '%' not in argv[0]: # no wildcards; no need for manifest.
+    if vars: raise ValueError(vars) # no wildcards in source path, so no vars accepted.
+    return open(product_path_for_source(argv[0] + '.tmp'), 'wb' if binary else 'w')
+  if vars in _dst_vars_opened:
+    raise Exception('file already opened for vars: {}'.format(vars))
+  _dst_vars_opened.add(vars)
+  path = dst_path(argv, vars)
+  assert '%' not in path
+  if _manifest_file is None:
+    _manifest_file = open(manifest_path(argv), 'w')
+  print(path, file=_manifest_file)
+  return open(path, mode=('wb' if binary else 'w'))
 
 
 def is_product_path(path):
@@ -99,6 +138,20 @@ def actual_path_for_target(target_path):
   if path_exists(target_path):
     return target_path
   return product_path_for_target(target_path)
+
+def target_path_for_source(source_path):
+  path = path_stem(source_path) # strip off source ext.
+  if is_product_path(path): # source might be a product.
+    return path[len(build_dir_slash):]
+  else:
+    return path
+
+def product_path_for_source(source_path):
+  path = path_stem(source_path) # strip off source ext.
+  if is_product_path(path): # source might be a product.
+    return path
+  else:
+    return path_join(build_dir, path)
 
 
 _open_deps_parameters = { 'binary', 'buffering', 'encoding', 'errors', 'newline' }
