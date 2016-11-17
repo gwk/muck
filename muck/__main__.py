@@ -24,8 +24,8 @@ from pithy.string_utils import format_byte_count_dec
 from pithy.task import runC
 from typing import Optional
 
-from muck import (actual_path_for_target, build_dir, build_dir_slash, ignored_exts, is_product_path, info_name,
-reserved_exts, product_path_for_target, reserved_names, regex_for_wildcard_path)
+from muck import (actual_path_for_target, build_dir, build_dir_slash, match_wildcards, ignored_exts, is_product_path, info_name,
+  is_wild, manifest_path, reserved_exts, product_path_for_target, reserved_names, target_path_for_source)
 
 
 def main():
@@ -340,8 +340,7 @@ def update_product_with_tmp(ctx: Ctx, src_path: str, tmp_path: str):
   move_file(tmp_path, product_path, overwrite=True)
   file_hash = hash_for_path(product_path)
   is_changed = (size != old.size or file_hash != old.hash)
-  if not is_changed:
-    noteF(target_path, 'product did not change (same size and hash).')
+  noteF(target_path, 'product {}; {}.', 'changed' if is_changed else 'did not change', format_byte_count_dec(size))
   return update_deps_and_info(ctx, target_path, product_path, is_changed, size, mtime, file_hash, src_path, old.deps)
 
 
@@ -489,7 +488,11 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
 
   prod_dir = path_dir(prod_path)
   make_dirs(prod_dir)
-  cmd = build_tool + [src_path, prod_path_tmp]
+
+  # Extract args from the combination of wildcards in the source and the matching target.
+  m = match_wildcards(target_path_for_source(src_path), target_path)
+  argv = [src_path] + list(m.groups())
+  cmd = build_tool + argv
 
   try: env_fn = build_tool_env_fns[src_ext]
   except KeyError: env = None
@@ -497,9 +500,6 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
     env = os.environ.copy()
     custom_env = env_fn()
     env.update(custom_env)
-
-  is_bare_target = not path_ext(target_path)
-  has_wildcards = ('%' in src_path)
 
   noteF(target_path, 'building: `{}`', ' '.join(shlex.quote(w) for w in cmd))
   out_file = open(prod_path_out, 'wb')
@@ -516,25 +516,24 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
     else:
       warnF(target_path, 'wrote data directly to `{}`;\n  ignoring output captured in `{}`', prod_path_tmp, prod_path_out)
 
-  def note_results(suffix):
-    noteF(target_path, 'finished: {:0.2f} seconds; {}.', time_end - time_start, suffix)
-
-  tmp_list_path = prod_path_tmp + '_list'
-  try: f = open(tmp_list_path)
+  manif_path = manifest_path(argv)
+  try: f = open(manif_path)
   except FileNotFoundError: # no list.
-    if not path_exists(prod_path_tmp): # stdout.
+    if not path_exists(prod_path_tmp):
+      via = 'stdout'
       tmp_paths = [prod_path_out]
-      note_results('{} (via stdout)'.format(format_byte_count_dec(file_size(prod_path_out))))
-    else: # tmp.
+    else:
+      via = 'tmp'
       tmp_paths = [prod_path_tmp]
       cleanup_out()
-      note_results('{} (via tmp)'.format(format_byte_count_dec(file_size(prod_path_tmp))))
-  else: # list.
-    tmp_paths = f.readlines()
-    if prod_path_tmp not in tmp_paths:
-      failF(target_path, 'manifest of outputs does not contain target: {}', tmp_paths)
+  else:
+    via = 'manifest'
+    tmp_paths = list(line[:-1] for line in f) # strip newlines.
     cleanup_out()
-    note_results('{} tmp files.', len(tmp_list))
+    if ('%' not in prod_path_tmp) and prod_path_tmp not in tmp_paths:
+      failF(target_path, 'product does not appear in manifest.')
+    remove_file(manif_path)
+  noteF(target_path, 'finished: {:0.2f} seconds (via {}).', time_end - time_start, via)
   return tmp_paths
 
 
@@ -640,21 +639,15 @@ def filter_source_names(names, prod_name):
 
   There are several concerns that make this matching complex.
   * Muck allows wildcards in script names.
-    This allows a single script to produce many targets for corresponding sources;
-    see muck.target_var().
+    This allows a single script to produce many targets for corresponding sources.
   * A source might itself be the product of another source.
   '''
   prod = prod_name.split('.')
   for src_name in names:
     src = src_name.split('.')
     if len(src) <= len(prod): continue
-    if all(match_comp(*p) for p in zip(src, prod)): # zip stops when src is exhausted.
+    if all(match_wildcards(*p) for p in zip(src, prod)): # zip stops when src is exhausted.
       yield '.'.join(src[:len(src)+1]) # the immediate source name has just one extension added.
-
-
-def match_comp(src, prod):
-  r = regex_for_wildcard_path(src)
-  return r.fullmatch(prod)
 
 
 def noteF(path, fmt, *items):
