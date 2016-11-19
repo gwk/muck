@@ -1,11 +1,16 @@
-# python.
-*.pyc
+# Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
 
-# osx.
+# Finder.
 .DS_Store
 
-# muck.
+# Python.
+__pycache__/
+*.egg-info/
+
+# Project.
 _build/
-_fetch/
 _misc/
-muck.egg-info
+gh-pages/
+
+# Muck.
+_fetch/
