@@ -12,6 +12,7 @@ import pithy.meta as meta
 
 from csv import reader as csv_reader
 from http import HTTPStatus
+from itertools import product
 from sys import argv
 from pithy.path_encode import path_for_url
 from pithy.io import errF, errFL, failF
@@ -28,6 +29,7 @@ __all__ = [
   'dst_file',
   'fetch',
   'load',
+  'load_many',
   'load_url',
   'open_dep',
   'transform',
@@ -58,20 +60,40 @@ ignored_exts = {
 
 _wildcard_re = re.compile(r'(%+)')
 
-def match_wildcards(wildcard_path, string):
+def match_wilds(wildcard_path, string):
   '''
-  Split by the muck wildcard character, '%'.
+  Match a string against a wildcard path.
+  The muck wildcard character is '%'.
   This character was chosen because bash treats it as a plain char.
-  Consecutive wildcards indicate required padding.
+  Consecutive wilds indicate required padding.
   '''
   chunks = _wildcard_re.split(wildcard_path)
   pattern = ''.join('({}+)'.format('.' * len(s)) if is_wild(s) else re.escape(s) for s in chunks)
   return re.fullmatch(pattern, string)
 
+def has_wilds(path): return '%' in path # TODO: allow for escaping the wildcard character.
 
 def is_wild(string): return isinstance(string, str) and string.startswith('%')
 
-def keep_wildcards(seq): return [el for el in seq if is_wild(el)]
+def keep_wilds(seq): return [el for el in seq if is_wild(el)]
+
+def count_wilds(seq): return len(keep_wilds(seq))
+
+
+def sub_vars_for_wilds(wildcard_path, vars):
+  chunks = _wildcard_re.split(wildcard_path)
+  count = count_wilds(chunks)
+  if len(vars) != count:
+    raise ValueError('wildcard path has {} wildcards; received {} vars.'.format(count, len(vars)))
+  it = iter(vars)
+  return ''.join([pad_sub(wildcard=chunk, var=next(it)) if is_wild(chunk) else chunk for chunk in chunks])
+
+
+def pad_sub(wildcard, var):
+  if isinstance(var, int):
+    return '{:0{width}}'.format(var, width=len(wildcard))
+  else:
+    return '{:_<{width}}'.format(var, width=len(wildcard))
 
 
 def dst_path(argv, vars, strict=True):
@@ -85,21 +107,14 @@ def dst_path(argv, vars, strict=True):
   if len(vars) != len(args):
     raise Error('expected {} vars; received {}.', len(args), len(vars))
 
-  pairs = iter(enumerate(zip(args, vars), 1))
-  chunks = _wildcard_re.split(product_path_for_source(src))
-  parts = []
-  for c in chunks:
-    if is_wild(c): # replace chunk with either arg or var.
-      i, (a, v) = next(pairs)
-      if is_wild(v):
-        if strict and is_wild(a): raise Error('arg {}: both arg and var are wildcards.', i)
-        x = a
-      else:
-        x = v
-      parts.append('{:{pad}>{width}}'.format(x, pad=('0' if isinstance(x, int) else '_'), width=len(c)))
+  subs = []
+  for i, (a, v) in enumerate(zip(args, vars), 1):
+    if is_wild(v):
+      if strict and is_wild(a): raise Error('arg {}: both arg and var are wildcards.', i)
+      subs.append(a)
     else:
-      parts.append(c)
-  return ''.join(parts) + '.tmp'
+      subs.append(v)
+  return sub_vars_for_wilds(product_path_for_source(src), vars=subs)
 
 
 def manifest_path(argv):
@@ -111,14 +126,14 @@ _manifest_file = None
 
 def dst_file(*vars, binary=False):
   global _manifest_file
-  if '%' not in argv[0]: # no wildcards; no need for manifest.
-    if vars: raise ValueError(vars) # no wildcards in source path, so no vars accepted.
+  if not has_wilds(argv[0]): # no need for manifest.
+    if vars: raise ValueError(vars) # no wilds in source path, so no vars accepted.
     return open(product_path_for_source(argv[0] + '.tmp'), 'wb' if binary else 'w')
   if vars in _dst_vars_opened:
     raise Exception('file already opened for vars: {}'.format(vars))
   _dst_vars_opened.add(vars)
   path = dst_path(argv, vars)
-  assert '%' not in path
+  assert not has_wilds('%')
   if _manifest_file is None:
     _manifest_file = open(manifest_path(argv), 'w')
   print(path, file=_manifest_file)
@@ -239,7 +254,34 @@ def load(target_path, ext=None, **kwargs):
   return load_fn(file, **kwargs)
 
 
-class HTTPError(Exception): pass
+def load_many(wildcard_path, *items, ext=None, **kwargs):
+  for vars, path in paths_from_range_items(wildcard_path, items):
+    yield vars, load(path, ext=ext, **kwargs)
+
+def paths_from_range_items(wildcard_path, items):
+  for vars in vars_from_range_items(items):
+    yield vars, sub_vars_for_wilds(wildcard_path=wildcard_path, vars=vars)
+
+
+def vars_from_range_items(items):
+  def gen(item):
+    if not isinstance(item, tuple) or len(item) != 2:
+      raise TypeError('range item must be a literal pair.')
+    s, e = item
+    t = type(s)
+    if type(e) != t:
+      raise ValueError('range item has mismatched types: {}'.format(item))
+    if t == int:
+      return range(s, e)
+    # TODO: hex strings? dates? letter ranges?
+    raise TypeError('range item tuple has unsupported element type: {}'.format(item))
+  return product(*map(gen, items))
+
+
+class HTTPError(Exception):
+  def __init__(self, msg, request):
+    super().__init__(msg)
+    self.request = request
 
 
 def _fetch(url, timeout, headers, expected_status_code):
@@ -259,7 +301,7 @@ def _fetch(url, timeout, headers, expected_status_code):
       s = HTTPStatus(r.status_code)
       msg = 'fetch failed with HTTP code: {}: {}; {}.'.format(s.value, s.phrase, s.description)
   if msg is not None:
-    raise HTTPError(msg)
+    raise HTTPError(msg=msg, request=r)
   return r
 
 
