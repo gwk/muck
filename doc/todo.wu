@@ -3,3 +3,6 @@ writeup v0
 # Support and use virtualenv.
 
 ## Use requirements.txt and virtualenv to track library dependencies.
+
+# Wildcards.
+* Fix logic for omitting manifest to depend on zero vars, not zero wildcards.

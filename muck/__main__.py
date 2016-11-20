@@ -24,8 +24,9 @@ from pithy.string_utils import format_byte_count_dec
 from pithy.task import runC
 from typing import Optional
 
-from muck import (actual_path_for_target, build_dir, build_dir_slash, match_wildcards, ignored_exts, is_product_path, info_name,
-  is_wild, manifest_path, reserved_exts, product_path_for_target, reserved_names, target_path_for_source)
+from muck import (actual_path_for_target, build_dir, build_dir_slash, match_wilds, has_wilds,
+  ignored_exts, is_product_path, info_name, is_wild,
+  manifest_path, paths_from_range_items, reserved_exts, product_path_for_target, reserved_names, target_path_for_source)
 
 
 def main():
@@ -415,6 +416,10 @@ except ImportError:
     failF(src_path, '`writeup` is not installed; run `pip install writeup-tool`.')
 
 
+def py_fail(src_path, node, name, msg):
+  failF(src_path, '{}:{}: `{}`: {}.', node.lineno, node.col_offset, name, msg)
+
+
 def py_dep_call(src_path, node):
   'Calculate dependencies for a Python ast.Call node.'
   func = node.func
@@ -423,11 +428,30 @@ def py_dep_call(src_path, node):
   # TODO: dispatch to handlers for all known functions.
   # add handler for source_url to check that repeated (url, target) pairs are consistent across entire project.
   if func.value.id != 'muck': return
-  if func.attr not in ('open_dep', 'load', 'transform'): return
+  fn = func.attr
+  if fn not in ('open_dep', 'load', 'load_many', 'transform'): return
   if len(node.args) < 1 or not isinstance(node.args[0], ast.Str):
-    failF(src_path, '{}:{}: muck.{}: first argument must be a string literal.',
-      node.lineno, node.col_offset, func.attr)
-  yield node.args[0].s # the string literal value from the ast.Str.
+    py_fail(src_path, node, fn, 'first argument must be a string literal')
+  dep_path = node.args[0].s  # the string value from the ast.Str literal.
+  if fn != 'load_many': # single dependency.
+    if has_wilds(dep_path):
+      py_fail(src_path, node.args[0], fn, 'wildcard dependencies are only partially implemented')
+    yield dep_path
+  else: # load_range; calculate all dependencies.
+    items = [py_dep_range_items(src_path, arg) for arg in node.args[1:]]
+    for vars, path in paths_from_range_items(wildcard_path=dep_path, items=items):
+      yield path
+
+
+def py_dep_range_items(src_path, arg):
+  if not isinstance(arg, ast.Tuple) or len(arg.elts) != 2:
+    py_fail(src_path, arg, 'load_range', 'item must be a literal tuple pair')
+  s, e = arg.elts
+  if not isinstance(s, ast.Num) or not isinstance(s.n, int):
+    py_fail(src_path, s, 'load_range', 'item start must be an integer literal')
+  if not isinstance(e, ast.Num) or not isinstance(e.n, int):
+    py_fail(src_path, e, 'load_range', 'item end must be an integer literal')
+  return (s.n, e.n)
 
 
 def py_dep_import(src_path, module_name, dir_names):
@@ -489,8 +513,8 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
   prod_dir = path_dir(prod_path)
   make_dirs(prod_dir)
 
-  # Extract args from the combination of wildcards in the source and the matching target.
-  m = match_wildcards(target_path_for_source(src_path), target_path)
+  # Extract args from the combination of wilds in the source and the matching target.
+  m = match_wilds(target_path_for_source(src_path), target_path)
   argv = [src_path] + list(m.groups())
   cmd = build_tool + argv
 
@@ -646,7 +670,7 @@ def filter_source_names(names, prod_name):
   for src_name in names:
     src = src_name.split('.')
     if len(src) <= len(prod): continue
-    if all(match_wildcards(*p) for p in zip(src, prod)): # zip stops when src is exhausted.
+    if all(match_wilds(*p) for p in zip(src, prod)): # zip stops when src is exhausted.
       yield '.'.join(src[:len(src)+1]) # the immediate source name has just one extension added.
 
 
