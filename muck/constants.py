@@ -8,6 +8,9 @@ Muck program constants.
 build_dir = '_build'
 build_dir_slash = build_dir + '/'
 db_name = '_muck'
+out_ext = '.out'
+tmp_ext = '.tmp'
+manifest_ext = '.tmp_manifest'
 
 ignored_exts = frozenset({
   '.err', '.iot', '.out', # iotest extensions.
@@ -15,8 +18,9 @@ ignored_exts = frozenset({
 
 
 reserved_exts = frozenset({
-  '.tmp',
-  '.tmp_manifest',
+  out_ext,
+  tmp_ext,
+  manifest_ext,
 })
 
 reserved_names = frozenset({
