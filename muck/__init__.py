@@ -9,13 +9,11 @@ assert sys.version_info.major == 3 # python 2 is not supported.
 
 import random
 import time
-import re
 import requests
 import pithy.meta as meta
 
 from csv import reader as csv_reader
 from http import HTTPStatus
-from itertools import product
 from sys import argv
 from pithy.path_encode import path_for_url
 from pithy.io import errF, errFL, failF
@@ -25,6 +23,7 @@ from pithy.transform import Transformer
 from typing import Optional
 
 from .constants import build_dir, build_dir_slash
+from .paths import actual_path_for_target, dst_path, has_wilds, manifest_path, paths_from_range_items, product_path_for_source
 
 
 # module exports.
@@ -41,69 +40,6 @@ __all__ = [
 ]
 
 
-_wildcard_re = re.compile(r'(%+)')
-
-def match_wilds(wildcard_path, string):
-  '''
-  Match a string against a wildcard path.
-  The muck wildcard character is '%'.
-  This character was chosen because bash treats it as a plain char.
-  Consecutive wilds indicate required padding.
-  '''
-  chunks = _wildcard_re.split(wildcard_path)
-  pattern = ''.join('({}+)'.format('.' * len(s)) if is_wild(s) else re.escape(s) for s in chunks)
-  return re.fullmatch(pattern, string)
-
-def has_wilds(path): return '%' in path # TODO: allow for escaping the wildcard character.
-
-def is_wild(string): return isinstance(string, str) and string.startswith('%')
-
-def keep_wilds(seq): return [el for el in seq if is_wild(el)]
-
-def count_wilds(seq): return len(keep_wilds(seq))
-
-
-def sub_vars_for_wilds(wildcard_path, vars):
-  chunks = _wildcard_re.split(wildcard_path)
-  count = count_wilds(chunks)
-  if len(vars) != count:
-    raise ValueError('wildcard path has {} wildcards; received {} vars.'.format(count, len(vars)))
-  it = iter(vars)
-  return ''.join([pad_sub(wildcard=chunk, var=next(it)) if is_wild(chunk) else chunk for chunk in chunks])
-
-
-def pad_sub(wildcard, var):
-  if isinstance(var, int):
-    return '{:0{width}}'.format(var, width=len(wildcard))
-  else:
-    return '{:_<{width}}'.format(var, width=len(wildcard))
-
-
-def dst_path(argv, vars, strict=True):
-  src = argv[0]
-  args = argv[1:]
-
-  class Error(Exception):
-    def __init__(self, fmt, *items):
-      super().__init__(('source: {}; args: {}; vars: {}; ' + fmt).format(src, args, vars, *items))
-
-  if len(vars) != len(args):
-    raise Error('expected {} vars; received {}.', len(args), len(vars))
-
-  subs = []
-  for i, (a, v) in enumerate(zip(args, vars), 1):
-    if is_wild(v):
-      if strict and is_wild(a): raise Error('arg {}: both arg and var are wildcards.', i)
-      subs.append(a)
-    else:
-      subs.append(v)
-  return sub_vars_for_wilds(product_path_for_source(src), vars=subs)
-
-
-def manifest_path(argv):
-  return dst_path(argv, argv[1:], strict=False) + '_manifest'
-
-
 _dst_vars_opened = set()
 _manifest_file = None
 
@@ -116,40 +52,11 @@ def dst_file(*vars, binary=False):
     raise Exception('file already opened for vars: {}'.format(vars))
   _dst_vars_opened.add(vars)
   path = dst_path(argv, vars)
-  assert not has_wilds('%')
+  assert not has_wilds(path)
   if _manifest_file is None:
     _manifest_file = open(manifest_path(argv), 'w')
   print(path, file=_manifest_file)
   return open(path, mode=('wb' if binary else 'w'))
-
-
-def is_product_path(path):
-  return path.startswith(build_dir_slash)
-
-def product_path_for_target(target_path):
-  if target_path == build_dir or is_product_path(target_path):
-    raise ValueError('provided target path is prefixed with build dir: {}'.format(target_path))
-  return path_join(build_dir, target_path)
-
-def actual_path_for_target(target_path):
-  'returns the target_path, if it exists, or else the corresponding product path.'
-  if path_exists(target_path):
-    return target_path
-  return product_path_for_target(target_path)
-
-def target_path_for_source(source_path):
-  path = path_stem(source_path) # strip off source ext.
-  if is_product_path(path): # source might be a product.
-    return path[len(build_dir_slash):]
-  else:
-    return path
-
-def product_path_for_source(source_path):
-  path = path_stem(source_path) # strip off source ext.
-  if is_product_path(path): # source might be a product.
-    return path
-  else:
-    return path_join(build_dir, path)
 
 
 _open_deps_parameters = { 'binary', 'buffering', 'encoding', 'errors', 'newline' }
@@ -240,25 +147,6 @@ def load(target_path, ext=None, **kwargs):
 def load_many(wildcard_path, *items, ext=None, **kwargs):
   for vars, path in paths_from_range_items(wildcard_path, items):
     yield vars, load(path, ext=ext, **kwargs)
-
-def paths_from_range_items(wildcard_path, items):
-  for vars in vars_from_range_items(items):
-    yield vars, sub_vars_for_wilds(wildcard_path=wildcard_path, vars=vars)
-
-
-def vars_from_range_items(items):
-  def gen(item):
-    if not isinstance(item, tuple) or len(item) != 2:
-      raise TypeError('range item must be a literal pair.')
-    s, e = item
-    t = type(s)
-    if type(e) != t:
-      raise ValueError('range item has mismatched types: {}'.format(item))
-    if t == int:
-      return range(s, e)
-    # TODO: hex strings? dates? letter ranges?
-    raise TypeError('range item tuple has unsupported element type: {}'.format(item))
-  return product(*map(gen, items))
 
 
 class HTTPError(Exception):
