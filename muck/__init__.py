@@ -52,6 +52,7 @@ reserved_names = {
 
 reserved_exts = {
   '.tmp',
+  '.tmp_manifest',
 }
 
 ignored_exts = {
