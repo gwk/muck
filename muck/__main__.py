@@ -24,7 +24,7 @@ from pithy.string_utils import format_byte_count_dec
 from pithy.task import runC
 from typing import Optional
 
-from muck import (actual_path_for_target, build_dir, build_dir_slash, db_name, has_wilds,
+from . import (actual_path_for_target, build_dir, build_dir_slash, db_name, has_wilds,
   ignored_exts, is_product_path, is_wild, manifest_path, match_wilds,
   paths_from_range_items, reserved_exts, product_path_for_target, reserved_names, target_path_for_source)
 
