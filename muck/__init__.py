@@ -40,7 +40,7 @@ build_dir = '_build'
 build_dir_slash = build_dir + '/'
 db_name = '_muck'
 
-reserved_names = {
+reserved_names = frozenset({
   'clean',
   'clean-all',
   'deps',
@@ -48,16 +48,16 @@ reserved_names = {
   'patch',
   build_dir,
   db_name,
-}
+})
 
-reserved_exts = {
+reserved_exts = frozenset({
   '.tmp',
   '.tmp_manifest',
-}
+})
 
-ignored_exts = {
+ignored_exts = frozenset({
   '.err', '.iot', '.out', # iotest extensions.
-}
+})
 
 
 _wildcard_re = re.compile(r'(%+)')
