@@ -1,5 +1,8 @@
 # Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
-# muck libary functions.
+
+'''
+Muck client libary functions.
+'''
 
 import sys
 assert sys.version_info.major == 3 # python 2 is not supported.

@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 # Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
 
+'''
+Muck build program.
+'''
+
 import sys
 assert sys.version_info.major == 3 # python 2 is not supported.
 
