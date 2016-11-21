@@ -38,7 +38,7 @@ __all__ = [
 
 build_dir = '_build'
 build_dir_slash = build_dir + '/'
-info_name = '_muck_info.json'
+db_name = '_muck'
 
 reserved_names = {
   'clean',
@@ -47,7 +47,7 @@ reserved_names = {
   'muck',
   'patch',
   build_dir,
-  info_name,
+  db_name,
 }
 
 reserved_exts = {

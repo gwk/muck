@@ -24,9 +24,9 @@ from pithy.string_utils import format_byte_count_dec
 from pithy.task import runC
 from typing import Optional
 
-from muck import (actual_path_for_target, build_dir, build_dir_slash, match_wilds, has_wilds,
-  ignored_exts, is_product_path, info_name, is_wild,
-  manifest_path, paths_from_range_items, reserved_exts, product_path_for_target, reserved_names, target_path_for_source)
+from muck import (actual_path_for_target, build_dir, build_dir_slash, db_name, has_wilds,
+  ignored_exts, is_product_path, is_wild, manifest_path, match_wilds,
+  paths_from_range_items, reserved_exts, product_path_for_target, reserved_names, target_path_for_source)
 
 
 def main():
@@ -46,9 +46,9 @@ def main():
   if command_fn and not command_needs_ctx:
     return command_fn(args.targets[1:])
 
-  make_dirs(build_dir) # required for load_info.
+  make_dirs(build_dir) # required for load_db.
 
-  ctx = Ctx(info=load_info(), statuses={}, dir_names={}, dependents=defaultdict(set), dbgF=dbgF)
+  ctx = Ctx(db=load_db(), statuses={}, dir_names={}, dependents=defaultdict(set), dbgF=dbgF)
 
   if command_fn:
     assert command_needs_ctx
@@ -59,7 +59,7 @@ def main():
 
 
 
-Ctx = namedtuple('Ctx', 'info statuses dir_names dependents dbgF')
+Ctx = namedtuple('Ctx', 'db statuses dir_names dependents dbgF')
 # info: dict (target_path: str => TargetInfo).
 # statuses: dict (target_path: str => is_changed: bool|Ellipsis).
 # dir_names: dict (dir_path: str => names: [str]).
@@ -68,30 +68,32 @@ Ctx = namedtuple('Ctx', 'info statuses dir_names dependents dbgF')
 
 # Build info.
 
-# Muck stores build information in a single json file within the build directory.
-info_path = path_join(build_dir, info_name)
+# Muck stores build information in a file within the build directory.
+db_path = path_join(build_dir, db_name)
 
 TargetInfo = namedtuple('TargetInfo', 'size mtime hash src_path deps')
 empty_info = TargetInfo(size=None, mtime=None, hash=None, src_path=None, deps=())
 
 def all_deps_for_target(ctx, target):
-  info = ctx.info[target]
+  info = ctx.db[target]
   if info.src_path is not None:
     return [info.src_path] + info.deps
   else:
     return info.deps
 
 
-# The info dictionary stores the persistent build information.
-# key: target path (not product paths prefixed with build_dir).
-# val: TargetInfo.
-# src_path is None for non-product sources.
-# Each dependency is a target path.
-# TODO: save info about muck version itself in the dict under reserved name 'muck'.
+'''
+Database format:
+ 'target': target path (not product paths prefixed with build_dir).
+ 'val: TargetInfo.
+ src_path is None for non-product sources.
+ Each dependency is a target path.
+ TODO: save info about muck version itself in the dict under reserved name 'muck'.
+'''
 
-def load_info():
+def load_db():
   try:
-    with open(info_path) as f:
+    with open(db_path) as f:
       return load_json(f, types=(TargetInfo,))
   except FileNotFoundError:
     return {}
@@ -100,9 +102,9 @@ def load_info():
     return {}
 
 
-def save_info(info: dict):
-  with open(info_path, 'w') as f:
-    write_json(f, { k: target_info._asdict() for k, target_info in info.items() })
+def save_db(db: dict):
+  with open(db_path, 'w') as f:
+    write_json(f, { k: target_info._asdict() for k, target_info in db.items() })
 
 
 # Commands.
@@ -115,13 +117,13 @@ def muck_clean(ctx, args):
   if not args:
     failF('muck clean error: clean command takes specific target arguments; use clean-all to remove all products.')
   for arg in args:
-    if arg not in ctx.info:
+    if arg not in ctx.db:
       errFL('muck clean note: {}: skipping unknown target.', arg)
       continue
     prod_path = product_path_for_target(arg)
     remove_file_if_exists(prod_path)
-    del ctx.info[arg]
-  save_info(ctx.info)
+    del ctx.db[arg]
+  save_db(ctx.db)
 
 
 def muck_clean_all(args):
@@ -138,7 +140,7 @@ def muck_deps(ctx, args):
   `muck deps` command: print dependency information.
   '''
   args = frozenset(args) # deduplicate arguments.
-  targets = args or frozenset(ctx.info); # default to all known targets.
+  targets = args or frozenset(ctx.db); # default to all known targets.
 
   for target in sorted(targets):
     update_dependency(ctx, target, dependent=None)
@@ -219,8 +221,8 @@ muck patch error: patch command takes one or two arguments. usage:
     # need to remove or update the target info to avoid the 'did you mean to patch?' safeguard.
     # for now, just delete it to be safe; this makes the target look stale.
     try:
-      del ctx.info[target_path]
-      save_info(ctx.info)
+      del ctx.db[target_path]
+      save_db(ctx.db)
     except KeyError: pass
 
 
@@ -337,7 +339,7 @@ def update_product_with_tmp(ctx: Ctx, src_path: str, tmp_path: str):
      failF(product_path, 'product path is not in build dir.')
   target_path = product_path[len(build_dir_slash):]
   size, mtime, old = calc_size_mtime_old(ctx, target_path, tmp_path)
-  ctx.info.pop(target_path, None) # delete metadata if it exists, just before overwrite.
+  ctx.db.pop(target_path, None) # delete metadata if it exists, just before overwrite.
   move_file(tmp_path, product_path, overwrite=True)
   file_hash = hash_for_path(product_path)
   is_changed = (size != old.size or file_hash != old.hash)
@@ -369,10 +371,10 @@ def update_deps_and_info(ctx, target_path: str, actual_path: str, is_changed, si
   if is_changed:
     info = TargetInfo(size=size, mtime=mtime, hash=file_hash, src_path=src_path, deps=deps)
     ctx.dbgF(target_path, 'updated info:\n  {}', info)
-    ctx.info[target_path] = info
+    ctx.db[target_path] = info
     # writing the entire dict at every step will not scale well;
     # at that point we should probably move to sqlite or similar anyway.
-    save_info(ctx.info)
+    save_db(ctx.db)
 
   return is_changed
 
@@ -609,7 +611,7 @@ def calc_size_mtime_old(ctx: Ctx, target_path: str, actual_path: str) -> tuple:
   except FileNotFoundError:
     size, mtime = None, None
   ctx.dbgF(target_path, 'size: {}; mtime: {}', size, mtime)
-  old = ctx.info.get(target_path, empty_info)
+  old = ctx.db.get(target_path, empty_info)
   return size, mtime, old
 
 
