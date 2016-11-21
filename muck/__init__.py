@@ -22,7 +22,7 @@ from pithy.json_utils import load_json, load_jsonl, load_jsons
 from pithy.transform import Transformer
 from typing import Optional
 
-from .constants import build_dir, build_dir_slash
+from .constants import build_dir, build_dir_slash, tmp_ext
 from .paths import actual_path_for_target, dst_path, has_wilds, manifest_path, paths_from_range_items, product_path_for_source
 
 
@@ -47,11 +47,11 @@ def dst_file(*vars, binary=False):
   global _manifest_file
   if not has_wilds(argv[0]): # no need for manifest.
     if vars: raise ValueError(vars) # no wilds in source path, so no vars accepted.
-    return open(product_path_for_source(argv[0] + '.tmp'), 'wb' if binary else 'w')
+    return open(product_path_for_source(argv[0]) + tmp_ext, 'wb' if binary else 'w')
   if vars in _dst_vars_opened:
     raise Exception('file already opened for vars: {}'.format(vars))
   _dst_vars_opened.add(vars)
-  path = dst_path(argv, vars)
+  path = dst_path(argv, vars) + tmp_ext
   assert not has_wilds(path)
   if _manifest_file is None:
     _manifest_file = open(manifest_path(argv), 'w')

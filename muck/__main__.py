@@ -26,7 +26,7 @@ from pithy.string_utils import format_byte_count_dec
 from pithy.task import runC
 from typing import Optional
 
-from .constants import build_dir, build_dir_slash, db_name, ignored_exts, reserved_exts, reserved_names
+from .constants import build_dir, build_dir_slash, db_name, ignored_exts, out_ext, reserved_exts, tmp_ext, reserved_names
 from .paths import actual_path_for_target, is_product_path, manifest_path, match_wilds,product_path_for_target, target_path_for_source
 from .py_deps import py_dependencies
 
@@ -212,7 +212,7 @@ muck patch error: patch command takes one or two arguments. usage:
     prod_path = product_path_for_target(target_path)
 
   # update patch (both cases).
-  patch_path_tmp = patch_path + '.tmp'
+  patch_path_tmp = patch_path + tmp_ext
   cmd = ['pat', 'diff', orig_path, prod_path]
   errFL('muck patch note: diffing: `{}`', ' '.join(shlex.quote(w) for w in cmd))
   with open(patch_path_tmp, 'wb') as f:
@@ -335,7 +335,7 @@ def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mt
 
 def update_product_with_tmp(ctx: Ctx, src_path: str, tmp_path: str):
   product_path, ext = split_stem_ext(tmp_path)
-  if ext not in ('.tmp', '.out'):
+  if ext not in (out_ext, tmp_ext):
     failF(tmp_path, 'product output path has unexpected extension: {!r}', ext)
   if not is_product_path(product_path):
      failF(product_path, 'product path is not in build dir.')
@@ -445,8 +445,8 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
   except KeyError:
     # TODO: fall back to generic .deps file.
     failF(target_path, 'unsupported source file extension: `{}`', src_ext)
-  prod_path_out = prod_path + '.out'
-  prod_path_tmp = prod_path + '.tmp'
+  prod_path_out = prod_path + out_ext
+  prod_path_tmp = prod_path + tmp_ext
   remove_file_if_exists(prod_path_out)
   remove_file_if_exists(prod_path_tmp)
 
@@ -499,7 +499,8 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
     tmp_paths = list(line[:-1] for line in f) # strip newlines.
     cleanup_out()
     if ('%' not in prod_path_tmp) and prod_path_tmp not in tmp_paths:
-      failF(target_path, 'product does not appear in manifest.')
+      failF(target_path, 'product does not appear in manifest ({} records): {}',
+        len(tmp_paths), manif_path)
     remove_file(manif_path)
   noteF(target_path, 'finished: {:0.2f} seconds (via {}).', time_end - time_start, via)
   return tmp_paths

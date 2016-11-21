@@ -5,9 +5,10 @@ Muck target path functions.
 '''
 
 import re
+from itertools import product
 from pithy.fs import path_exists, path_join, path_stem
 
-from .constants import build_dir, build_dir_slash
+from .constants import build_dir, build_dir_slash, manifest_ext
 
 
 def is_product_path(path):
@@ -71,7 +72,7 @@ def count_wilds(seq): return len(keep_wilds(seq))
 
 
 def manifest_path(argv):
-  return dst_path(argv, argv[1:], strict=False) + '_manifest'
+  return dst_path(argv, argv[1:], strict=False) + manifest_ext
 
 
 def sub_vars_for_wilds(wildcard_path, vars):
