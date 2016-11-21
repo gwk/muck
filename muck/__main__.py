@@ -72,7 +72,7 @@ Ctx = namedtuple('Ctx', 'info statuses dir_names dependents dbgF')
 info_path = path_join(build_dir, info_name)
 
 TargetInfo = namedtuple('TargetInfo', 'size mtime hash src_path deps')
-empty_info = TargetInfo(None, None, None, None, ())
+empty_info = TargetInfo(size=None, mtime=None, hash=None, src_path=None, deps=())
 
 def all_deps_for_target(ctx, target):
   info = ctx.info[target]
@@ -367,7 +367,7 @@ def update_deps_and_info(ctx, target_path: str, actual_path: str, is_changed, si
 
   ctx.statuses[target_path] = is_changed # replace sentinal with final value.
   if is_changed:
-    info = TargetInfo(size, mtime, file_hash, src_path, deps)
+    info = TargetInfo(size=size, mtime=mtime, hash=file_hash, src_path=src_path, deps=deps)
     ctx.dbgF(target_path, 'updated info:\n  {}', info)
     ctx.info[target_path] = info
     # writing the entire dict at every step will not scale well;
