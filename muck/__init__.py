@@ -24,6 +24,8 @@ from pithy.json_utils import load_json, load_jsonl, load_jsons
 from pithy.transform import Transformer
 from typing import Optional
 
+from .constants import build_dir, build_dir_slash
+
 
 # module exports.
 __all__ = [
@@ -37,30 +39,6 @@ __all__ = [
   'open_dep',
   'transform',
 ]
-
-
-build_dir = '_build'
-build_dir_slash = build_dir + '/'
-db_name = '_muck'
-
-reserved_names = frozenset({
-  'clean',
-  'clean-all',
-  'deps',
-  'muck',
-  'patch',
-  build_dir,
-  db_name,
-})
-
-reserved_exts = frozenset({
-  '.tmp',
-  '.tmp_manifest',
-})
-
-ignored_exts = frozenset({
-  '.err', '.iot', '.out', # iotest extensions.
-})
 
 
 _wildcard_re = re.compile(r'(%+)')
