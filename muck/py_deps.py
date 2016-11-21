@@ -5,8 +5,9 @@ import re
 
 from pithy.io import errF, failF
 from pithy.fs import is_file, path_dir, path_join
-from . import has_wilds, is_wild
+from .paths import has_wilds, paths_from_range_items
 
+# these functions are recognized by the static analyzer.
 from . import load, load_many, open_dep, transform
 dep_fn_names = tuple(fn.__name__ for fn in (load, load_many, open_dep, transform))
 
