@@ -366,12 +366,14 @@ def update_deps_and_info(ctx, target_path: str, actual_path: str, is_changed, si
     is_changed |= update_dependency(ctx, dep, dependent=target_path)
 
   ctx.statuses[target_path] = is_changed # replace sentinal with final value.
-  info = TargetInfo(size, mtime, file_hash, src_path, deps)
-  ctx.dbgF(target_path, 'updated info:\n  {}', info)
-  ctx.info[target_path] = info
-  # writing the entire dict at every step will not scale well;
-  # at that point we should probably move to sqlite or similar anyway.
-  save_info(ctx.info)
+  if is_changed:
+    info = TargetInfo(size, mtime, file_hash, src_path, deps)
+    ctx.dbgF(target_path, 'updated info:\n  {}', info)
+    ctx.info[target_path] = info
+    # writing the entire dict at every step will not scale well;
+    # at that point we should probably move to sqlite or similar anyway.
+    save_info(ctx.info)
+
   return is_changed
 
 
