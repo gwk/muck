@@ -588,7 +588,7 @@ def list_dir_filtered(src_dir, cache):
   '''
   try: return cache[src_dir]
   except KeyError: pass
-  names = [n for n in list_dir(src_dir) if n not in reserved_names and not n.startswith('.')]
+  names = [n for n in list_dir(src_dir, hidden=False) if n not in reserved_names]
   if cache is not None:
     cache[dir] = names
   return names
