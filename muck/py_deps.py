@@ -7,6 +7,9 @@ from pithy.io import errF, failF
 from pithy.fs import is_file, path_dir, path_join
 from . import has_wilds, is_wild
 
+from . import load, load_many, open_dep, transform
+dep_fn_names = tuple(fn.__name__ for fn in (load, load_many, open_dep, transform))
+
 
 def py_dependencies(src_path, src_file, dir_names):
   'Calculate dependencies for a .py (python3 source) file.'
@@ -31,7 +34,7 @@ def py_dep_call(src_path, node):
   # add handler for source_url to check that repeated (url, target) pairs are consistent across entire project.
   if func.value.id != 'muck': return
   fn = func.attr
-  if fn not in ('open_dep', 'load', 'load_many', 'transform'): return
+  if fn not in dep_fn_names: return
   if len(node.args) < 1 or not isinstance(node.args[0], ast.Str):
     py_fail(src_path, node, fn, 'first argument must be a string literal')
   dep_path = node.args[0].s  # the string value from the ast.Str literal.
