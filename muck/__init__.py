@@ -43,6 +43,7 @@ info_name = '_muck_info.json'
 reserved_names = {
   'clean',
   'clean-all',
+  'deps',
   'muck',
   'patch',
   build_dir,
