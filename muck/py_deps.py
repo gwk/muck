@@ -15,7 +15,7 @@ dep_fn_names = tuple(fn.__name__ for fn in (load, load_many, open_dep, transform
 def py_dependencies(src_path, src_file, dir_names):
   'Calculate dependencies for a .py (python3 source) file.'
   src_text = src_file.read()
-  tree = ast.parse(src_text, src_path)
+  tree = ast.parse(src_text, filename=src_path)
   for node in ast.walk(tree):
     if isinstance(node, ast.Call):
       yield from py_dep_call(src_path, node)
