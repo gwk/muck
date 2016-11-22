@@ -97,17 +97,20 @@ def paths_from_range_items(wildcard_path, items):
 
 
 def vars_from_range_items(items):
+  msg_suffix = '; NOTE: muck should catch this error during static analysis.'
   def gen(item):
-    if not isinstance(item, tuple) or len(item) != 2:
-      raise TypeError('range item must be a literal pair.')
-    s, e = item
-    t = type(s)
-    if type(e) != t:
-      raise ValueError('range item has mismatched types: {}'.format(item))
-    if t == int:
-      return range(s, e)
-    # TODO: hex strings? dates? letter ranges?
-    raise TypeError('range item tuple has unsupported element type: {}'.format(item))
+    if isinstance(item, tuple):
+      if len(item) != 2:
+        raise TypeError('range argument tuple must be a pair' + msg_suffix)
+      s, e = item
+      t = type(s)
+      if type(e) != t:
+        raise TypeError('range argument tuple has mismatched types: {}'.format(item) + msg_suffix)
+      if t == int:
+        return range(s, e)
+      # TODO: hex strings? dates? letter ranges?
+      raise TypeError('range argument tuple has unsupported element type: {}'.format(item + msg_suffix))
+    raise TypeError('range argument must be a pair of integers.')
   return product(*map(gen, items))
 
 

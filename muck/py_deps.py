@@ -26,40 +26,6 @@ def py_dependencies(src_path, src_file, dir_names):
       yield from py_dep_import(src_path, node.module, dir_names)
 
 
-def py_dep_call(src_path, node):
-  'Calculate dependencies for a Python ast.Call node.'
-  func = node.func
-  if not isinstance(func, ast.Attribute): return
-  if not isinstance(func.value, ast.Name): return
-  # TODO: dispatch to handlers for all known functions.
-  # add handler for source_url to check that repeated (url, target) pairs are consistent across entire project.
-  if func.value.id != 'muck': return
-  fn = func.attr
-  if fn not in dep_fn_names: return
-  if len(node.args) < 1 or not isinstance(node.args[0], ast.Str):
-    py_fail(src_path, node, fn, 'first argument must be a string literal')
-  dep_path = node.args[0].s  # the string value from the ast.Str literal.
-  if fn != 'load_many': # single dependency.
-    if has_wilds(dep_path):
-      py_fail(src_path, node.args[0], fn, 'wildcard dependencies are only partially implemented')
-    yield dep_path
-  else: # load_range; calculate all dependencies.
-    items = [py_dep_range_items(src_path, arg) for arg in node.args[1:]]
-    for vars, path in paths_from_range_items(wildcard_path=dep_path, items=items):
-      yield path
-
-
-def py_dep_range_items(src_path, arg):
-  if not isinstance(arg, ast.Tuple) or len(arg.elts) != 2:
-    py_fail(src_path, arg, 'load_range', 'item must be a literal tuple pair')
-  s, e = arg.elts
-  if not isinstance(s, ast.Num) or not isinstance(s.n, int):
-    py_fail(src_path, s, 'load_range', 'item start must be an integer literal')
-  if not isinstance(e, ast.Num) or not isinstance(e.n, int):
-    py_fail(src_path, e, 'load_range', 'item end must be an integer literal')
-  return (s.n, e.n)
-
-
 def py_dep_import(src_path, module_name, dir_names):
   'Calculate dependencies for a Python ast.Import or ast.ImportFrom node.'
   src_dir = path_dir(src_path)
@@ -68,6 +34,44 @@ def py_dep_import(src_path, module_name, dir_names):
   module_path = path_join(src_dir, *module_parts) + '.py'
   if is_file(module_path):
     yield module_path
+
+
+def py_dep_call(src_path, node):
+  'Calculate dependencies for a Python ast.Call node.'
+  func = node.func
+  if not isinstance(func, ast.Attribute): return
+  if not isinstance(func.value, ast.Name): return
+  # TODO: dispatch to handlers for all known functions.
+  # TDOO: add handler for source_url to check that repeated (url, target) pairs are consistent across entire project.
+  if func.value.id != 'muck': return
+  fn = func.attr
+  if fn not in dep_fn_names: return
+  if len(node.args) < 1 or not isinstance(node.args[0], ast.Str):
+    py_fail(src_path, node, fn, 'first argument must be a string literal')
+  dep_path = node.args[0].s  # the string value from the ast.Str literal.
+  if fn == load_many.__name__:
+    items = [eval_arg(src_path, fn, arg) for arg in node.args[1:]]
+  else:
+    items = []
+  for vars, path in paths_from_range_items(wildcard_path=dep_path, items=items):
+    yield path
+
+
+def eval_arg(src_path, fn, arg):
+  if isinstance(arg, ast.Tuple):
+    return eval_tuple(src_path, fn, arg)
+  py_fail(src_path, fn, arg, 'argument literal must be a pair of integers')
+
+
+def eval_tuple(src_path, fn, arg):
+  if len(arg.elts) != 2:
+    py_fail(src_path, arg, 'load_range', 'range argument tuple must be a pair')
+  s, e = arg.elts
+  if not isinstance(s, ast.Num) or not isinstance(s.n, int):
+    py_fail(src_path, s, 'load_range', 'range argument tuple start must be an integer literal')
+  if not isinstance(e, ast.Num) or not isinstance(e.n, int):
+    py_fail(src_path, e, 'load_range', 'range argument tuple end must be an integer literal')
+  return (s.n, e.n)
 
 
 def py_fail(src_path, node, name, msg):
