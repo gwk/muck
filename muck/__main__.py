@@ -616,8 +616,8 @@ def filter_source_names(names, prod_name):
   for src_name in names:
     src = src_name.split('.')
     if len(src) <= len(prod): continue
-    if all(match_wilds(*p) for p in zip(src, prod)): # zip stops when src is exhausted.
-      yield '.'.join(src[:len(src)+1]) # the immediate source name has just one extension added.
+    if all(match_wilds(*p) for p in zip(src, prod)): # zip stops when prod is exhausted.
+      yield '.'.join(src[:len(prod)+1]) # the immediate source name has just one extension added.
 
 
 def noteF(path, fmt, *items):
