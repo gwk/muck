@@ -563,7 +563,7 @@ def file_size_and_mtime(path):
 
 def source_for_target(ctx, target_path):
   '''
-  Find the unique source path to whose name matches `target_path`, or else error.
+  Find the unique source path whose name matches `target_path`, or else error.
   '''
   src_dir, prod_name = split_dir_name(target_path)
   src_name = source_candidate(ctx, target_path, src_dir, prod_name)
