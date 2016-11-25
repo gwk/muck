@@ -311,6 +311,7 @@ def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
 def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mtime, old) -> bool:
   ctx.dbgF(target_path, 'update_product')
   src_path = source_for_target(ctx, target_path)
+  ctx.dbgF(target_path, 'src_path: {}', src_path)
   if old.src_path != src_path:
     is_changed = True
     if old.src_path:
@@ -459,6 +460,8 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
 
   # Extract args from the combination of wilds in the source and the matching target.
   m = match_wilds(target_path_for_source(src_path), target_path)
+  if m is None:
+    failF(target_path, 'internal error: match failed; src_path: {!r}', src_path)
   argv = [src_path] + list(m.groups())
   cmd = build_tool + argv
 
