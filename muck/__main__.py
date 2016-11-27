@@ -34,6 +34,7 @@ from .py_deps import py_dependencies
 def main():
   arg_parser = ArgumentParser(description='muck around with dependencies.')
   arg_parser.add_argument('targets', nargs='*', default=['index.html'], help='target file names.')
+  arg_parser.add_argument('-no-times', action='store_true', help='do not report process times.')
   arg_parser.add_argument('-dbg', action='store_true')
   args = arg_parser.parse_args()
 
@@ -50,7 +51,8 @@ def main():
 
   make_dirs(build_dir) # required for load_db.
 
-  ctx = Ctx(db=load_db(), statuses={}, dir_names={}, dependents=defaultdict(set), dbgF=dbgF)
+  ctx = Ctx(db=load_db(), statuses={}, dir_names={}, dependents=defaultdict(set),
+    report_times=(not args.no_times), dbgF=dbgF)
 
   if command_fn:
     assert command_needs_ctx
@@ -61,7 +63,7 @@ def main():
 
 
 
-Ctx = namedtuple('Ctx', 'db statuses dir_names dependents dbgF')
+Ctx = namedtuple('Ctx', 'db statuses dir_names dependents report_times dbgF')
 # info: dict (target_path: str => TargetInfo).
 # statuses: dict (target_path: str => is_changed: bool|Ellipsis).
 # dir_names: dict (dir_path: str => names: [str]).
@@ -476,7 +478,7 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
   out_file = open(prod_path_out, 'wb')
   time_start = time.time()
   code = runC(cmd, env=env, out=out_file)
-  time_end = time.time()
+  time_elapsed = time.time() - time_start
   out_file.close()
   if code != 0:
     failF(target_path, 'build failed with code: {}', code)
@@ -505,7 +507,8 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
       failF(target_path, 'product does not appear in manifest ({} records): {}',
         len(tmp_paths), manif_path)
     remove_file(manif_path)
-  noteF(target_path, 'finished: {:0.2f} seconds (via {}).', time_end - time_start, via)
+  time_msg = '{:0.2f} seconds '.format(time_elapsed) if ctx.report_times else ''
+  noteF(target_path, 'finished: {}(via {}).', time_msg, via)
   return tmp_paths
 
 
