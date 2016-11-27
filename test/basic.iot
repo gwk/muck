@@ -1,0 +1,5 @@
+{
+  'cmd': 'muck -no-times test/basic/basic.html',
+  'code': 0,
+  'links': {'test'},
+}

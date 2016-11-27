@@ -1,0 +1,12 @@
+muck note: test/basic/b.txt: building: `python3.5 test/basic/b.txt.py`
+muck note: test/basic/b.txt: finished: (via stdout).
+muck note: test/basic/b.txt: product changed; 21 B.
+muck note: test/basic/c.txt.py: building: `python3.5 test/basic/c.txt.py.py`
+muck note: test/basic/c.txt.py: finished: (via stdout).
+muck note: test/basic/c.txt.py: product changed; 30 B.
+muck note: test/basic/c.txt: building: `python3.5 _build/test/basic/c.txt.py`
+muck note: test/basic/c.txt: finished: (via stdout).
+muck note: test/basic/c.txt: product changed; 21 B.
+muck note: test/basic/basic.html: building: `writeup test/basic/basic.html.wu`
+muck note: test/basic/basic.html: finished: (via stdout).
+muck note: test/basic/basic.html: product changed; 4.75 kB.
