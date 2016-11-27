@@ -1,0 +1,15 @@
+writeup v0
+
+# Source.
+<embed: a.txt>
+
+# Product of a source.
+<embed: b.txt>
+
+# Product of a product/src.
+<embed: c.txt>
+
+
+`<embed: e.html>`
+
+`<embed: f.html>`
