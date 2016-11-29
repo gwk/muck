@@ -153,6 +153,7 @@ class HTTPError(Exception):
   def __init__(self, msg, request):
     super().__init__(msg)
     self.request = request
+    self.status_code = 0 if request is None else request.status_code
 
 
 def _fetch(url, timeout, headers, expected_status_code):
@@ -161,6 +162,7 @@ def _fetch(url, timeout, headers, expected_status_code):
   without this, a backtrace due to a network failure is massive, involves multiple exceptions,
   and is mostly irrelevant to the caller.
   '''
+  r = None
   try:
     msg = None
     r = requests.get(url, timeout=timeout, headers=headers)
