@@ -4,7 +4,6 @@ import csv
 import leather
 import matplotlib.pyplot as plt
 
-from sys import argv
 from io import BytesIO, TextIOWrapper
 from pithy.io import *
 
@@ -51,5 +50,5 @@ gdps = [float(gdp.strip('"')) for gdp in gdps]
 #Plot with matplotlib
 plt.title("Sub-Saharan GDP (in $)")
 plt.plot(years, gdps)
-plt.savefig(argv[1], format='svg')
+plt.savefig(muck.dst_file(), format='svg')
 #plt.show()
