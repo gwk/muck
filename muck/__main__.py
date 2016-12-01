@@ -346,10 +346,11 @@ def update_product_with_tmp(ctx: Ctx, src_path: str, tmp_path: str):
      failF(product_path, 'product path is not in build dir.')
   target_path = product_path[len(build_dir_slash):]
   size, mtime, old = calc_size_mtime_old(ctx, target_path, tmp_path)
-  ctx.db.pop(target_path, None) # delete metadata if it exists, just before overwrite.
-  move_file(tmp_path, product_path, overwrite=True)
-  file_hash = hash_for_path(product_path)
+  file_hash = hash_for_path(tmp_path)
   is_changed = (size != old.size or file_hash != old.hash)
+  if is_changed:
+    ctx.db.pop(target_path, None) # delete metadata if it exists, just before overwrite, in case muck fails before update.
+  move_file(tmp_path, product_path, overwrite=True) # move regardless; if not changed, just cleans up the identical tmp file.
   noteF(target_path, 'product {}; {}.', 'changed' if is_changed else 'did not change', format_byte_count_dec(size))
   return update_deps_and_info(ctx, target_path, product_path, is_changed, size, mtime, file_hash, src_path, old.deps)
 
