@@ -36,6 +36,8 @@ def main():
   arg_parser.add_argument('targets', nargs='*', default=['index.html'], help='target file names.')
   arg_parser.add_argument('-no-times', action='store_true', help='do not report process times.')
   arg_parser.add_argument('-dbg', action='store_true')
+  arg_parser.add_argument('-force', action='store_true')
+
   args = arg_parser.parse_args()
 
   if args.dbg:
@@ -59,7 +61,7 @@ def main():
     command_fn(ctx, args.targets[1:])
   else: # no command; default behavior is to update each specified target.
     for target in args.targets:
-      update_dependency(ctx, target, dependent=None, force=True)
+      update_dependency(ctx, target, dependent=None, force=args.force)
 
 
 
