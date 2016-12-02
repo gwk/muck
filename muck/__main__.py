@@ -104,7 +104,7 @@ def load_db():
   except FileNotFoundError:
     return {}
   except json.JSONDecodeError as e:
-    warnF(info_path, 'JSON decode failed; ignoring build info ({}).', e)
+    warnF(db_path, 'JSON decode failed; ignoring build database ({}).', e)
     return {}
 
 
