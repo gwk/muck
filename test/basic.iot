@@ -1,9 +1,10 @@
 {
   'code': 0,
-  'links': {'test'},
   'files': {
     '_build/test/basic/basic.html' : {
       'path': 'test/basic-out.html'
     }
-  }
+  },
+  'links': {'test'},
+  'timeout': 10,
 }
