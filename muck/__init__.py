@@ -218,4 +218,5 @@ def transform(target_path, ext=None, **kwargs):
   `target_path` must be a string literal.
   '''
   seq = load(target_path, ext=ext, **kwargs)
-  return Transformer(seq, log_stem=path_stem(argv[1]) + '.')
+  product = product_path_for_source(argv[0]) # TODO: needs to process wildcards.
+  return Transformer(seq, log_stem=path_stem(product) + '.')
