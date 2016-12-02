@@ -1,0 +1,94 @@
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>test/basic/basic.html.wu</title>
+  <meta name="description" content="">
+  <meta name="author" content="">
+  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgo=">
+  <style type="text/css">a { background-color: transparent; } a:active { outline: 0; } a:hover { outline: 0; } blockquote { border-left-color: #E0E0E0; border-left-style: solid; border-left-width: 0.333rem; margin: 0; padding: 0 0.677rem; } body { margin: 1rem; } body footer { border-top-color: #E8E8E8; border-top-style: solid; border-top-width: 1px; color: #606060; font-size: .875rem; margin: 1rem 0 0 0; } code { background-color: rgb(240, 240, 240); border-radius: 3px; font-family: source code pro, menlo, terminal, monospace; } footer { display: block; } h1 { font-size: 1.6rem; margin: 0.8rem 0; } h2 { font-size: 1.4rem; margin: 0.7rem 0; } h3 { font-size: 1.3rem; margin: 0.6rem 0; } h4 { font-size: 1.2rem; margin: 0.5rem 0; } h5 { font-size: 1.1rem; margin: 0.4rem 0; } h6 { font-size: 1.0rem; margin: 0.3rem 0; } header { display: block; } html { background: white; color: black; font-family: source sans pro, sans-serif; font-size: 1rem; } nav { display: block; } p { margin: 0.5rem 0; } pre { background: #F0F0F0; font-family: source code pro, menlo, terminal, monospace; font-size: 1rem; overflow: auto; padding: 0.1rem; border-radius: 4px; } section { display: block; } section.S1 { border-top-color: #E8E8E8; border-top-style: solid; border-top-width: 1px; margin: 1.6rem 0; } section.S2 { margin: 1.4rem 0; } section.S3 { margin: 1.3rem 0; } section.S4 { margin: 1.2rem 0; } section.S5 { margin: 1.1rem 0; } section.S6 { margin: 1.0rem 0; } section#s1 { border-top-width: 0; } table { font-family: sans-serif; color:#666; background:#eaebec; margin:16px; border:#ccc 1px solid; border-radius:3px; box-shadow: 0 1px 2px #d1d1d1; } table th { padding:20px 24px 20px 24px; border-top:1px solid #fafafa; border-bottom:1px solid #e0e0e0; background: #ededed; } table th:first-child { text-align: left; padding-left:20px; } table tr:first-child th:first-child { border-top-left-radius:3px; } table tr:first-child th:last-child { border-top-right-radius:3px; } table tr { text-align: center; padding-left:20px; } table td:first-child { text-align: left; padding-left:20px; border-left: 0; } table td { padding:8px; border-top: 1px solid #ffffff; border-bottom:1px solid #e0e0e0; border-left: 1px solid #e0e0e0; background: #fafafa; } table tr.even td { background: #f6f6f6; } table tr:last-child td { border-bottom:0; } table tr:last-child td:first-child { border-bottom-left-radius:3px; } table tr:last-child td:last-child { border-bottom-right-radius:3px; } table tr:hover td { background: #f2f2f2; } ul { line-height: 1.333rem; list-style-position: inside; list-style-type: disc; margin: 0rem; padding-left: 0.1rem; } ul > ul { padding-left: 1.1rem; } @media print { @page { margin: 2cm; } }</style>
+  <script type="text/javascript"> "use strict";
+function scrollToElementId(id) {
+  window.scrollTo(0, document.getElementById(id).offsetTop);
+}
+
+var in_pres_mode = false;
+function togglePresentationMode() {
+  in_pres_mode = !in_pres_mode;
+  for (var sid of paging_ids) {
+    var section = document.getElementById(sid);
+    if (section.id == 'body') {
+      // skip; not actually a section.
+    } else {
+      section.style['margin'] = in_pres_mode ? '100vh 0 0 0' : '0';
+    }
+  }
+  var footer = document.getElementById('footer');
+  footer.style['margin'] = in_pres_mode ? '100vh 0 0 0' : '0';
+}
+
+var section_ids = null;
+var paging_ids = null;
+var paging_idx = 0;
+
+window.onkeydown = function(e) {
+  if (e.keyCode === 37) { // left.
+    if (paging_idx > 0) {
+      paging_idx -= 1;
+    }
+    scrollToElementId(paging_ids[paging_idx]);
+  } else if (e.keyCode === 39) { // right.
+    if (paging_idx < paging_ids.length - 1) {
+      paging_idx += 1;
+    }
+    scrollToElementId(paging_ids[paging_idx]);
+  }
+};
+
+window.onkeypress = function(e) {
+  if (e.charCode === 112) { // 'p'.
+    togglePresentationMode();
+  }
+};
+</script>
+</head>
+<body id="body">
+<section class="S1" id="s1">
+  <h1 id="h1">Source.</h1>
+  <p>
+    <pre>
+Contents of `a.txt`.</pre>
+
+  </p>
+</section>
+<section class="S1" id="s2">
+  <h1 id="h2">Product of a source.</h1>
+  <p>
+    <pre>
+Contents of `b.txt`.
+</pre>
+
+  </p>
+</section>
+<section class="S1" id="s3">
+  <h1 id="h3">Product of a product/src.</h1>
+  <p>
+    <pre>
+Contents of `c.txt`.
+</pre>
+
+  </p>
+  <p>
+    <code>&lt;embed:&nbsp;e.html&gt;</code>
+
+  </p>
+  <p>
+    <code>&lt;embed:&nbsp;f.html&gt;</code>
+
+  </p>
+</section>
+<script type="text/javascript"> "use strict";
+section_ids = ['s1','s2','s3'];
+paging_ids = ['body', 's1','s2','s3'];
+</script>
+</body>
+</html>
