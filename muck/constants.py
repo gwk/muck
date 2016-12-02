@@ -8,6 +8,8 @@ Muck program constants.
 build_dir = '_build'
 build_dir_slash = build_dir + '/'
 db_name = '_muck'
+db_path = build_dir_slash + db_name
+
 out_ext = '.out'
 tmp_ext = '.tmp'
 manifest_ext = '.tmp_manifest'

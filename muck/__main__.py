@@ -26,7 +26,8 @@ from pithy.string_utils import format_byte_count_dec
 from pithy.task import runC
 from typing import Optional
 
-from .constants import build_dir, build_dir_slash, db_name, ignored_exts, out_ext, reserved_exts, tmp_ext, reserved_names
+from .db import TargetRecord, empty_record, is_empty_record, DB, DBError
+from .constants import build_dir, build_dir_slash, db_name, db_path, ignored_exts, out_ext, reserved_exts, tmp_ext, reserved_names
 from .paths import actual_path_for_target, is_product_path, manifest_path, match_wilds,product_path_for_target, target_path_for_source
 from .py_deps import py_dependencies
 
@@ -51,9 +52,9 @@ def main():
   if command_fn and not command_needs_ctx:
     return command_fn(args.targets[1:])
 
-  make_dirs(build_dir) # required for load_db.
+  make_dirs(build_dir) # required to create new DB.
 
-  ctx = Ctx(db=load_db(), statuses={}, dir_names={}, dependents=defaultdict(set),
+  ctx = Ctx(db=DB(path=db_path), statuses={}, dir_names={}, dependents=defaultdict(set),
     report_times=(not args.no_times), dbgF=dbgF)
 
   if command_fn:
@@ -66,59 +67,12 @@ def main():
 
 
 Ctx = namedtuple('Ctx', 'db statuses dir_names dependents report_times dbgF')
-# info: dict (target_path: str => TargetRecord).
+# db: DB.
 # statuses: dict (target_path: str => is_changed: bool|Ellipsis).
 # dir_names: dict (dir_path: str => names: [str]).
+# dependents: defaultdict(set) (target_path: str => depedents).
+# report_times: bool.
 # dbgF: debug printing function.
-
-
-# Build info.
-
-# Muck stores build information in a file within the build directory.
-db_path = path_join(build_dir, db_name)
-
-TargetRecord = namedtuple('TargetRecord', 'path size mtime hash src deps')
-
-
-def empty_record(target_path):
-  return TargetRecord(path=target_path, size=0, mtime=0, hash=None, src=None, deps=())
-
-
-def is_empty_record(record):
-  return record.hash is None
-
-
-def all_deps_for_target(ctx, target):
-  record = ctx.db[target]
-  if record.src is not None:
-    return [record.src] + record.deps
-  else:
-    return record.deps
-
-
-'''
-Database format:
- 'target': target path (not product paths prefixed with build_dir).
- 'val: TargetRecord.
- src is None for non-product sources.
- Each dependency is a target path.
- TODO: save info about muck version itself in the dict under reserved name 'muck'.
-'''
-
-def load_db():
-  try:
-    with open(db_path) as f:
-      return load_json(f, types=(TargetRecord,))
-  except FileNotFoundError:
-    return {}
-  except json.JSONDecodeError as e:
-    warnF(db_path, 'JSON decode failed; ignoring build database ({}).', e)
-    return {}
-
-
-def save_db(db: dict):
-  with open(db_path, 'w') as f:
-    write_json(f, { k: record._asdict() for k, record in db.items() })
 
 
 # Commands.
@@ -130,14 +84,14 @@ def muck_clean(ctx, args):
   '''
   if not args:
     failF('muck clean error: clean command takes specific target arguments; use clean-all to remove all products.')
-  for arg in args:
-    if arg not in ctx.db:
-      errFL('muck clean note: {}: skipping unknown target.', arg)
+  for target in args:
+    if not ctx.db.contains_record(target_path=target):
+      errFL('muck clean note: {}: skipping unknown target.', target)
       continue
-    prod_path = product_path_for_target(arg)
+    prod_path = product_path_for_target(target)
     remove_file_if_exists(prod_path)
-    del ctx.db[arg]
-  save_db(ctx.db)
+    ctx.db.delete_record(target_path=target)
+
 
 
 def muck_clean_all(args):
@@ -154,7 +108,7 @@ def muck_deps(ctx, args):
   `muck deps` command: print dependency information.
   '''
   args = frozenset(args) # deduplicate arguments.
-  targets = args or frozenset(ctx.db); # default to all known targets.
+  targets = args or frozenset(ctx.db.all_target_names())
 
   for target in sorted(targets):
     update_dependency(ctx, target, dependent=None)
@@ -235,8 +189,7 @@ muck patch error: patch command takes one or two arguments. usage:
     # need to remove or update the target record to avoid the 'did you mean to patch?' safeguard.
     # for now, just delete it to be safe; this makes the target look stale.
     try:
-      del ctx.db[target_path]
-      save_db(ctx.db)
+      ctx.db.delete_record(target_path=target_path)
     except KeyError: pass
 
 
@@ -357,7 +310,7 @@ def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str):
   file_hash = hash_for_path(tmp_path)
   is_changed = (size != old.size or file_hash != old.hash)
   if is_changed:
-    ctx.db.pop(target_path, None) # delete metadata if it exists, just before overwrite, in case muck fails before update.
+    ctx.db.delete_record(target_path=target_path) # delete metadata if it exists, just before overwrite, in case muck fails before update.
   move_file(tmp_path, product_path, overwrite=True) # move regardless; if not changed, just cleans up the identical tmp file.
   noteF(target_path, 'product {}; {}.', 'changed' if is_changed else 'did not change', format_byte_count_dec(size))
   return update_deps_and_record(ctx, target_path, product_path,
@@ -390,10 +343,10 @@ def update_deps_and_record(ctx, target_path: str, actual_path: str,
   if is_changed:
     record = TargetRecord(path=target_path, size=size, mtime=mtime, hash=file_hash, src=src, deps=deps)
     ctx.dbgF(target_path, 'updated record:\n  {}', record)
-    ctx.db[target_path] = record
-    # writing the entire dict at every step will not scale well;
-    # at that point we should probably move to sqlite or similar anyway.
-    save_db(ctx.db)
+    if src or is_empty_record(old):
+      ctx.db.insert_record(record)
+    else:
+      ctx.db.update_record(record)
 
   return is_changed
 
@@ -572,9 +525,7 @@ def calc_size_mtime_old(ctx: Ctx, target_path: str, actual_path: str) -> tuple:
   except FileNotFoundError:
     size, mtime = 0, 0
   ctx.dbgF(target_path, 'size: {}; mtime: {}', size, mtime)
-  try: old = ctx.db[target_path]
-  except KeyError: old = empty_record(target_path)
-  return size, mtime, old
+  return size, mtime, ctx.db.get_record(target_path=target_path)
 
 
 def file_size_and_mtime(path):
