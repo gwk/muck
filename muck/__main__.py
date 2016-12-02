@@ -322,32 +322,31 @@ def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
 
 def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mtime, old) -> bool:
   ctx.dbgF(target_path, 'update_product')
-  src_path = source_for_target(ctx, target_path)
-  ctx.dbgF(target_path, 'src_path: {}', src_path)
-  if old.src != src_path:
+  src = source_for_target(ctx, target_path)
+  ctx.dbgF(target_path, 'src: {}', src)
+  if old.src != src:
     is_changed = True
     if old.src:
-      noteF(target_path, 'source path of target product changed\n  was: {}\n  now: {}',
-        old.src, src_path)
-  is_changed |= update_dependency(ctx, src_path, dependent=target_path)
+      noteF(target_path, 'source path of target product changed\n  was: {}\n  now: {}', old.src, src)
+  is_changed |= update_dependency(ctx, src, dependent=target_path)
 
   if is_changed: # must rebuild product.
-    actual_src_path = actual_path_for_target(src_path) # source might itself be a product.
-    tmp_paths = build_product(ctx, target_path, actual_src_path, actual_path)
+    actual_src = actual_path_for_target(src) # source might itself be a product.
+    tmp_paths = build_product(ctx, target_path, actual_src, actual_path)
     ctx.dbgF(target_path, 'tmp_paths: {}', tmp_paths)
     if tmp_paths:
       is_changed = False # now determine if any product has actually changed.
       for tmp_path in tmp_paths:
-        is_changed |= update_product_with_tmp(ctx, src_path, tmp_path)
+        is_changed |= update_product_with_tmp(ctx, src, tmp_path)
       return is_changed
     size, mtime, file_hash = 0, 0, None # no product.
   else: # not is_changed.
     file_hash = old.hash
   return update_deps_and_record(ctx, target_path, actual_path,
-    is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src_path=src_path, old=old)
+    is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=src, old=old)
 
 
-def update_product_with_tmp(ctx: Ctx, src_path: str, tmp_path: str):
+def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str):
   product_path, ext = split_stem_ext(tmp_path)
   if ext not in (out_ext, tmp_ext):
     failF(tmp_path, 'product output path has unexpected extension: {!r}', ext)
@@ -362,7 +361,7 @@ def update_product_with_tmp(ctx: Ctx, src_path: str, tmp_path: str):
   move_file(tmp_path, product_path, overwrite=True) # move regardless; if not changed, just cleans up the identical tmp file.
   noteF(target_path, 'product {}; {}.', 'changed' if is_changed else 'did not change', format_byte_count_dec(size))
   return update_deps_and_record(ctx, target_path, product_path,
-    is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src_path=src_path, old=old)
+    is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=src, old=old)
 
 
 def update_non_product(ctx: Ctx, target_path: str, is_changed: bool, size, mtime, old) -> bool:
@@ -374,11 +373,11 @@ def update_non_product(ctx: Ctx, target_path: str, is_changed: bool, size, mtime
       noteF(target_path, 'source changed.')
 
   return update_deps_and_record(ctx, target_path, target_path,
-    is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src_path=None, old=old)
+    is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=None, old=old)
 
 
 def update_deps_and_record(ctx, target_path: str, actual_path: str,
-  is_changed: bool, size: int, mtime: int, file_hash: Optional[str], src_path: str, old: TargetRecord) -> bool:
+  is_changed: bool, size: int, mtime: int, file_hash: Optional[str], src: str, old: TargetRecord) -> bool:
   ctx.dbgF(target_path, 'update_deps_and_record')
   if is_changed:
     deps = calc_dependencies(actual_path, ctx.dir_names)
@@ -389,7 +388,7 @@ def update_deps_and_record(ctx, target_path: str, actual_path: str,
 
   ctx.statuses[target_path] = is_changed # replace sentinal with final value.
   if is_changed:
-    record = TargetRecord(path=target_path, size=size, mtime=mtime, hash=file_hash, src=src_path, deps=deps)
+    record = TargetRecord(path=target_path, size=size, mtime=mtime, hash=file_hash, src=src, deps=deps)
     ctx.dbgF(target_path, 'updated record:\n  {}', record)
     ctx.db[target_path] = record
     # writing the entire dict at every step will not scale well;
@@ -589,9 +588,9 @@ def source_for_target(ctx, target_path):
   '''
   src_dir, prod_name = split_dir_name(target_path)
   src_name = source_candidate(ctx, target_path, src_dir, prod_name)
-  src_path = path_join(src_dir, src_name)
-  assert src_path != target_path
-  return src_path
+  src = path_join(src_dir, src_name)
+  assert src != target_path
+  return src
 
 
 def source_candidate(ctx, target_path, src_dir, prod_name):
