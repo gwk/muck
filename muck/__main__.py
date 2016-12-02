@@ -500,7 +500,7 @@ build_tool_env_fns = {
 # Utilities.
 
 
-def hash_for_path(path, max_chunks=sys.maxsize):
+def hash_for_path(path: str, max_chunks=sys.maxsize) -> bytes:
   '''
   return a hash string for the contents of the file at the given path.
   '''
@@ -515,8 +515,11 @@ def hash_for_path(path, max_chunks=sys.maxsize):
     chunk = f.read(chunk_size)
     if not chunk: break
     h.update(chunk)
-  d = h.digest()
-  return base64.urlsafe_b64encode(d).decode()
+  return h.digest()
+
+
+def hash_string(hash: bytes) -> str:
+  return base64.urlsafe_b64encode(hash).decode()
 
 
 def calc_size_mtime_old(ctx: Ctx, target_path: str, actual_path: str) -> tuple:
