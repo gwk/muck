@@ -22,7 +22,7 @@ from pithy.fs import (current_dir, file_size, is_file, list_dir, make_dirs, move
   remove_dir_contents, remove_file, remove_file_if_exists, split_dir_name, split_stem_ext)
 from pithy.io import errF, errFL, failF, outL, outZ
 from pithy.json_utils import load_json, write_json
-from pithy.string_utils import format_byte_count_dec
+from pithy.string_utils import format_byte_count
 from pithy.task import runC
 from typing import Optional
 
@@ -312,7 +312,7 @@ def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str):
   if is_changed:
     ctx.db.delete_record(target_path=target_path) # delete metadata if it exists, just before overwrite, in case muck fails before update.
   move_file(tmp_path, product_path, overwrite=True) # move regardless; if not changed, just cleans up the identical tmp file.
-  noteF(target_path, 'product {}; {}.', 'changed' if is_changed else 'did not change', format_byte_count_dec(size))
+  noteF(target_path, 'product {}; {}.', 'changed' if is_changed else 'did not change', format_byte_count(size))
   return update_deps_and_record(ctx, target_path, product_path,
     is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=src, old=old)
 
