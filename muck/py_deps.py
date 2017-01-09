@@ -36,34 +36,37 @@ def py_dep_import(src_path, module_name, dir_names):
     yield module_path
 
 
-def py_dep_call(src_path, node):
+def py_dep_call(src_path, call):
   'Calculate dependencies for a Python ast.Call node.'
-  func = node.func
+  func = call.func
   if not isinstance(func, ast.Attribute): return
   if not isinstance(func.value, ast.Name): return
   # TODO: dispatch to handlers for all known functions.
   # TDOO: add handler for source_url to check that repeated (url, target) pairs are consistent across entire project.
   if func.value.id != 'muck': return
-  fn = func.attr
-  if fn not in dep_fn_names: return
-  if len(node.args) < 1 or not isinstance(node.args[0], ast.Str):
-    py_fail(src_path, node, fn, 'first argument must be a string literal')
-  dep_path = node.args[0].s  # the string value from the ast.Str literal.
-  if fn == load_many.__name__:
-    items = [eval_arg(src_path, fn, arg) for arg in node.args[1:]]
+  name = func.attr
+  if name not in dep_fn_names: return
+  if len(call.args) < 1:
+    py_fail(src_path, call, 'first argument must be a string literal; found no arguments')
+  arg0 = call.args[0]
+  if not isinstance(arg0, ast.Str):
+    py_fail(src_path, arg0, 'first argument must be a string literal; found {}', type(arg0).__name__)
+  dep_path = arg0.s # the string value from the ast.Str literal.
+  if name == load_many.__name__:
+    items = [eval_arg(src_path, i, arg) for (i, arg) in enumerate(call.args[1:])]
   else:
     items = []
   for vars, path in paths_from_range_items(wildcard_path=dep_path, items=items):
     yield path
 
 
-def eval_arg(src_path, fn, arg):
+def eval_arg(src_path, index, arg):
   if isinstance(arg, ast.Tuple):
-    return eval_tuple(src_path, fn, arg)
-  py_fail(src_path, fn, arg, 'argument literal must be a pair of integers')
+    return eval_tuple(src_path, arg)
+  py_fail(src_path, arg, 'argument {} literal must be a pair of integers; found {}', index, type(arg).__name__)
 
 
-def eval_tuple(src_path, fn, arg):
+def eval_tuple(src_path, arg):
   if len(arg.elts) != 2:
     py_fail(src_path, arg, 'load_range', 'range argument tuple must be a pair')
   s, e = arg.elts
@@ -74,7 +77,7 @@ def eval_tuple(src_path, fn, arg):
   return (s.n, e.n)
 
 
-def py_fail(src_path, node, name, msg):
-  errF('muck error: {}: ', src_path)
-  failF('{}:{}: `{}`: {}.', node.lineno, node.col_offset, name, msg)
+def py_fail(src_path, node, fmt, *items):
+  errF('muck error: {}:', src_path)
+  failF('{}:{}: {}.', node.lineno, node.col_offset + 1, fmt.format(*items))
 

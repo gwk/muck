@@ -548,7 +548,8 @@ def source_for_target(ctx, target_path):
 
 
 def source_candidate(ctx, target_path, src_dir, prod_name):
-  src_dir_names = list_dir_filtered(src_dir or '.', cache=ctx.dir_names)
+  try: src_dir_names = list_dir_filtered(src_dir or '.', cache=ctx.dir_names)
+  except FileNotFoundError: failF(target_path, 'no such source directory: `{}`', src_dir)
   candidates = list(filter_source_names(src_dir_names, prod_name))
   if len(candidates) == 1:
     return candidates[0]
