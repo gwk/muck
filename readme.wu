@@ -3,47 +3,67 @@ Dedicated to the public domain under CC0: https://creativecommons.org/publicdoma
 
 # Muck
 
-Muck is a build tool; given a target (a file to be built), it looks in the current directory for a source file with a matching name, determines its dependencies, recursively builds those, and then finally builds the target. Unlike traditional build systems such as Make, Muck determines the dependencies of a given file by analyzing the file source; there is no 'makefile'. This means that Muck is limited to source languages that it understands, and to source code written using Muck conventions. Muck also provides conventional functions that imply data dependencies, allowing data transformation projects to be organized as a series of dependent steps.
+Muck is a build tool for data projects. Given a target (a file to be built), it looks in the current directory tree for a source file with a matching name, determines its dependencies, recursively builds those, and then builds the target. Unlike Make and other traditional build systems, Muck does not use a "makefile". Instead, Muck determines the dependencies of a given file by analyzing its contents. This means that Muck is limited to source languages that it understands, and to source code written using Muck conventions. In particular, Muck provides a few functions that make data dependencies explicit to the analyzer.
+
+By using Muck, programmers and data scientists can organize projects into discrete steps with arbitrary dependencies between them. When the source code for a particular step changes, Muck will rebuild that step and all dependent ("downstream") steps, but will not redo any work that is not affected by the change. This incremental rebuild behavior can speed up the development process dramatically.
+
+By choosing sensible names for each step, the programmer can make the purpose of each step clear. Muck can print the entire dependency graph of the project, resulting in a precise, high-level description of how the code is organized.
+
 
 # Installation
 
-- Install the latest python3 from http://python.org; Muck tracks python3 aggressively.
-- Install the following python dependencies:
-  - `pip3 install --upgrade agate pygal requests beautifulsoup4`
-- Clone the repository somewhere or add it as a submodule to your project.
-- In the `muck` root directory, run `git submodule update --init --recursive` to get Muck's dependencies.
+## Python 3.6
+Muck is written against python3.6; older versions of Python are not supported. (In the future it will support running project scripts in any available version).
+* macOS: install from http://python.org, or perhaps use Homebrew.
+* Ubuntu:
+  * `$ sudo apt-get python3.6`
+  * For versions of Ubuntu that do not ship with a Python 3.6 package, use Felix Krull's `deadsnakes` PPA (personal package archive):
+| $ sudo add-apt-repository ppa:fkrull/deadsnakes
+| $ sudo apt-get update
+| $ sudo apt-get install python3.6
+For more information, see: <http://askubuntu.com/questions/682869/how-do-i-install-newer-python-versions-using-apt-get>
+
+## Pip
+Muck should be installable with a single command: `pip3 install muck`. Once installed, it should be available on the command line. If it is not, it may be that the `PATH` environment variable in your shell is not configured to point to console scripts installed by pip.
+
+## Development
+See doc/dev-setup.wu.
 
 # Usage
 
-`muck.py` takes a list of targets as command line arguments.
+`muck` takes a list of targets as command line arguments. If no targets are provided it defaults to `index.html`.
 Given a target `dir/stem.ext`, muck tries to produce the target file using the following steps:
-- If it exists as named, then it does nothing.
-- If a script exists that begins with the whole target name, e.g. `dir/stem.ext.py`, then that script is executed and its standard output is piped to produce `_build/stem.ext`.
-- If a script exists that begins with the stem, e.g. `dir/stem.py`, then that script is executed without piping stdout, and it is expected to produce `_build/stem.ext` itself.
-- Otherwise Muck issues an error.
+* If the target exists as named, then it does nothing.
+* If a script exists that begins with the whole target name, e.g. `dir/stem.ext.py`, then that script is executed and its standard output is written to `_build/stem.ext`.
+* Otherwise Muck issues an error.
 
-When a python script is run, it is first analyzed by Muck for any dependencies, which will be built before running the script. Dependency analysis is limited to the conventions that Muck understands.
-
-# Examples
-
-Imagine the following files; the python scripts contain `muck.source` function calls which indicate data dependencies.
-- input.csv
-- step1.csv.py: muck.source('input.csv')
-- step2.csv.py: muck.source('step1.csv')
-- final.html.wu: <embed: step2.csv>
-
-Running `muck final.html` will cause the following to be built in order:
-- step1.csv
-- step2.csv
-- final.html
+When a script is run, it is first analyzed by Muck for any dependencies, which will be built before running the script. Dependency analysis is limited to the conventions that Muck understands.
 
 
-# TODO
+# An Example
 
-- improve the muck python library function names and conventions. `source` and `sink`?
-- For source file types that Muck does not recognize, it should default to looking for an associated '.deps' file, which would provide a list of dependencies.
-- support graphviz dot files.
-- output and optionally render the dependency graph.
+Suppose we want to produce a document that contains two charts, A and B. Each of these is derived from some data that we scrape from the web. A typical Muck project to achieve this would consist of four files:
+* `document.html.wu`, referencing `chartA.svg` and `chartB.svg`.
+* `chartA.svg.py`, referencing `data.csv`.
+* `chartB.svg.py`, referencing `data.csv`.
+* `data.csv.py`.
+This project has a dependency graph whose shape is essentially a diamond, with `document.html` at the root, and `data.csv.py` having no dependencies.
 
-
+The programmer can build the document by invoking `muck document.html` on the command line. Muck will then take the following steps:
+* `document.html`: does not exist; infer source: `document.html.wu`.
+* `document.html.wu`: analyze, discover dependencies: `chartA.svg`, `chartB.svg`.
+* `chartA.svg`: does not exist; infer source: `chartA.svg.py`.
+* `chartA.svg.py`: analyze, discover dependencies: `data.csv`.
+* `data.csv`: does not exist; infer source: `data.csv.py`.
+* `data.csv.py`:
+  * analyze; no dependencies.
+  * run `python3 data.csv.py`, writing stdout to `_build/data.csv`.
+* `chartA.svg.py`:
+  * run `python3 chartA.svg.py`, which reads `_build/data.csv` and writes stdout to `_build/chartA.svg`.
+* `chartB.svg`: does not exist; infer source: `chartB.svg.py`.
+* `chartB.svg.py`:
+  * analyze, discover dependencies: `data.csv`.
+  * run `python3 chartB.svg.py`, which reads `_build/data.csv` and writes stdout to `_build/chartB.svg`.
+* `document.html`:
+  * run `writeup document.html.wu`, which reads `_build/chartA.svg`, `_build/chartB.svg`, and writes `_build/document.html`.
 

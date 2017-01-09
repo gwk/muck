@@ -1,8 +1,22 @@
 writeup v0
 
+* document the muck functions.
+
+* Invoking muck with a source file as target should run that source file.
+* Use requirements.txt and virtualenv to track library dependencies.
+
 # Support and use virtualenv.
 
-## Use requirements.txt and virtualenv to track library dependencies.
+
 
 # Wildcards.
 * Fix logic for omitting manifest to depend on zero vars, not zero wildcards.
+
+
+* improve the muck python library function names and conventions.
+* For source file types that Muck does not recognize, it should default to looking for an associated '.deps' file, which would provide a list of dependencies.
+* render the dependency graph.
+* support graphviz dot files?
+
+
+
