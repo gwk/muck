@@ -13,7 +13,7 @@ setup(
   author_email='george.w.king@gmail.com',
   url='https://github.com/gwk/' + name,
   description='Muck is a build tool for data projects that automatically calculates dependencies.',
-  packages=[name],
+  packages=[name, name + '.pithy'],
   entry_points = {'console_scripts': [
     'muck=muck.__main__:main',
   ]},
