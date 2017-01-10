@@ -21,7 +21,7 @@ setup(
     'requests',
   ],
   keywords=[
-    'documentation', 'markup'
+    'build tool', 'data science',
   ],
   classifiers=[ # See https://pypi.python.org/pypi?%3Aaction=list_classifiers.
     'Development Status :: 3 - Alpha',
