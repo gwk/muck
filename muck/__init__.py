@@ -16,6 +16,7 @@ from csv import reader as csv_reader
 from http import HTTPStatus
 from sys import argv
 from typing import Optional
+from urllib.parse import urlparse
 
 from .pithy.path_encode import path_for_url
 from .pithy.io import errF, errFL, failF
@@ -203,6 +204,12 @@ def load_url(url, ext=None, expected_status_code=200, headers={}, timeout=4, del
   # alternatively, the source functions could be reimplemented to take text strings,
   # or perhaps streams.
   # in the uncached case, muck would do the open and read.
+  if ext is None:
+    # extract the extension from the url path;
+    # load will try to extract it from the encoded path,
+    # which may have url path/parameters/query/fragment.
+    parts = urlparse(url)
+    ext = path_ext(parts.path)
   path = fetch(url, expected_status_code=expected_status_code, headers=headers,
     timeout=timeout, delay=delay, delay_range=delay_range)
   return load(path, ext=ext, **kwargs)
