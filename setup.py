@@ -7,7 +7,7 @@ name = 'muck'
 
 setup(
   name=name,
-  version='0.0.1',
+  version='0.0.2',
   license='CC0',
   author='George King',
   author_email='george.w.king@gmail.com',
