@@ -83,7 +83,7 @@ def muck_clean(ctx, args):
   `muck clean` command.
   '''
   if not args:
-    failF('muck clean error: clean command takes specific target arguments; use clean-all to remove all products.')
+    exit('muck clean error: clean command takes specific target arguments; use clean-all to remove all products.')
   for target in args:
     if not ctx.db.contains_record(target_path=target):
       errFL('muck clean note: {}: skipping unknown target.', target)
