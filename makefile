@@ -5,7 +5,7 @@
 # $^: The names of all the prerequisites, with spaces between them.
 
 
-.PHONY: _default clean cov pip-develop pip-uninstall pypi-dist pypi-register pypi-upload test
+.PHONY: _default clean cov pip-develop pip-uninstall pypi-dist pypi-upload test
 
 # First target of a makefile is the default.
 _default: test
