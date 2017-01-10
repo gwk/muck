@@ -12,8 +12,7 @@ setup(
   author='George King',
   author_email='george.w.king@gmail.com',
   url='https://github.com/gwk/' + name,
-  description='Muck is a build tool that automatically calculates dependencies.',
-  long_description=open('readme.wu').read(),
+  description='Muck is a build tool for data projects that automatically calculates dependencies.',
   packages=[name],
   entry_points = {'console_scripts': [
     'muck=muck.__main__:main',
