@@ -3,8 +3,8 @@
 import ast
 import re
 
-from pithy.io import errF, failF
-from pithy.fs import is_file, path_dir, path_join
+from .pithy.io import errF, failF
+from .pithy.fs import is_file, path_dir, path_join
 from .paths import has_wilds, paths_from_range_items
 
 # these functions are recognized by the static analyzer.

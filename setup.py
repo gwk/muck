@@ -19,7 +19,6 @@ setup(
     'muck=muck.__main__:main',
   ]},
   install_requires=[
-    'pithy',
     'requests',
   ],
   keywords=[

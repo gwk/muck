@@ -8,8 +8,8 @@ It is a single table and could be swapped out for a different key-value store.
 from collections import namedtuple
 from marshal import dumps as to_marshalled, loads as from_marshalled
 from sqlite3 import DatabaseError, IntegrityError, connect, sqlite_version, version as module_version
-from pithy.fs import path_join
-from pithy.io import failF
+from .pithy.fs import path_join
+from .pithy.io import failF
 
 
 TargetRecord = namedtuple('TargetRecord', 'path size mtime hash src deps')

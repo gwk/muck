@@ -15,12 +15,13 @@ import pithy.meta as meta
 from csv import reader as csv_reader
 from http import HTTPStatus
 from sys import argv
-from pithy.path_encode import path_for_url
-from pithy.io import errF, errFL, failF
-from pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, path_stem
-from pithy.json_utils import load_json, load_jsonl, load_jsons
-from pithy.transform import Transformer
 from typing import Optional
+
+from .pithy.path_encode import path_for_url
+from .pithy.io import errF, errFL, failF
+from .pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, path_stem
+from .pithy.json_utils import load_json, load_jsonl, load_jsons
+from .pithy.transform import Transformer
 
 from .constants import build_dir, build_dir_slash, tmp_ext
 from .paths import actual_path_for_target, dst_path, has_wilds, manifest_path, paths_from_range_items, product_path_for_source

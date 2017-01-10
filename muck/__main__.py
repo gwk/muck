@@ -17,14 +17,15 @@ import time
 from argparse import ArgumentParser
 from collections import defaultdict, namedtuple
 from hashlib import sha256
-from pithy.fs import (current_dir, file_size, is_file, list_dir, make_dirs, move_file,
+from typing import Optional
+
+from .pithy.fs import (current_dir, file_size, is_file, list_dir, make_dirs, move_file,
   path_dir, path_exists, path_ext, path_join, path_stem,
   remove_dir_contents, remove_file, remove_file_if_exists, split_dir_name, split_stem_ext)
-from pithy.io import errF, errFL, failF, outL, outZ
-from pithy.json_utils import load_json, write_json
-from pithy.string_utils import format_byte_count
-from pithy.task import runC
-from typing import Optional
+from .pithy.io import errF, errFL, failF, outL, outZ
+from .pithy.json_utils import load_json, write_json
+from .pithy.string_utils import format_byte_count
+from .pithy.task import runC
 
 from .db import TargetRecord, empty_record, is_empty_record, DB, DBError
 from .constants import build_dir, build_dir_slash, db_name, db_path, ignored_exts, out_ext, reserved_exts, tmp_ext, reserved_names

@@ -6,7 +6,7 @@ Muck target path functions.
 
 import re
 from itertools import product
-from pithy.fs import path_exists, path_join, path_stem
+from .pithy.fs import path_exists, path_join, path_stem
 
 from .constants import build_dir, build_dir_slash, manifest_ext
 
