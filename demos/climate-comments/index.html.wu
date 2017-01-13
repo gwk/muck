@@ -1,0 +1,16 @@
+writeup v0
+
+# Climate comments
+
+This demo takes data from <https://catalog.data.gov/dataset/climate-change-adaptation-task-force> and produces some stuff.
+
+# Comment Sentiment
+
+<embed: comment-sentiment.svg>
+
+
+# Top Submitted comments
+
+These are all comments with duplicates removed. As you can see, some were form comments submitted many times.
+
+<embed: repeat-comments.csv>
