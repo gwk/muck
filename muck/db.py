@@ -39,14 +39,6 @@ class DBError(Exception):
 idx_id, idx_path, idx_size, idx_mtime, idx_hash, idx_src, idx_deps = range(7)
 
 
-def all_deps_for_target(ctx, target):
-  record = ctx.db[target]
-  if record.src is not None:
-    return [record.src] + record.deps
-  else:
-    return record.deps
-
-
 class DB:
 
   def __init__(self, path):
@@ -118,6 +110,14 @@ class DB:
     self.run('DELETE FROM targets WHERE path=:path', path=target_path)
 
 
+  def all_deps_for_target(self, target_path):
+    record = self.get_record(target_path)
+    if record.src is not None:
+      return [record.src] + record.deps
+    else:
+      return record.deps
+
+
   def dbg_query(self, *stmts):
     for stmt in stmts:
       errFL('\nDBG: {}', stmt)
@@ -125,18 +125,6 @@ class DB:
       errSL('COLS:', *[col[0] for col in c.description])
       for row in c.fetchall():
         errSL('  ', *['{}:{!r}'.format(k, v) for k, v in zip(row.keys(), row)])
-
-
-
-# Build info.
-
-
-def all_deps_for_target(ctx, target):
-  record = ctx.db[target]
-  if record.src is not None:
-    return [record.src] + record.deps
-  else:
-    return record.deps
 
 
 '''

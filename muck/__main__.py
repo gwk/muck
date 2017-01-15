@@ -109,7 +109,7 @@ def muck_deps(ctx, args):
   `muck deps` command: print dependency information.
   '''
   args = frozenset(args) # deduplicate arguments.
-  targets = args or frozenset(ctx.db.all_target_names())
+  targets = args or frozenset(ctx.db.all_target_paths())
 
   for target in sorted(targets):
     update_dependency(ctx, target, dependent=None)
@@ -118,7 +118,7 @@ def muck_deps(ctx, args):
   roots.update(t for t, s in ctx.dependents.items() if len(s) > 1)
 
   def visit(depth, target):
-    deps = all_deps_for_target(ctx, target)
+    deps = ctx.db.all_deps_for_target(target)
     dependents = ctx.dependents[target]
     if depth == 0 and len(dependents) > 0:
       suffix = ' (dependents: {}):'.format(' '.join(sorted(dependents)))
