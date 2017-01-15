@@ -180,11 +180,15 @@ def _fetch(url, timeout, headers, expected_status_code):
   return r
 
 
-def fetch(url, expected_status_code=200, headers={}, timeout=4, delay=0, delay_range=0):
+def fetch(url, expected_status_code=200, headers={}, timeout=4, delay=0, delay_range=0, spoof=False):
   "Fetch the data at `url` and save it to a path in the '_fetch' directory derived from the URL."
   path = path_join('_fetch', path_for_url(url))
   if not path_exists(path):
     errFL('fetch: {}', url)
+    if spoof:
+      h = spoofing_headers()
+      h.update(headers)
+      headers = h
     r = _fetch(url, timeout, headers, expected_status_code)
     make_dirs(path_dir(path))
     with open(path, 'wb') as f:
@@ -197,7 +201,7 @@ def fetch(url, expected_status_code=200, headers={}, timeout=4, delay=0, delay_r
   return path
 
 
-def load_url(url, ext=None, expected_status_code=200, headers={}, timeout=4, delay=0, delay_range=0, **kwargs):
+def load_url(url, ext=None, expected_status_code=200, headers={}, timeout=4, delay=0, delay_range=0, spoof=False, **kwargs):
   'Fetch the data at `url` and then load using `muck.load`.'
   # note: implementing uncached requests efficiently requires new versions of the source functions;
   # these will take a text argument instead of a path argument.
@@ -211,8 +215,19 @@ def load_url(url, ext=None, expected_status_code=200, headers={}, timeout=4, del
     parts = urlparse(url)
     ext = path_ext(parts.path)
   path = fetch(url, expected_status_code=expected_status_code, headers=headers,
-    timeout=timeout, delay=delay, delay_range=delay_range)
+    timeout=timeout, delay=delay, delay_range=delay_range, spoof=spoof)
   return load(path, ext=ext, **kwargs)
+
+
+def spoofing_headers():
+  # Headers that Safari currently sends. TODO: allow imitating other browsers?
+  return {
+    'DNT': '1',
+    'Upgrade-Insecure-Requests': '1',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Cache-Control': 'max-age=0',
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_2) AppleWebKit/602.3.12 (KHTML, like Gecko) Version/10.0.2 Safari/602.3.12',
+  }
 
 
 def transform(target_path, ext=None, **kwargs):
