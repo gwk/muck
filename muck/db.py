@@ -9,7 +9,7 @@ from collections import namedtuple
 from marshal import dumps as to_marshalled, loads as from_marshalled
 from sqlite3 import DatabaseError, IntegrityError, connect, sqlite_version, version as module_version
 from .pithy.fs import path_join
-from .pithy.io import failF
+from .pithy.io import errFL, errSL, failF
 
 
 TargetRecord = namedtuple('TargetRecord', 'path size mtime hash src deps')
@@ -70,6 +70,15 @@ class DB:
     return self.conn.execute(query, args)
 
 
+  def dbg_query(self, *stmts):
+    for stmt in stmts:
+      errFL('\nDBG: {}', stmt)
+      c = self.run(stmt)
+      errSL('COLS:', *[col[0] for col in c.description])
+      for row in c.fetchall():
+        errSL('  ', *['{}:{!r}'.format(k, v) for k, v in zip(row.keys(), row)])
+
+
   def contains_record(self, target_path):
     c = self.run('SELECT COUNT(*) FROM targets WHERE path=:path', path=target_path)
     count = c.fetchone()[0]
@@ -118,15 +127,6 @@ class DB:
       return record.deps
 
 
-  def dbg_query(self, *stmts):
-    for stmt in stmts:
-      errFL('\nDBG: {}', stmt)
-      c = self.run(stmt)
-      errSL('COLS:', *[col[0] for col in c.description])
-      for row in c.fetchall():
-        errSL('  ', *['{}:{!r}'.format(k, v) for k, v in zip(row.keys(), row)])
-
-
 '''
 Database format:
  'target': target path (not product paths prefixed with build_dir).
@@ -145,25 +145,3 @@ def load_db():
   except json.JSONDecodeError as e:
     warnF(db_path, 'JSON decode failed; ignoring build database ({}).', e)
     return {}
-
-
-def save_db(db: dict):
-  with open(db_path, 'w') as f:
-    write_json(f, { k: record._asdict() for k, record in db.items() })
-
-
-
-
-def main():
-  #dbg_query('SELECT * FROM sqlite_master')
-  #dbg_query('EXPLAIN QUERY PLAN SELECT * FROM targets WHERE path=""');
-  db = DB(':memory:')
-
-  db.insert_record(TargetRecord('a', size=0, mtime=1, hash=b'abcd', src='', deps=()))
-  errSL('GET A:', db.get_record('a'))
-  errSL('ALL:', *db.all_target_paths())
-  errFL('CONTAINS a: {}; b: {}', db.contains_record('a'), db.contains_record('b'))
-  db.insert_record(TargetRecord('a', size=1, mtime=2, hash=b'zzzz', src='', deps=('b', 'c')))
-  errSL('GET A:', db.get_record('a'))
-
-if __name__ == '__main__': main()
