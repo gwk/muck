@@ -63,6 +63,13 @@ def main():
     command_fn(ctx, args.targets[1:])
   else: # no command; default behavior is to update each specified target.
     for target in args.targets:
+      if path_exists(target):
+        stem = path_stem(target)
+        if stem != target:
+          noteF(target, 'specified target is a source and not a product; building {!r}...', stem)
+          target = stem
+        else:
+          noteF(target, 'specified target is a source and not a product.')
       update_dependency(ctx, target, dependent=None, force=args.force)
 
 
