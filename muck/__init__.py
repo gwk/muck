@@ -10,7 +10,6 @@ assert sys.version_info.major == 3 # python 2 is not supported.
 import random
 import time
 import requests
-import pithy.meta as meta
 
 from csv import reader as csv_reader
 from http import HTTPStatus

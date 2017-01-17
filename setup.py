@@ -15,7 +15,7 @@ setup(
   description='Muck is a build tool for data projects that automatically calculates dependencies.',
   packages=[name, name + '.pithy'],
   entry_points = {'console_scripts': [
-    'muck=muck.__main__:main',
+    'muck=muck.main:main',
   ]},
   install_requires=[
     'requests',
