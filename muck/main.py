@@ -50,7 +50,8 @@ def main():
   command_needs_ctx, command_fn = commands.get(args.targets[0], (None, None))
 
   if command_fn and not command_needs_ctx:
-    return command_fn(args.targets[1:])
+    command_fn(args.targets[1:])
+    return
 
   make_dirs(build_dir) # required to create new DB.
 
@@ -114,6 +115,8 @@ def muck_deps(ctx, args):
   '''
   `muck deps` command: print dependency information.
   '''
+  if not args:
+    args = ['index.html']
   args = frozenset(args) # deduplicate arguments.
   targets = args or frozenset(ctx.db.all_target_paths())
 

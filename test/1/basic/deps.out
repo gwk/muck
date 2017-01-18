@@ -1,0 +1,9 @@
+
+index.html:
+  index.html.wu:
+    a.txt
+    b.txt:
+      b.txt.py
+    c.txt:
+      c.txt.py:
+        c.txt.py.py
