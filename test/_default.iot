@@ -1,0 +1,12 @@
+{
+  'coverage': [
+    '__main__',
+    'muck.__init__',
+    'muck.constants',
+    'muck.db',
+    'muck.main',
+    'muck.paths',
+    'muck.py_deps',
+  ],
+  'env': {'MUCK': '$PROJ/muck/__main__.py'},
+}

@@ -1,0 +1,11 @@
+{
+  'desc': 'initial',
+  'cmd': '$MUCK -no-times',
+  'code': 0,
+  'links': {
+    'test/1/basic/a.txt',
+    'test/1/basic/b.txt.py',
+    'test/1/basic/c.txt.py.py',
+    'test/1/basic/index.html.wu',
+  }
+}

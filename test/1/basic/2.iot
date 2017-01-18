@@ -1,0 +1,4 @@
+{
+  'desc': 'rebuild 2; no-op',
+  'cmd': '$MUCK',
+}
