@@ -11,6 +11,7 @@ __pycache__/
 _build/
 _misc/
 gh-pages/
+todo.txt
 
 # Muck.
 _fetch/
