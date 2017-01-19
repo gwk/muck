@@ -174,6 +174,7 @@ muck patch error: patch command takes one or two arguments. usage:
       copy_file(orig_path, prod_path)
 
   else: # update existing patch.
+    assert len(args) == 1
     patch_path = args[0]
     if path_ext(patch_path) != '.pat':
       failF('muck patch error: argument does not specify a .pat file: {!r}', patch_path)
@@ -206,7 +207,7 @@ commands = {
   'deps'      : (True,  muck_deps),
   'patch'     : (True,  muck_patch),
 }
-
+assert all(c in reserved_names for c in commands)
 
 # Default update functionality.
 
