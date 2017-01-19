@@ -111,19 +111,16 @@ def muck_clean_all(args):
   remove_dir_contents(build_dir)
 
 
-def muck_deps(ctx, args):
+def muck_deps(ctx, targets):
   '''
   `muck deps` command: print dependency information.
   '''
-  if not args:
-    args = ['index.html']
-  args = frozenset(args) # deduplicate arguments.
-  targets = args or frozenset(ctx.db.all_target_paths())
+  if not targets: targets = ['index.html']
 
   for target in sorted(targets):
     update_dependency(ctx, target, dependent=None)
 
-  roots = set(args) or { t for t in targets if t not in ctx.dependents }
+  roots = set(targets)
   roots.update(t for t, s in ctx.dependents.items() if len(s) > 1)
 
   def visit(depth, target):

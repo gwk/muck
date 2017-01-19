@@ -85,11 +85,6 @@ class DB:
     return bool(count)
 
 
-  def all_target_paths(self):
-    for row in self.run('SELECT path FROM targets'):
-      yield row[0]
-
-
   def get_record(self, target_path):
     c = self.run('SELECT * FROM targets WHERE path=:path', path=target_path)
     rows = c.fetchall()
@@ -125,22 +120,3 @@ class DB:
     else:
       return record.deps
 
-
-'''
-Database format:
- 'target': target path (not product paths prefixed with build_dir).
- 'val: TargetRecord.
- src is None for non-product sources.
- Each dependency is a target path.
- TODO: save info about muck version itself in the dict under reserved name 'muck'.
-'''
-
-def load_db():
-  try:
-    with open(db_path) as f:
-      return load_json(f, types=(TargetRecord,))
-  except FileNotFoundError:
-    return {}
-  except json.JSONDecodeError as e:
-    warnF(db_path, 'JSON decode failed; ignoring build database ({}).', e)
-    return {}
