@@ -350,7 +350,7 @@ def update_deps_and_record(ctx, target_path: str, actual_path: str,
   if is_changed:
     record = TargetRecord(path=target_path, size=size, mtime=mtime, hash=file_hash, src=src, deps=deps)
     ctx.dbgF(target_path, 'updated record:\n  {}', record)
-    if src or is_empty_record(old):
+    if is_empty_record(old):
       ctx.db.insert_record(record)
     else:
       ctx.db.update_record(record)
