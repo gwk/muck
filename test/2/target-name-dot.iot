@@ -1,0 +1,4 @@
+{
+  'cmd': ['$MUCK', '.'],
+  'err-val': "muck error: invalid target: '.'; cannot begin or end with '.'.\n",
+}

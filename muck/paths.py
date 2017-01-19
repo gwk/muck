@@ -6,9 +6,39 @@ Muck target path functions.
 
 import re
 from itertools import product
-from .pithy.fs import path_exists, path_join, path_stem
+from .pithy.fs import path_exists, path_ext, path_join, path_name_stem, path_stem
+from .constants import build_dir, build_dir_slash, manifest_ext, reserved_exts, reserved_names, reserved_or_ignored_exts
 
-from .constants import build_dir, build_dir_slash, manifest_ext
+
+class InvalidTarget(Exception):
+  def __init__(self, target, msg):
+    super().__init__(target, msg)
+    self.target = target
+    self.msg = msg
+
+
+target_re = re.compile(r'[\w\.\-%\[\]{}/]+')
+target_invalids_re = re.compile(r'\.\.|\./|//')
+
+def validate_target(target):
+  if not target_re.fullmatch(target):
+    raise InvalidTarget(target, 'does not match regex: {}'.format(target_re.pattern))
+  inv_m  =target_invalids_re.search(target)
+  if inv_m:
+    raise InvalidTarget(target, "cannot contain '{}'.".format(inv_m.group(0)))
+  if target[0] == '.' or target[-1] == '.':
+    raise InvalidTarget(target, "cannot begin or end with '.'.")
+  if path_name_stem(target) in reserved_names:
+    reserved_desc = ', '.join(sorted(reserved_names))
+    raise InvalidTarget(target, f'name is reserved; please rename the target.\n(reserved names: {reserved_desc}.)')
+  if path_ext(target) in reserved_exts:
+    raise InvalidTarget(target, 'target name has reserved extension; please rename the target.')
+
+
+def validate_target_or_error(target):
+  try: validate_target(target)
+  except InvalidTarget as e:
+    exit('muck error: invalid target: {!r}; {}'.format(e.target, e.msg))
 
 
 def is_product_path(path):

@@ -27,8 +27,9 @@ from .pithy.string_utils import format_byte_count
 from .pithy.task import runC
 
 from .db import TargetRecord, empty_record, is_empty_record, DB, DBError
-from .constants import build_dir, build_dir_slash, db_name, db_path, ignored_exts, out_ext, reserved_exts, tmp_ext, reserved_names
-from .paths import actual_path_for_target, is_product_path, manifest_path, match_wilds,product_path_for_target, target_path_for_source
+from .constants import build_dir, build_dir_slash, db_name, db_path, out_ext, tmp_ext, reserved_names, reserved_or_ignored_exts
+from .paths import (InvalidTarget, actual_path_for_target, is_product_path, manifest_path, match_wilds,product_path_for_target,
+  target_path_for_source, validate_target, validate_target_or_error)
 from .py_deps import py_dependencies
 
 
@@ -50,7 +51,9 @@ def main():
   command_needs_ctx, command_fn = commands.get(args.targets[0], (None, None))
 
   if command_fn and not command_needs_ctx:
-    command_fn(args.targets[1:])
+    targets = args.targets[1:]
+    for t in targets: validate_target_or_error(t)
+    command_fn(targets)
     return
 
   make_dirs(build_dir) # required to create new DB.
@@ -60,9 +63,12 @@ def main():
 
   if command_fn:
     assert command_needs_ctx
+    targets = args.targets[1:]
+    for t in targets: validate_target_or_error(t)
     command_fn(ctx, args.targets[1:])
   else: # no command; default behavior is to update each specified target.
     for target in args.targets:
+      validate_target_or_error(target)
       if path_exists(target):
         stem = path_stem(target)
         if stem != target:
@@ -216,14 +222,7 @@ def update_dependency(ctx: Ctx, target_path: str, dependent: Optional[str], forc
   '''
   returns is_changed.
   '''
-  target_ext = path_ext(target_path)
-
-  if not target_path.strip():
-    errorF(repr(target_path), 'invalid target name.')
-  if target_path in reserved_names:
-    errorF(target_path, 'target name is reserved; please rename the target.')
-  if target_ext in reserved_exts:
-    errorF(target_path, 'target name has reserved extension; please rename the target.')
+  validate_target(target_path)
 
   if dependent is not None:
     ctx.dependents[target_path].add(dependent)
@@ -283,6 +282,7 @@ def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
 def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mtime, old) -> bool:
   ctx.dbgF(target_path, 'update_product')
   src = source_for_target(ctx, target_path)
+  validate_target(src) # this should never happen if target is valid, so do not catch.
   ctx.dbgF(target_path, 'src: {}', src)
   if old.src != src:
     is_changed = True
@@ -341,6 +341,10 @@ def update_deps_and_record(ctx, target_path: str, actual_path: str,
   ctx.dbgF(target_path, 'update_deps_and_record')
   if is_changed:
     deps = calc_dependencies(actual_path, ctx.dir_names)
+    for dep in deps:
+      try: validate_target(dep)
+      except InvalidTarget as e:
+        exit('muck error: {}: invalid dependency: {!r}: {}'.format(target_path, e.target, e.msg))
   else:
     deps = old.deps
   for dep in deps:
@@ -576,7 +580,7 @@ def list_dir_filtered(src_dir, cache):
   try: return cache[src_dir]
   except KeyError: pass
   names = [n for n in list_dir(src_dir, hidden=False)
-    if n not in reserved_names and path_ext(n) not in ignored_exts]
+    if n not in reserved_names and path_ext(n) not in reserved_or_ignored_exts]
   if cache is not None:
     cache[dir] = names
   return names

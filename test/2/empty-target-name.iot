@@ -1,4 +1,0 @@
-{
-  'cmd': ['$MUCK', ''],
-  'err-val': "muck error: '': invalid target name.\n",
-}

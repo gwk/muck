@@ -18,12 +18,13 @@ ignored_exts = frozenset({
   '.err', '.iot', '.out', # iotest extensions.
 })
 
-
 reserved_exts = frozenset({
   out_ext,
   tmp_ext,
   manifest_ext,
 })
+
+reserved_or_ignored_exts = reserved_exts | ignored_exts
 
 reserved_names = frozenset({
   'clean',
