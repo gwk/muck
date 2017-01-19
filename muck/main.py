@@ -195,8 +195,7 @@ muck patch error: patch command takes one or two arguments. usage:
   if len(args) == 1: # updated existing patch.
     # need to remove or update the target record to avoid the 'did you mean to patch?' safeguard.
     # for now, just delete it to be safe; this makes the target look stale.
-    try:
-      ctx.db.delete_record(target_path=target_path)
+    try: ctx.db.delete_record(target_path=target_path)
     except KeyError: pass
 
 
