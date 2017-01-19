@@ -6,6 +6,7 @@
     'test/0/basic/a.txt',
     'test/0/basic/b.txt.py',
     'test/0/basic/c.txt.py.py',
+    'test/0/basic/d.txt.py',
     'test/0/basic/index.html.wu',
   }
 }

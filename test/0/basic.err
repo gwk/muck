@@ -1,12 +1,15 @@
+muck note: d.txt: building: `python3.6 d.txt.py`
+muck note: d.txt: finished: (via stdout).
+muck note: d.txt: product changed; 6 B.
 muck note: b.txt: building: `python3.6 b.txt.py`
 muck note: b.txt: finished: (via stdout).
-muck note: b.txt: product changed; 21 B.
+muck note: b.txt: product changed; 19 B.
 muck note: c.txt.py: building: `python3.6 c.txt.py.py`
 muck note: c.txt.py: finished: (via stdout).
-muck note: c.txt.py: product changed; 30 B.
+muck note: c.txt.py: product changed; 109 B.
 muck note: c.txt: building: `python3.6 _build/c.txt.py`
 muck note: c.txt: finished: (via stdout).
-muck note: c.txt: product changed; 21 B.
+muck note: c.txt: product changed; 19 B.
 muck note: index.html: building: `writeup index.html.wu`
 muck note: index.html: finished: (via stdout).
-muck note: index.html: product changed; 4.732 kB.
+muck note: index.html: product changed; 4.728 kB.

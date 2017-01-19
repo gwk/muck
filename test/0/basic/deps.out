@@ -1,9 +1,14 @@
 
+d.txt (dependents: b.txt.py c.txt.py):
+  d.txt.py
+
 index.html:
   index.html.wu:
     a.txt
     b.txt:
-      b.txt.py
+      b.txt.py:
+        d.txt*
     c.txt:
       c.txt.py:
         c.txt.py.py
+        d.txt*
