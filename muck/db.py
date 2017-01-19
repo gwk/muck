@@ -71,7 +71,7 @@ class DB:
 
 
   def dbg_query(self, *stmts):
-    for stmt in stmts:
+    for stmt in stmts: #no-cov!
       errFL('\nDBG: {}', stmt)
       c = self.run(stmt)
       errSL('COLS:', *[col[0] for col in c.description])
@@ -106,7 +106,8 @@ class DB:
     try:
       self.run('INSERT INTO targets (path, size, mtime, hash, src, deps) VALUES (:path, :size, :mtime, :hash, :src, :deps)',
         path=record.path, size=record.size, mtime=record.mtime, hash=record.hash, src=record.src, deps=to_marshalled(record.deps))
-    except IntegrityError as e: raise DBError('insert_record: target path is not unique: {}', record.path) from e #no-cov!
+    except IntegrityError as e: #no-cov!
+      raise DBError('insert_record: target path is not unique: {}', record.path) from e
 
 
   def delete_record(self, target_path: str):
