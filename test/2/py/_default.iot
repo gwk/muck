@@ -1,0 +1,4 @@
+{
+  'cmd': '$MUCK $STEM',
+  'links': {'test'},
+}

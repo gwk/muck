@@ -15,7 +15,11 @@ dep_fn_names = tuple(fn.__name__ for fn in (load, load_many, open_dep, transform
 def py_dependencies(src_path, src_file, dir_names):
   'Calculate dependencies for a .py (python3 source) file.'
   src_text = src_file.read()
-  tree = ast.parse(src_text, filename=src_path)
+  try: tree = ast.parse(src_text, filename=src_path)
+  except SyntaxError as e:
+    failF('muck error: {}:{}:{}: syntax error.\n  {}  {}^',
+      src_path, e.lineno, e.offset, e.text, ' ' * (e.offset - 1))
+
   for node in ast.walk(tree):
     if isinstance(node, ast.Call):
       yield from py_dep_call(src_path, node)
@@ -78,6 +82,5 @@ def eval_tuple(src_path, arg):
 
 
 def py_fail(src_path, node, fmt, *items):
-  errF('muck error: {}:', src_path)
-  failF('{}:{}: {}.', node.lineno, node.col_offset + 1, fmt.format(*items))
+  failF('muck error: {}:{}:{}: {}.', src_path, node.lineno, node.col_offset + 1, fmt.format(*items))
 
