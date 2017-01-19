@@ -1,7 +1,7 @@
 # Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
 
 '''
-Muck build program.
+Muck is a build tool that infers dependencies between files.
 '''
 
 import sys
@@ -34,7 +34,7 @@ from .py_deps import py_dependencies
 
 
 def main():
-  arg_parser = ArgumentParser(description='muck around with dependencies.')
+  arg_parser = ArgumentParser(description=__doc__)
   arg_parser.add_argument('targets', nargs='*', default=['index.html'], help='target file names.')
   arg_parser.add_argument('-no-times', action='store_true', help='do not report process times.')
   arg_parser.add_argument('-dbg', action='store_true')
