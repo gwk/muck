@@ -254,7 +254,7 @@ def update_dependency(ctx: Ctx, target_path: str, dependent: Optional[str], forc
     if is_product != old_is_product: # nature of the target changed.
       noteF(target_path, 'target is {} a product.', 'now' if is_product else 'no longer')
       is_changed = True
-    if not has_old_file and target_ext: # product was deleted and not a phony target.
+    if not has_old_file:
       noteF(target_path, 'old product was deleted.')
 
   if is_product:
