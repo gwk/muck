@@ -1,0 +1,4 @@
+{
+  'cmd': '$MUCK clean missing.txt',
+  'code': 0,
+}
