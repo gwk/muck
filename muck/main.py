@@ -70,8 +70,8 @@ def main():
     for target in args.targets:
       validate_target_or_error(target)
       if path_exists(target):
-        stem = path_stem(target)
-        if stem != target:
+        stem, ext = split_stem_ext(target)
+        if ext in dependency_fns:
           noteF(target, 'specified target is a source and not a product; building {!r}...', stem)
           target = stem
         else:
