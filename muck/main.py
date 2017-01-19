@@ -18,7 +18,7 @@ from collections import defaultdict, namedtuple
 from hashlib import sha256
 from typing import Optional
 
-from .pithy.fs import (current_dir, file_size, is_file, list_dir, make_dirs, move_file,
+from .pithy.fs import (copy_file, current_dir, file_size, is_file, list_dir, make_dirs, move_file,
   path_dir, path_exists, path_ext, path_join, path_stem,
   remove_dir_contents, remove_file, remove_file_if_exists, split_dir_name, split_stem_ext)
 from .pithy.io import errF, errFL, failF, outL, outZ
