@@ -33,7 +33,7 @@ def is_empty_record(record):
 
 class DBError(Exception):
   def __init__(self, fmt, *items, **kw):
-    super().__init__(fmt.format(*items, **kw))
+    super().__init__(fmt.format(*items, **kw)) #no-cov!
 
 
 idx_id, idx_path, idx_size, idx_mtime, idx_hash, idx_src, idx_deps = range(7)
@@ -50,7 +50,7 @@ class DB:
     except DatabaseError as e:
       if e.args[0] == 'file is encrypted or is not a database':
         failF('muck error: database is outdated or corrupt; run `muck clean-all`.')
-      else: raise
+      else: raise #no-cov!
 
     self.run('''
     CREATE TABLE IF NOT EXISTS targets (
@@ -94,7 +94,7 @@ class DB:
     c = self.run('SELECT * FROM targets WHERE path=:path', path=target_path)
     rows = c.fetchall()
     if len(rows) > 1:
-      raise DBError('multiple rows matching target path: {!r}', target_path)
+      raise DBError('multiple rows matching target path: {!r}', target_path) #no-cov!
     if rows:
       r = rows[0]
       return TargetRecord(target_path, r[idx_size], r[idx_mtime], r[idx_hash], r[idx_src], from_marshalled(r[idx_deps]))
@@ -111,8 +111,7 @@ class DB:
     try:
       self.run('INSERT INTO targets (path, size, mtime, hash, src, deps) VALUES (:path, :size, :mtime, :hash, :src, :deps)',
         path=record.path, size=record.size, mtime=record.mtime, hash=record.hash, src=record.src, deps=to_marshalled(record.deps))
-    except IntegrityError as e:
-      raise DBError('insert_record: target path is not unique: {}', record.path) from e
+    except IntegrityError as e: raise DBError('insert_record: target path is not unique: {}', record.path) from e #no-cov!
 
 
   def delete_record(self, target_path: str):
