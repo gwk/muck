@@ -12,4 +12,4 @@ muck note: c.txt: finished: (via stdout).
 muck note: c.txt: product changed; 19 B.
 muck note: index.html: building: `writeup index.html.wu`
 muck note: index.html: finished: (via stdout).
-muck note: index.html: product changed; 4.728 kB.
+muck note: index.html: product changed; 4.736 kB.

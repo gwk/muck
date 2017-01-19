@@ -6,7 +6,7 @@ writeup v0
 # Product of a source.
 <embed: b.txt>
 
-# Product of a product/src.
+# Product of a product of a source.
 <embed: c.txt>
 
 
