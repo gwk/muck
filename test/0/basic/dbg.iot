@@ -1,0 +1,5 @@
+{
+  'cmd': '$MUCK -dbg',
+  'code': 0,
+  'err-mode': 'match',
+}

@@ -1,0 +1,36 @@
+| muck dbg: index.html: examining... (dependent=None)
+~ muck dbg: index.html: size: 4732; mtime: .+
+| muck dbg: index.html: update_product
+| muck dbg: index.html: src: index.html.wu
+| muck dbg: index.html.wu: examining... (dependent=index.html)
+~ muck dbg: index.html.wu: size: 159; mtime: .+
+| muck dbg: index.html.wu: update_non_product
+| muck dbg: index.html.wu: update_deps_and_record
+| muck dbg: a.txt: examining... (dependent=index.html.wu)
+~ muck dbg: a.txt: size: 20; mtime: .+
+| muck dbg: a.txt: update_non_product
+| muck dbg: a.txt: update_deps_and_record
+| muck dbg: b.txt: examining... (dependent=index.html.wu)
+~ muck dbg: b.txt: size: 21; mtime: .+
+| muck dbg: b.txt: update_product
+| muck dbg: b.txt: src: b.txt.py
+| muck dbg: b.txt.py: examining... (dependent=b.txt)
+~ muck dbg: b.txt.py: size: 30; mtime: .+
+| muck dbg: b.txt.py: update_non_product
+| muck dbg: b.txt.py: update_deps_and_record
+| muck dbg: b.txt: update_deps_and_record
+| muck dbg: c.txt: examining... (dependent=index.html.wu)
+~ muck dbg: c.txt: size: 21; mtime: .+
+| muck dbg: c.txt: update_product
+| muck dbg: c.txt: src: c.txt.py
+| muck dbg: c.txt.py: examining... (dependent=c.txt)
+~ muck dbg: c.txt.py: size: 30; mtime: .+
+| muck dbg: c.txt.py: update_product
+| muck dbg: c.txt.py: src: c.txt.py.py
+| muck dbg: c.txt.py.py: examining... (dependent=c.txt.py)
+~ muck dbg: c.txt.py.py: size: 39; mtime: .+
+| muck dbg: c.txt.py.py: update_non_product
+| muck dbg: c.txt.py.py: update_deps_and_record
+| muck dbg: c.txt.py: update_deps_and_record
+| muck dbg: c.txt: update_deps_and_record
+| muck dbg: index.html: update_deps_and_record
