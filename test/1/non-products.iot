@@ -1,0 +1,5 @@
+{
+  'cmd': '$MUCK -no-times $NAME-0.py $NAME-1',
+  'code': 0,
+  'links': {'$STEM-0.py', '$STEM-1'}
+}
