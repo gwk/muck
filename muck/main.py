@@ -107,7 +107,7 @@ def muck_clean_all(args):
   `muck clean-all` command.
   '''
   if args:
-    failF('muck clean-all error: clean-all command no arguments; use clean to remove individual products.')
+    failF('clean-all command takes no arguments; use clean to remove individual products. provided args: {!r}', args)
   remove_dir_contents(build_dir)
 
 
@@ -219,11 +219,11 @@ def update_dependency(ctx: Ctx, target_path: str, dependent: Optional[str], forc
   target_ext = path_ext(target_path)
 
   if not target_path.strip():
-    failF(repr(target_path), 'invalid target name.')
+    errorF(repr(target_path), 'invalid target name.')
   if target_path in reserved_names:
-    failF(target_path, 'target name is reserved; please rename the target.')
+    errorF(target_path, 'target name is reserved; please rename the target.')
   if target_ext in reserved_exts:
-    failF(target_path, 'target name has reserved extension; please rename the target.')
+    errorF(target_path, 'target name has reserved extension; please rename the target.')
 
   if dependent is not None:
     ctx.dependents[target_path].add(dependent)
@@ -232,7 +232,7 @@ def update_dependency(ctx: Ctx, target_path: str, dependent: Optional[str], forc
     status = ctx.statuses[target_path]
     if status is Ellipsis: # recursion sentinal.
       involved_paths = sorted(path for path, status in ctx.statuses.items() if status is Ellipsis)
-      failF(target_path, 'target has circular dependency; involved paths:\n  {}',
+      errorF(target_path, 'target has circular dependency; involved paths:\n  {}',
         '\n  '.join(involved_paths))
     return status
   except KeyError: pass
@@ -275,7 +275,7 @@ def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
   if size != old.size or (mtime != old.mtime and hash_for_path(actual_path) != old.hash):
     ctx.dbgF(target_path, 'size: {} -> {}; mtime: {} -> {}', old.size, size, old.mtime, mtime)
     # TODO: change language depending on whether product is derived from a patch?
-    failF(target_path, 'existing product has changed; did you mean to update a patch?\n'
+    errorF(target_path, 'existing product has changed; did you mean to update a patch?\n'
       '  Otherwise, save your changes if necessary and then `muck clean {}`.',
       target_path)
 
@@ -309,9 +309,9 @@ def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mt
 def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str):
   product_path, ext = split_stem_ext(tmp_path)
   if ext not in (out_ext, tmp_ext):
-    failF(tmp_path, 'product output path has unexpected extension: {!r}', ext)
+    errorF(tmp_path, 'product output path has unexpected extension: {!r}', ext)
   if not is_product_path(product_path):
-     failF(product_path, 'product path is not in build dir.')
+     errorF(product_path, 'product path is not in build dir.')
   target_path = product_path[len(build_dir_slash):]
   size, mtime, old = calc_size_mtime_old(ctx, target_path, tmp_path)
   file_hash = hash_for_path(tmp_path)
@@ -390,13 +390,13 @@ def mush_dependencies(src_path, src_file, dir_names):
 try: from pat import pat_dependencies
 except ImportError:
   def pat_dependencies(src_path, src_file, dir_names):
-    failF(src_path, '`pat` is not installed; run `pip install pat-tool`.')
+    errorF(src_path, '`pat` is not installed; run `pip install pat-tool`.')
 
 
 try: from writeup.v0 import writeup_dependencies
 except ImportError:
   def writeup_dependencies(src_path, src_file, dir_names):
-    failF(src_path, '`writeup` is not installed; run `pip install writeup-tool`.')
+    errorF(src_path, '`writeup` is not installed; run `pip install writeup-tool`.')
 
 
 dependency_fns = {
@@ -421,7 +421,7 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
     build_tool = build_tools[src_ext]
   except KeyError:
     # TODO: fall back to generic .deps file.
-    failF(target_path, 'unsupported source file extension: `{}`', src_ext)
+    errorF(target_path, 'unsupported source file extension: `{}`', src_ext)
   prod_path_out = prod_path + out_ext
   prod_path_tmp = prod_path + tmp_ext
   remove_file_if_exists(prod_path_out)
@@ -437,7 +437,7 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
   # Extract args from the combination of wilds in the source and the matching target.
   m = match_wilds(target_path_for_source(src_path), target_path)
   if m is None:
-    failF(target_path, 'internal error: match failed; src_path: {!r}', src_path)
+    errorF(target_path, 'internal error: match failed; src_path: {!r}', src_path)
   argv = [src_path] + list(m.groups())
   cmd = build_tool + argv
 
@@ -455,7 +455,7 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
   time_elapsed = time.time() - time_start
   out_file.close()
   if code != 0:
-    failF(target_path, 'build failed with code: {}', code)
+    errorF(target_path, 'build failed with code: {}', code)
 
   def cleanup_out():
     if file_size(prod_path_out) == 0:
@@ -478,7 +478,7 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
     tmp_paths = list(line[:-1] for line in f) # strip newlines.
     cleanup_out()
     if ('%' not in prod_path_tmp) and prod_path_tmp not in tmp_paths:
-      failF(target_path, 'product does not appear in manifest ({} records): {}',
+      errorF(target_path, 'product does not appear in manifest ({} records): {}',
         len(tmp_paths), manif_path)
     remove_file(manif_path)
   time_msg = '{:0.2f} seconds '.format(time_elapsed) if ctx.report_times else ''
@@ -514,7 +514,7 @@ def hash_for_path(path: str, max_chunks=sys.maxsize) -> bytes:
   try:
     f = open(path, 'rb')
   except IsADirectoryError:
-    failF(path, 'expected a file but found a directory')
+    errorF(path, 'expected a file but found a directory')
   h = sha256()
   # a quick timing experiment suggested that chunk sizes larger than this are not faster.
   chunk_size = 1 << 16
@@ -556,16 +556,16 @@ def source_for_target(ctx, target_path):
 
 def source_candidate(ctx, target_path, src_dir, prod_name):
   try: src_dir_names = list_dir_filtered(src_dir or '.', cache=ctx.dir_names)
-  except FileNotFoundError: failF(target_path, 'no such source directory: `{}`', src_dir)
+  except FileNotFoundError: errorF(target_path, 'no such source directory: `{}`', src_dir)
   candidates = list(filter_source_names(src_dir_names, prod_name))
   if len(candidates) == 1:
     return candidates[0]
   # error.
   deps = ', '.join(sorted(ctx.dependents[target_path])) or target_path
   if len(candidates) == 0:
-    failF(deps, 'no source candidates matching `{}`', target_path)
+    errorF(deps, 'no source candidates matching `{}`', target_path)
   else:
-    failF(deps, 'multiple source candidates matching `{}`: {}', target_path, candidates)
+    errorF(deps, 'multiple source candidates matching `{}`: {}', target_path, candidates)
 
 
 def list_dir_filtered(src_dir, cache):
@@ -611,7 +611,7 @@ def warnF(path, fmt, *items):
   errF('muck WARNING: {}: ', path)
   errFL(fmt, *items)
 
-def failF(path, fmt, *items):
+def errorF(path, fmt, *items):
   errF('muck error: {}: ', path)
   errFL(fmt, *items)
   exit(1)
