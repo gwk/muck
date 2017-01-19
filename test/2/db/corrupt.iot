@@ -1,0 +1,4 @@
+{
+  'compile': ['$PROJ/$STEM.sh'],
+  'cmd': '$MUCK',
+}
