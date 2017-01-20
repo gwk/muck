@@ -1,0 +1,7 @@
+{
+  'compile': ['touch modified.txt.pat'],
+  'cmd': '$MUCK -patch original.txt modified.txt',
+  'err-val': '''\
+muck -patch error: patch is an existing target: modified.txt.pat
+'''
+}

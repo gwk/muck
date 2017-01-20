@@ -1,0 +1,7 @@
+{
+  'cmd': '$MUCK -update-patch',
+  'err-val': '''\
+muck -update-patch error: requires one argument, the patch target to update.
+The patch file will be updated with the diff of the previously specified original and _build/[target].
+'''
+}
