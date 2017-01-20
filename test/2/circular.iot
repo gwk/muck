@@ -1,0 +1,9 @@
+{
+  'cmd': '$MUCK circular',
+  'links': {'$STEM.py'},
+  'err-val': '''\
+muck error: circular: target has circular dependency; involved paths:
+  circular
+  circular.py
+'''
+}
