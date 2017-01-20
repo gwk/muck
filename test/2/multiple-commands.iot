@@ -1,0 +1,4 @@
+{
+  'cmd': '$MUCK -clean -deps',
+  'err-val': "muck error: multiple commands specified: '-clean', '-deps'.\n",
+}
