@@ -225,8 +225,9 @@ def update_dependency(ctx: Ctx, target_path: str, dependent: Optional[str], forc
   ctx.statuses[target_path] = Ellipsis # recursion sentinal is replaced before return.
 
   ctx.dbgF(target_path, 'examining... (dependent={})', dependent)
-
   is_product = not path_exists(target_path)
+  if is_product and is_link(target_path):
+    errorF(target_path, 'target is a dangling symlink to: {}', read_link(target_path))
   actual_path = product_path_for_target(target_path) if is_product else target_path
   size, mtime, old = calc_size_mtime_old(ctx, target_path, actual_path)
   has_old_file = (mtime > 0)
