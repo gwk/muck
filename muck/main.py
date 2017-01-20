@@ -144,10 +144,10 @@ def muck_deps(ctx, targets):
 
 
 def muck_create_patch(ctx, args):
-  '`muck -create-patch` command.'
+  '`muck -patch` command.'
   if len(args) != 2:
     failF('''\
-muck -create-patch error: requires two arguments: [original] [modified].
+muck -patch error: requires two arguments: [original] [modified].
 This command creates an empty patch called [modified].pat, and copies [original] to _build/[modified].''')
   original, modified = args
   patch = modified + '.pat'
