@@ -546,7 +546,8 @@ def source_for_target(ctx, target_path):
 
 
 def source_candidate(ctx, target_path, src_dir, prod_name):
-  try: src_dir_names = list_dir_filtered(src_dir or '.', cache=ctx.dir_names)
+  src_dir = src_dir or '.'
+  try: src_dir_names = list_dir_filtered(src_dir, cache=ctx.dir_names)
   except FileNotFoundError: errorF(target_path, 'no such source directory: `{}`', src_dir)
   candidates = list(filter_source_names(src_dir_names, prod_name))
   if len(candidates) == 1:
@@ -554,7 +555,7 @@ def source_candidate(ctx, target_path, src_dir, prod_name):
   # error.
   deps = ', '.join(sorted(ctx.dependents[target_path])) or target_path
   if len(candidates) == 0:
-    errorF(deps, 'no source candidates matching `{}`', target_path)
+    errorF(deps, 'no source candidates matching `{}` in `{}`', target_path, src_dir)
   else:
     errorF(deps, 'multiple source candidates matching `{}`: {}', target_path, candidates)
 
@@ -568,8 +569,7 @@ def list_dir_filtered(src_dir, cache):
   except KeyError: pass
   names = [n for n in list_dir(src_dir, hidden=False)
     if n not in reserved_names and path_ext(n) not in reserved_or_ignored_exts]
-  if cache is not None:
-    cache[dir] = names
+  cache[dir] = names
   return names
 
 
