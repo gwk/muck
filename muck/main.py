@@ -65,17 +65,16 @@ def main():
     muck_clean_all()
     exit()
 
-  targets = args.targets or ['index.html']
-  for t in targets: validate_target_or_error(t)
+  for t in args.targets: validate_target_or_error(t)
 
   ctx = Ctx(db=DB(path=db_path), statuses={}, dir_names={}, dependents=defaultdict(set),
     report_times=(not args.no_times), dbgF=dbgF)
 
   if cmd:
-    command_fns[cmd](ctx, targets)
+    command_fns[cmd](ctx, args.targets)
     return
   else: # no command; default behavior is to update each specified target.
-    for target in targets:
+    for target in (args.targets or ['index.html']):
       if path_exists(target):
         stem, ext = split_stem_ext(target)
         if ext in dependency_fns:
