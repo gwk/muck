@@ -1,0 +1,8 @@
+{
+  'desc': 'modify file.',
+  'compile': [
+    # because of 1sec granularity on HFS+ we need to sleep prior to modification.
+    "sh -c 'sleep 1 && echo modified text. > _build/patched.txt'",
+    ],
+  'cmd': '$MUCK patched.txt',
+}

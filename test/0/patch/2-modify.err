@@ -1,0 +1,2 @@
+muck error: patched.txt: existing product has changed; did you mean to update a patch?
+  Otherwise, save your changes if necessary and then `muck clean patched.txt`.

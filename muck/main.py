@@ -32,12 +32,21 @@ from .py_deps import py_dependencies
 
 def main():
   arg_parser = ArgumentParser(description=__doc__)
-  arg_parser.add_argument('targets', nargs='*', default=['index.html'], help='target file names.')
+  arg_parser.add_argument('targets', nargs='*', default=[], help="target file names; defaults to 'index.html'.")
   arg_parser.add_argument('-no-times', action='store_true', help='do not report process times.')
-  arg_parser.add_argument('-dbg', action='store_true')
-  arg_parser.add_argument('-force', action='store_true')
+  arg_parser.add_argument('-dbg', action='store_true', help='log lots of details to stderr.')
+  arg_parser.add_argument('-force', action='store_true', help='rebuild specified targets even if they are up to date.')
+
+  group = arg_parser.add_argument_group('special commands')
+  def add_cmd(cmd, help): group.add_argument('-' + cmd, dest='cmds', action='append_const', const=cmd, help=help)
+
+  add_cmd('clean', help='clean the specified targets or the entire build folder.')
+  add_cmd('deps',  help='print dependencies of targets.')
+  add_cmd('patch', help='create a patch; usage: [original] [modified.pat]')
+  add_cmd('update-patch', help='update a patch: usage: [target.pat]')
 
   args = arg_parser.parse_args()
+  cmds = args.cmds or []
 
   if args.dbg:
     def dbgF(path, fmt, *items):
@@ -45,27 +54,28 @@ def main():
   else:
     def dbgF(path, fmt, *items): pass
 
-  command_needs_ctx, command_fn = commands.get(args.targets[0], (None, None))
-
-  if command_fn and not command_needs_ctx:
-    targets = args.targets[1:]
-    for t in targets: validate_target_or_error(t)
-    command_fn(targets)
-    return
+  if len(cmds) > 1:
+    desc = ', '.join(repr('-' + c) for c in cmds)
+    exit(f'muck error: multiple commands specified: {desc}.')
 
   make_dirs(build_dir) # required to create new DB.
+
+  cmd = cmds[0] if cmds else None
+  if cmd == 'clean' and not args.targets:
+    muck_clean_all()
+    exit()
+
+  targets = args.targets or ['index.html']
+  for t in targets: validate_target_or_error(t)
 
   ctx = Ctx(db=DB(path=db_path), statuses={}, dir_names={}, dependents=defaultdict(set),
     report_times=(not args.no_times), dbgF=dbgF)
 
-  if command_fn:
-    assert command_needs_ctx
-    targets = args.targets[1:]
-    for t in targets: validate_target_or_error(t)
-    command_fn(ctx, args.targets[1:])
+  if cmd:
+    command_fns[cmd](ctx, targets)
+    return
   else: # no command; default behavior is to update each specified target.
-    for target in args.targets:
-      validate_target_or_error(target)
+    for target in targets:
       if path_exists(target):
         stem, ext = split_stem_ext(target)
         if ext in dependency_fns:
@@ -89,10 +99,13 @@ Ctx = namedtuple('Ctx', 'db statuses dir_names dependents report_times dbgF')
 # Commands.
 
 
+def muck_clean_all():
+  '`muck -clean` command with no arguments.'
+  remove_dir_contents(build_dir)
+
+
 def muck_clean(ctx, args):
-  '''
-  `muck clean` command.
-  '''
+  '`muck -clean [targets...]` command.'
   if not args:
     exit('muck clean error: clean command takes specific target arguments; use clean-all to remove all products.')
   for target in args:
@@ -104,20 +117,8 @@ def muck_clean(ctx, args):
     ctx.db.delete_record(target_path=target)
 
 
-
-def muck_clean_all(args):
-  '''
-  `muck clean-all` command.
-  '''
-  if args:
-    failF('clean-all command takes no arguments; use clean to remove individual products. provided args: {!r}', args)
-  remove_dir_contents(build_dir)
-
-
 def muck_deps(ctx, targets):
-  '''
-  `muck deps` command: print dependency information.
-  '''
+  '`muck -deps [targets...]` command: print dependency information.'
   if not targets: targets = ['index.html']
 
   for target in sorted(targets):
@@ -144,73 +145,63 @@ def muck_deps(ctx, targets):
     visit(0, root)
 
 
-def muck_patch(ctx, args):
-
-  if not len(args) in (1, 2):
+def muck_create_patch(ctx, args):
+  '`muck -create-patch` command.'
+  if len(args) != 2:
     failF('''\
-muck patch error: patch command takes one or two arguments. usage:
+muck -create-patch error: requires two arguments: [original] [modified].
+This command creates an empty patch called [modified].pat, and copies [original] to _build/[modified].''')
+  original, modified = args
+  patch = modified + '.pat'
+  if original.endswith('.pat'):
+    exit(f"muck -patch error: 'original' should not be a patch file: {original}")
+  if modified.endswith('.pat'):
+    exit(f"muck -patch error: 'modified' should not be a patch file: {modified}")
+  if path_exists(modified) or ctx.db.contains_record(patch):
+    exit(f"muck -patch error: 'modified' is an existing target: {modified}")
+  if path_exists(patch) or ctx.db.contains_record(patch):
+    exit(f"muck -patch error: patch is an existing target: {patch}")
+  update_dependency(ctx, original, dependent=None)
+  orig_path = actual_path_for_target(original)
+  mod_path = product_path_for_target(modified)
+  cmd = ['pat', 'create', orig_path, mod_path, patch]
+  errFL('muck -patch note: creating patch: `{}`', ' '.join(shlex.quote(w) for w in cmd))
+  exit(runC(cmd))
 
-  muck patch [original_target] [target]
-    creates a new target by copying either the source or product of the original to _build/[target],
-    and then creates an empty [target].pat.
 
-  muck patch [target.pat]
-    update the patch file with the diff of the previously specified original and target.
-''')
-
-  if len(args) == 2: # create new patch.
-    orig_target_path, target_path = args
-    if orig_target_path.endswith('.pat'):
-      errFL('muck patch error: original should not be a patch file: {}', orig_target_path)
-    if target_path.endswith('.pat'):
-      errFL('muck patch error: {} {}: target should not be a patch file: {}', target_path)
-    patch_path = target_path + '.pat'
-    if path_exists(patch_path):
-      failF('muck patch error: {}: patch already exists.', patch_path)
-    update_dependency(ctx, orig_target_path, dependent=None)
-    orig_path = actual_path_for_target(orig_target_path)
-    prod_path = product_path_for_target(target_path)
-    if path_exists(prod_path):
-      errFL('muck patch note: product already exists: {}', prod_path)
-    else:
-      errFL('muck patch note: copying original to product: {} -> {}', orig_path, prod_path)
-      copy_file(orig_path, prod_path)
-
-  else: # update existing patch.
-    assert len(args) == 1
-    patch_path = args[0]
-    if path_ext(patch_path) != '.pat':
-      failF('muck patch error: argument does not specify a .pat file: {!r}', patch_path)
-    deps = pat_dependencies(patch_path, open(patch_path), {})
-    orig_target_path = deps[0]
-    update_dependency(ctx, orig_target_path, dependent=None)
-    orig_path = actual_path_for_target(orig_target_path)
-    target_path = path_stem(patch_path)
-    prod_path = product_path_for_target(target_path)
-
-  # update patch (both cases).
+def muck_update_patch(ctx, args):
+  '`muck -update-patch` command.'
+  if len(args) != 1:
+    failF('''\
+muck -update-patch error: requires one argument, the patch target to update.
+The patch file will be updated with the diff of the previously specified original and _build/[target].''')
+  patch_path = args[0]
+  if path_ext(patch_path) != '.pat':
+    failF('muck -update-patch error: argument does not specify a .pat file: {!r}', patch_path)
+  deps = pat_dependencies(patch_path, open(patch_path), {})
+  assert len(deps) == 1
+  orig_target_path = deps[0]
+  update_dependency(ctx, orig_target_path, dependent=None)
+  orig_path = actual_path_for_target(orig_target_path)
+  target_path = path_stem(patch_path)
+  prod_path = product_path_for_target(target_path)
   patch_path_tmp = patch_path + tmp_ext
-  cmd = ['pat', 'diff', orig_path, prod_path]
-  errFL('muck patch note: diffing: `{}`', ' '.join(shlex.quote(w) for w in cmd))
-  with open(patch_path_tmp, 'wb') as f:
-    code = runC(cmd, out=f)
-  move_file(patch_path_tmp, patch_path, overwrite=True)
-
-  if len(args) == 1: # updated existing patch.
-    # need to remove or update the target record to avoid the 'did you mean to patch?' safeguard.
-    # for now, just delete it to be safe; this makes the target look stale.
-    try: ctx.db.delete_record(target_path=target_path)
-    except KeyError: pass
+  cmd = ['pat', 'diff', orig_path, prod_path, patch_path_tmp]
+  errFL('muck -update-patch note: diffing: `{}`', ' '.join(shlex.quote(w) for w in cmd))
+  code = runC(cmd)
+  # need to remove or update the target record to avoid the 'did you mean to patch?' safeguard.
+  # for now, just delete it to be safe; this makes the target look stale.
+  # TODO: update target_path instead.
+  ctx.db.delete_record(target_path=target_path) # no-op if does not exist.
 
 
-commands = {
-  # values are (needs_ctx, fn).
-  'clean'     : (True,  muck_clean),
-  'clean-all' : (False, muck_clean_all),
-  'deps'      : (True,  muck_deps),
-  'patch'     : (True,  muck_patch),
+command_fns = {
+  'clean'         : muck_clean,
+  'deps'          : muck_deps,
+  'patch'         : muck_create_patch,
+  'update-patch'  : muck_update_patch,
 }
-assert all(c in reserved_names for c in commands)
+
 
 # Default update functionality.
 

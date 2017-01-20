@@ -1,0 +1,11 @@
+{
+  'desc': 'rebuild after creating patch. currently does work because muck_create_patch does not create a record for the modified target.',
+  'compile': ['ls', 'ls _build'],
+  'cmd': '$MUCK -no-times patched.txt',
+  'code': 0,
+  'files': {
+    '_build/patched.txt' : {
+      'val': 'original text.\n'
+    },
+  },
+}

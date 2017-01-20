@@ -1,4 +1,4 @@
 {
   'desc': 'clean b.txt',
-  'cmd': '$MUCK clean b.txt',
+  'cmd': '$MUCK -clean b.txt',
 }

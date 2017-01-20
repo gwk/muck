@@ -1,0 +1,13 @@
+{
+  'desc': 'update patch.',
+  'cmd': '$MUCK -update-patch patched.txt.pat',
+  'code': 0,
+  'files': {
+    'patched.txt.pat': {
+      'val': '''\
+pat v0
+orig.txt
+'''
+    }
+  }
+}

@@ -1,0 +1,1 @@
+muck -update-patch note: diffing: `pat diff orig.txt _build/patched.txt patched.txt.pat.tmp`

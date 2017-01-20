@@ -27,11 +27,7 @@ reserved_exts = frozenset({
 reserved_or_ignored_exts = reserved_exts | ignored_exts
 
 reserved_names = frozenset({
-  'clean',
-  'clean-all',
-  'deps',
   'muck',
-  'patch',
   build_dir,
   db_name,
 })
