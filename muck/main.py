@@ -105,8 +105,7 @@ def muck_clean_all():
 
 def muck_clean(ctx, args):
   '`muck -clean [targets...]` command.'
-  if not args:
-    exit('muck clean error: clean command takes specific target arguments; use clean-all to remove all products.')
+  assert args
   for target in args:
     if not ctx.db.contains_record(target_path=target):
       errFL('muck clean note: {}: skipping unknown target.', target)
