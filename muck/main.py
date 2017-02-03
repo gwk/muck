@@ -5,7 +5,7 @@ Muck is a build tool that infers dependencies between files.
 '''
 
 import sys
-assert sys.version_info.major == 3 # python 2 is not supported.
+assert sys.version_info >= (3, 6, 0)
 
 import base64
 import json
