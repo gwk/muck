@@ -31,9 +31,7 @@ def is_empty_record(record):
   return record.hash is None
 
 
-class DBError(Exception):
-  def __init__(self, fmt, *items, **kw):
-    super().__init__(fmt.format(*items, **kw)) #no-cov!
+class DBError(Exception): pass
 
 
 idx_id, idx_path, idx_size, idx_mtime, idx_hash, idx_src, idx_deps = range(7)
@@ -76,7 +74,7 @@ class DB:
       c = self.run(stmt)
       errSL('COLS:', *[col[0] for col in c.description])
       for row in c.fetchall():
-        errSL('  ', *['{}:{!r}'.format(k, v) for k, v in zip(row.keys(), row)])
+        errSL('  ', *['{k}:{v!r}' for k, v in zip(row.keys(), row)])
 
 
   def contains_record(self, target_path):
@@ -89,7 +87,7 @@ class DB:
     c = self.run('SELECT * FROM targets WHERE path=:path', path=target_path)
     rows = c.fetchall()
     if len(rows) > 1:
-      raise DBError('multiple rows matching target path: {!r}', target_path) #no-cov!
+      raise DBError(f'multiple rows matching target path: {target_path!r}') #no-cov!
     if rows:
       r = rows[0]
       return TargetRecord(target_path, r[idx_size], r[idx_mtime], r[idx_hash], r[idx_src], from_marshalled(r[idx_deps]))
@@ -107,7 +105,7 @@ class DB:
       self.run('INSERT INTO targets (path, size, mtime, hash, src, deps) VALUES (:path, :size, :mtime, :hash, :src, :deps)',
         path=record.path, size=record.size, mtime=record.mtime, hash=record.hash, src=record.src, deps=to_marshalled(record.deps))
     except IntegrityError as e: #no-cov!
-      raise DBError('insert_record: target path is not unique: {}', record.path) from e
+      raise DBError(f'insert_record: target path is not unique: {record.path}') from e
 
 
   def delete_record(self, target_path: str):

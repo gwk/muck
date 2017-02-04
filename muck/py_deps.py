@@ -3,7 +3,7 @@
 import ast
 import re
 
-from .pithy.io import errF, failF
+from .pithy.io import errF
 from .pithy.fs import is_file, path_dir, path_join
 from .paths import has_wilds, paths_from_range_items
 
@@ -17,8 +17,8 @@ def py_dependencies(src_path, src_file, dir_names):
   src_text = src_file.read()
   try: tree = ast.parse(src_text, filename=src_path)
   except SyntaxError as e:
-    failF('muck error: {}:{}:{}: syntax error.\n  {}  {}^',
-      src_path, e.lineno, e.offset, e.text, ' ' * (e.offset - 1))
+    pad = ' ' * (e.offset - 1)
+    exit(f'muck error: {src_path}:{e.lineno}:{e.offset}: syntax error.\n  {e.text}  {pad}^')
 
   for node in ast.walk(tree):
     if isinstance(node, ast.Call):
@@ -54,7 +54,7 @@ def py_dep_call(src_path, call):
     py_fail(src_path, call, 'first argument must be a string literal; found no arguments')
   arg0 = call.args[0]
   if not isinstance(arg0, ast.Str):
-    py_fail(src_path, arg0, 'first argument must be a string literal; found {}', type(arg0).__name__)
+    py_fail(src_path, arg0, f'first argument must be a string literal; found {type(arg0).__name__}')
   dep_path = arg0.s # the string value from the ast.Str literal.
   if name == load_many.__name__:
     items = [eval_arg(src_path, i, arg) for (i, arg) in enumerate(call.args[1:])]
@@ -67,7 +67,7 @@ def py_dep_call(src_path, call):
 def eval_arg(src_path, index, arg):
   if isinstance(arg, ast.Tuple):
     return eval_tuple(src_path, arg)
-  py_fail(src_path, arg, 'argument {} literal must be a pair of integers; found {}', index, type(arg).__name__)
+  py_fail(src_path, arg, f'argument {index} literal must be a pair of integers; found {type(arg).__name__}')
 
 
 def eval_tuple(src_path, arg):
@@ -81,6 +81,6 @@ def eval_tuple(src_path, arg):
   return (s.n, e.n)
 
 
-def py_fail(src_path, node, fmt, *items):
-  failF('muck error: {}:{}:{}: {}.', src_path, node.lineno, node.col_offset + 1, fmt.format(*items))
+def py_fail(src_path, node, msg):
+  exit(f'muck error: {src_path}:{node.lineno}:{node.col_offset+1}: {msg}.')
 

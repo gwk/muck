@@ -22,10 +22,10 @@ target_invalids_re = re.compile(r'\.\.|\./|//')
 
 def validate_target(target):
   if not target_re.fullmatch(target):
-    raise InvalidTarget(target, 'does not match regex: {}'.format(target_re.pattern))
+    raise InvalidTarget(target, f'does not match regex: {target_re.pattern}')
   inv_m  =target_invalids_re.search(target)
   if inv_m:
-    raise InvalidTarget(target, "cannot contain '{}'.".format(inv_m.group(0)))
+    raise InvalidTarget(target, f'cannot contain {inv_m.group(0)!r}.')
   if target[0] == '.' or target[-1] == '.':
     raise InvalidTarget(target, "cannot begin or end with '.'.")
   if path_name_stem(target) in reserved_names:
@@ -38,7 +38,7 @@ def validate_target(target):
 def validate_target_or_error(target):
   try: validate_target(target)
   except InvalidTarget as e:
-    exit('muck error: invalid target: {!r}; {}'.format(e.target, e.msg))
+    exit(f'muck error: invalid target: {e.target!r}; {e.msg}')
 
 
 def is_product_path(path):
@@ -57,7 +57,7 @@ def actual_path_for_target(target_path):
 
 def product_path_for_target(target_path):
   if target_path == build_dir or is_product_path(target_path):
-    raise ValueError('provided target path is prefixed with build dir: {}'.format(target_path))
+    raise ValueError(f'provided target path is prefixed with build dir: {target_path}')
   return path_join(build_dir, target_path)
 
 
@@ -109,16 +109,17 @@ def sub_vars_for_wilds(wildcard_path, vars):
   chunks = _wildcard_re.split(wildcard_path)
   count = count_wilds(chunks)
   if len(vars) != count:
-    raise ValueError('wildcard path has {} wildcards; received {} vars.'.format(count, len(vars)))
+    raise ValueError(f'wildcard path has {count} wildcards; received {len(vars)} vars: {wildcard_path}')
   it = iter(vars)
   return ''.join([pad_sub(wildcard=chunk, var=next(it)) if is_wild(chunk) else chunk for chunk in chunks])
 
 
 def pad_sub(wildcard, var):
+  width = len(wildcard)
   if isinstance(var, int):
-    return '{:0{width}}'.format(var, width=len(wildcard))
+    return f'{var:0{width}}'
   else:
-    return '{:_<{width}}'.format(var, width=len(wildcard))
+    return f'{var:_<{width}}'
 
 
 def paths_from_range_items(wildcard_path, items):
@@ -135,11 +136,11 @@ def vars_from_range_items(items):
       s, e = item
       t = type(s)
       if type(e) != t:
-        raise TypeError('range argument tuple has mismatched types: {}'.format(item) + msg_suffix)
+        raise TypeError(f'range argument tuple has mismatched types: {item}{msg_suffix}')
       if t == int:
         return range(s, e)
       # TODO: hex strings? dates? letter ranges?
-      raise TypeError('range argument tuple has unsupported element type: {}'.format(item + msg_suffix))
+      raise TypeError(f'range argument tuple has unsupported element type: {item}{msg_suffix}')
     raise TypeError('range argument must be a pair of integers.')
   return product(*map(gen, items))
 
@@ -149,11 +150,11 @@ def dst_path(argv, vars, strict=True):
   args = argv[1:]
 
   class Error(Exception):
-    def __init__(self, fmt, *items):
-      super().__init__(('source: {}; args: {}; vars: {}; ' + fmt).format(src, args, vars, *items))
+    def __init__(self, msg):
+      super().__init__((f'source: {src}; args: {args}; vars: {vars}; {msg}'))
 
   if len(vars) != len(args):
-    raise Error('expected {} vars; received {}.', len(args), len(vars))
+    raise Error(f'expected {len(vars)} vars; received {len(args)}')
 
   subs = []
   for i, (a, v) in enumerate(zip(args, vars), 1):

@@ -50,7 +50,7 @@ def dst_file(*vars, binary=False):
     if vars: raise ValueError(vars) # no wilds in source path, so no vars accepted.
     return open(product_path_for_source(argv[0]) + tmp_ext, 'wb' if binary else 'w')
   if vars in _dst_vars_opened:
-    raise Exception('file already opened for vars: {}'.format(vars))
+    raise Exception(f'file already opened for vars: {vars}')
   _dst_vars_opened.add(vars)
   path = dst_path(argv, vars) + tmp_ext
   assert not has_wilds(path)
@@ -89,11 +89,11 @@ def add_loader(ext, fn, **open_dep_kwargs):
   all other keyword arguments will be passed to `fn`.
   '''
   if not ext.startswith('.'):
-    raise ValueError("file extension does not start with '.': {!r}".format(ext))
+    raise ValueError(f"file extension does not start with '.': {ext!r}")
   if ext not in _default_loaders:
     try: existing_fn, _ = _loaders[ext]
     except KeyError: pass
-    else: raise Exception('add_loader: extension previously registered: {!r}; fn: {!r}'.format(ext, existing_fn))
+    else: raise Exception(f'add_loader: extension previously registered: {ext!r}; fn: {existing_fn!r}')
   for k, v in sorted(open_dep_kwargs.items()):
     if k not in _open_deps_parameters: raise KeyError(k)
   _loaders[ext] = (fn, open_dep_kwargs)
@@ -168,12 +168,12 @@ def _fetch(url, timeout, headers, expected_status_code):
     msg = None
     r = requests.get(url, timeout=timeout, headers=headers)
   except Exception as e:
-    msg = 'fetch failed with exception: {}: {}'.format(
-      type(e).__name__, ', '.join(str(a) for a in e.args))
+    args_str = ', '.join(str(a) for a in e.args)
+    msg = f'fetch failed with exception: {type(e).__name__}: {args_str}' # TODO: use `raise from e` here.
   else:
     if r.status_code != expected_status_code:
       s = HTTPStatus(r.status_code)
-      msg = 'fetch failed with HTTP code: {}: {}; {}.'.format(s.value, s.phrase, s.description)
+      msg = f'fetch failed with HTTP code: {s.value}: {s.phrase}; {s.description}.'
   if msg is not None:
     raise HTTPError(msg=msg, request=r)
   return r

@@ -129,7 +129,7 @@ def muck_deps(ctx, targets):
     deps = ctx.db.all_deps_for_target(target)
     dependents = ctx.dependents[target]
     if depth == 0 and len(dependents) > 0:
-      suffix = ' (dependents: {}):'.format(' '.join(sorted(dependents)))
+      suffix = f' (dependents: {" ".join(sorted(dependents))}):'
     elif len(dependents) > 1: suffix = '*'
     elif len(deps) == 0:      suffix = ''
     else:                     suffix = ':'
@@ -331,7 +331,7 @@ def update_deps_and_record(ctx, target_path: str, actual_path: str,
     for dep in deps:
       try: validate_target(dep)
       except InvalidTarget as e:
-        exit('muck error: {}: invalid dependency: {!r}: {}'.format(target_path, e.target, e.msg))
+        exit(f'muck error: {target_path}: invalid dependency: {e.target!r}: {e.msg}')
   else:
     deps = old.deps
   for dep in deps:
@@ -472,16 +472,17 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
       errorF(target_path, 'product does not appear in manifest ({} records): {}',
         len(tmp_paths), manif_path)
     remove_file(manif_path)
-  time_msg = '{:0.2f} seconds '.format(time_elapsed) if ctx.report_times else ''
-  noteF(target_path, 'finished: {}(via {}).', time_msg, via)
+  time_msg = f'{time_elapsed:0.2f} seconds ' if ctx.report_times else ''
+  noteF(target_path, f'finished: {time_msg}(via {via}).')
   return tmp_paths
 
 
+_pythonV_V = 'python' + '.'.join(str(v) for v in sys.version_info[:2])
 build_tools = {
   '.list' : [], # no-op.
   '.mush' : ['mush'],
   '.pat' : ['pat', 'apply'],
-  '.py' : ['python{}.{}'.format(sys.version_info.major, sys.version_info.minor)],
+  '.py' : [_pythonV_V],
     # use the same version of python that muck is running under.
   '.wu' : ['writeup'],
 }
