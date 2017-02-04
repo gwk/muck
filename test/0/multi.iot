@@ -1,0 +1,14 @@
+{
+  'cmd': '$MUCK -no-times c-many.txt',
+  'code': 0,
+  'links': {
+    'test/0/multi/a-to-many-%.txt.py',
+    'test/0/multi/b-through-%.txt.py',
+    'test/0/multi/c-many.txt.py',
+  },
+  'files': {
+    '_build/c-many.txt' : {
+      'path': '$STEM/c-many-exp.txt',
+    }
+  }
+}

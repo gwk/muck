@@ -1,0 +1,7 @@
+muck note: a-to-many-0.txt: building: `python3.6 a-to-many-%.txt.py 0`
+muck note: a-to-many-0.txt: finished: (via manifest).
+muck note: a-to-many-0.txt: product changed; 12 B.
+muck note: a-to-many-1.txt: product changed; 12 B.
+muck note: c-many.txt: building: `python3.6 c-many.txt.py`
+muck note: c-many.txt: finished: (via stdout).
+muck note: c-many.txt: product changed; 40 B.
