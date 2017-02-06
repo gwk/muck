@@ -3,13 +3,20 @@
 import ast
 import re
 
-from .pithy.io import errF
+from .pithy.io import errF, read_line_from_path
 from .pithy.fs import is_file, path_dir, path_join
-from .paths import has_wilds, paths_from_range_items
+from .paths import has_wilds, paths_from_format_items
 
 # these functions are recognized by the static analyzer.
 from . import load, load_many, open_dep, transform
 dep_fn_names = tuple(fn.__name__ for fn in (load, load_many, open_dep, transform))
+
+
+def src_error(path, line1, col1, msg, text=None):
+  pad = ' ' * (col1 - 1)
+  if text is None:
+    text = read_line_from_path(path, line0=line1-1, default='<MISSING>')
+  exit(f'muck error: {path}:{line1}:{col1}: {msg}.\n  {text}\n  {pad}^')
 
 
 def py_dependencies(src_path, src_file, dir_names):
@@ -17,9 +24,7 @@ def py_dependencies(src_path, src_file, dir_names):
   src_text = src_file.read()
   try: tree = ast.parse(src_text, filename=src_path)
   except SyntaxError as e:
-    pad = ' ' * (e.offset - 1)
-    exit(f'muck error: {src_path}:{e.lineno}:{e.offset}: syntax error.\n  {e.text}  {pad}^')
-
+    src_error(src_path, e.lineno, e.offset, 'syntax error', e.text.rstrip('\n'))
   for node in ast.walk(tree):
     if isinstance(node, ast.Call):
       yield from py_dep_call(src_path, node)
@@ -51,36 +56,58 @@ def py_dep_call(src_path, call):
   name = func.attr
   if name not in dep_fn_names: return
   if len(call.args) < 1:
-    py_fail(src_path, call, 'first argument must be a string literal; found no arguments')
+    node_error(src_path, call, 'first argument must be a string literal; found no arguments')
   arg0 = call.args[0]
   if not isinstance(arg0, ast.Str):
-    py_fail(src_path, arg0, f'first argument must be a string literal; found {type(arg0).__name__}')
+    node_error(src_path, arg0, f'first argument must be a string literal; found {type(arg0).__name__}')
   dep_path = arg0.s # the string value from the ast.Str literal.
   if name == load_many.__name__:
     items = [eval_arg(src_path, i, arg) for (i, arg) in enumerate(call.args[1:])]
   else:
     items = []
-  for vars, path in paths_from_range_items(wildcard_path=dep_path, items=items):
+  for vars, path in paths_from_format_items(format_path=dep_path, items=items):
     yield path
 
 
 def eval_arg(src_path, index, arg):
-  if isinstance(arg, ast.Tuple):
-    return eval_tuple(src_path, arg)
-  py_fail(src_path, arg, f'argument {index} literal must be a pair of integers; found {type(arg).__name__}')
+  if isinstance(arg, ast.Call):
+    return eval_call(src_path, arg)
+  if isinstance(arg, (ast.List, ast.Set, ast.Tuple)):
+    return tuple(eval_el(src_path, el) for el in arg.elts)
+  node_error(src_path, arg, f'argument must be statically evaluable; found {type(arg).__name__}')
 
 
-def eval_tuple(src_path, arg):
-  if len(arg.elts) != 2:
-    py_fail(src_path, arg, 'load_range', 'range argument tuple must be a pair')
-  s, e = arg.elts
-  if not isinstance(s, ast.Num) or not isinstance(s.n, int):
-    py_fail(src_path, s, 'load_range', 'range argument tuple start must be an integer literal')
-  if not isinstance(e, ast.Num) or not isinstance(e.n, int):
-    py_fail(src_path, e, 'load_range', 'range argument tuple end must be an integer literal')
-  return (s.n, e.n)
+def eval_el(path, el):
+  if isinstance(el, ast.Num): return eval_int(path, el)
+  if isinstance(el, ast.Str): return el.s
+  node_error(path, el, f'sequence element must be an int or str; found {type(arg).__name__}')
 
 
-def py_fail(src_path, node, msg):
-  exit(f'muck error: {src_path}:{node.lineno}:{node.col_offset+1}: {msg}.')
+def eval_call(path, call):
+  func = call.func
+  if not isinstance(func, ast.Name):
+    node_error(path, func, 'called function must be a statically evaluable name.')
+  if func.id == 'range':
+    args = call.args
+    if not (1 <= len(call.args) <= 3):
+      node_error(src_path, call, "'range' requires 1 to 3 arguments.")
+    nat_args = tuple(eval_nat(path, a) for a in args)
+    return range(*nat_args) # TODO: support negative start, stop.
+  else: node_error(path, func, f"called function must be statically evaluable, i.e. 'range'")
+
+
+def eval_int(path, num):
+  if not (isinstance(num, ast.Num) or not isinstance(num.n, int)):
+    node_error(path, num, f'expected a literal integer; found {type(num).__name__}.')
+  return num.n
+
+
+def eval_nat(path, num):
+  n = eval_int(path, num)
+  if n < 0: node_error(path, num, 'expected a non-negative literal integer.')
+  return n
+
+
+def node_error(path, node, msg):
+  src_error(path, node.lineno, node.col_offset + 1, msg)
 

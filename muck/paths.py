@@ -122,27 +122,9 @@ def pad_sub(wildcard, var):
     return f'{var:_<{width}}'
 
 
-def paths_from_range_items(wildcard_path, items):
-  for vars in vars_from_range_items(items):
-    yield vars, sub_vars_for_wilds(wildcard_path=wildcard_path, vars=vars)
-
-
-def vars_from_range_items(items):
-  msg_suffix = '; NOTE: muck should catch this error during static analysis.'
-  def gen(item):
-    if isinstance(item, tuple):
-      if len(item) != 2:
-        raise TypeError('range argument tuple must be a pair' + msg_suffix)
-      s, e = item
-      t = type(s)
-      if type(e) != t:
-        raise TypeError(f'range argument tuple has mismatched types: {item}{msg_suffix}')
-      if t == int:
-        return range(s, e)
-      # TODO: hex strings? dates? letter ranges?
-      raise TypeError(f'range argument tuple has unsupported element type: {item}{msg_suffix}')
-    raise TypeError('range argument must be a pair of integers.')
-  return product(*map(gen, items))
+def paths_from_format_items(format_path, items):
+  for args in product(*items):
+    yield args, sub_vars_for_wilds(wildcard_path=format_path, vars=args)
 
 
 def dst_path(argv, vars, strict=True):

@@ -8,7 +8,7 @@
   },
   'files': {
     '_build/c-many.txt' : {
-      'path': '$STEM/c-many-exp.txt',
-    }
-  }
+      'val': '',
+    },
+  },
 }

@@ -24,7 +24,7 @@ from .pithy.json_utils import load_json, load_jsonl, load_jsons
 from .pithy.transform import Transformer
 
 from .constants import build_dir, build_dir_slash, tmp_ext
-from .paths import actual_path_for_target, dst_path, has_wilds, manifest_path, paths_from_range_items, product_path_for_source
+from .paths import actual_path_for_target, dst_path, has_wilds, manifest_path, paths_from_format_items, product_path_for_source
 
 
 # module exports.
@@ -99,7 +99,10 @@ def add_loader(ext, fn, **open_dep_kwargs):
   _loaders[ext] = (fn, open_dep_kwargs)
 
 
-def load_txt(f): return f
+def load_txt(f, clip_ends=False):
+  if clip_ends: return (line.rstrip('\n') for line in f)
+  return f
+
 
 _default_loaders = (
   ('.csv',   csv_reader, dict(newline='')),
@@ -145,8 +148,8 @@ def load(target_path, ext=None, **kwargs):
   return load_fn(file, **kwargs)
 
 
-def load_many(wildcard_path, *items, ext=None, **kwargs):
-  for vars, path in paths_from_range_items(wildcard_path, items):
+def load_many(format_path, *items, ext=None, **kwargs):
+  for vars, path in paths_from_format_items(format_path, items):
     yield vars, load(path, ext=ext, **kwargs)
 
 
