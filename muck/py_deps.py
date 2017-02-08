@@ -5,7 +5,7 @@ import re
 
 from .pithy.io import read_line_from_path
 from .pithy.fs import is_file, path_dir, path_join
-from .paths import has_wilds, paths_from_format_items
+from .paths import paths_from_format_seqs
 
 # these functions are recognized by the static analyzer.
 from . import load, load_many, open_dep, transform
@@ -65,7 +65,7 @@ def py_dep_call(src_path, call):
     items = [eval_arg(src_path, i, arg) for (i, arg) in enumerate(call.args[1:])]
   else:
     items = []
-  for vars, path in paths_from_format_items(format_path=dep_path, items=items):
+  for vars, path in paths_from_format_seqs(format_path=dep_path, seqs=items):
     yield path
 
 

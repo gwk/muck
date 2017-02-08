@@ -6,6 +6,7 @@ Muck target path functions.
 
 import re
 from itertools import product
+from .pithy.format import count_formatters, has_formatter, format_to_re
 from .pithy.fs import path_exists, path_ext, path_join, path_name_stem, path_stem
 from .constants import build_dir, build_dir_slash, manifest_ext, reserved_exts, reserved_names, reserved_or_ignored_exts
 
@@ -17,12 +18,11 @@ class InvalidTarget(Exception):
     self.msg = msg
 
 
-target_re = re.compile(r'[\w\.\-%\[\]{}/]+')
-target_invalids_re = re.compile(r'\.\.|\./|//')
+target_invalids_re = re.compile(r'[\s]|\.\.|\./|//')
 
 def validate_target(target):
-  if not target_re.fullmatch(target):
-    raise InvalidTarget(target, f'does not match regex: {target_re.pattern}')
+  if not target:
+    raise InvalidTarget(target, f'empty string.')
   inv_m  =target_invalids_re.search(target)
   if inv_m:
     raise InvalidTarget(target, f'cannot contain {inv_m.group(0)!r}.')
@@ -88,30 +88,19 @@ def match_wilds(wildcard_path, string):
   This character was chosen because bash treats it as a plain char.
   Consecutive wilds indicate required padding.
   '''
-  chunks = _wildcard_re.split(wildcard_path)
-  pattern = ''.join('({}+)'.format('.' * len(s)) if is_wild(s) else re.escape(s) for s in chunks)
-  return re.fullmatch(pattern, string)
-
-def has_wilds(path): return '%' in path # TODO: allow for escaping the wildcard character.
-
-def is_wild(string): return isinstance(string, str) and string.startswith('%')
-
-def keep_wilds(seq): return [el for el in seq if is_wild(el)]
-
-def count_wilds(seq): return len(keep_wilds(seq))
+  r = format_to_re(wildcard_path)
+  return r.fullmatch(string)
 
 
 def manifest_path(argv):
   return dst_path(argv, argv[1:], strict=False) + manifest_ext
 
 
-def sub_vars_for_wilds(wildcard_path, vars):
-  chunks = _wildcard_re.split(wildcard_path)
-  count = count_wilds(chunks)
-  if len(vars) != count:
-    raise ValueError(f'wildcard path has {count} wildcards; received {len(vars)} vars: {wildcard_path}')
-  it = iter(vars)
-  return ''.join([pad_sub(wildcard=chunk, var=next(it)) if is_wild(chunk) else chunk for chunk in chunks])
+def format_args(format_path, args):
+  count = count_formatters(format_path)
+  if len(args) != count:
+    raise ValueError(f'format path has {count} formatters; received {len(args)} args: {format_path}')
+  return format_path.format(*args)
 
 
 def pad_sub(wildcard, var):
@@ -122,9 +111,9 @@ def pad_sub(wildcard, var):
     return f'{var:_<{width}}'
 
 
-def paths_from_format_items(format_path, items):
-  for args in product(*items):
-    yield args, sub_vars_for_wilds(wildcard_path=format_path, vars=args)
+def paths_from_format_seqs(format_path, seqs):
+  for args in product(*seqs):
+    yield args, format_args(format_path, args)
 
 
 def dst_path(argv, vars, strict=True):
@@ -140,9 +129,10 @@ def dst_path(argv, vars, strict=True):
 
   subs = []
   for i, (a, v) in enumerate(zip(args, vars), 1):
-    if is_wild(v):
-      if strict and is_wild(a): raise Error('arg {}: both arg and var are wildcards.', i)
+    if isinstance(v, str) and has_formatter(v):
+      if strict and has_formatter(a):
+        raise Error(f'arg {i}: both arg and var are format strings.')
       subs.append(a)
     else:
       subs.append(v)
-  return sub_vars_for_wilds(product_path_for_source(src), vars=subs)
+  return format_args(product_path_for_source(src), args=subs)

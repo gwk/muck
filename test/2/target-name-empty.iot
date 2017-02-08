@@ -1,4 +1,4 @@
 {
   'cmd': ['$MUCK', ''],
-  'err-val': "muck error: invalid target: ''; does not match regex: [\w\.\-%\[\]{}/]+\n",
+  'err-val': "muck error: invalid target: ''; empty string.\n",
 }

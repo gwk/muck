@@ -19,12 +19,13 @@ from urllib.parse import urlparse
 
 from .pithy.path_encode import path_for_url
 from .pithy.io import errL
+from .pithy.format import has_formatter
 from .pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, path_stem
 from .pithy.json_utils import load_json, load_jsonl, load_jsons
 from .pithy.transform import Transformer
 
 from .constants import build_dir, build_dir_slash, tmp_ext
-from .paths import actual_path_for_target, dst_path, has_wilds, manifest_path, paths_from_format_items, product_path_for_source
+from .paths import actual_path_for_target, dst_path, manifest_path, paths_from_format_seqs, product_path_for_source
 
 
 # module exports.
@@ -46,14 +47,14 @@ _manifest_file = None
 
 def dst_file(*vars, binary=False):
   global _manifest_file
-  if not has_wilds(argv[0]): # no need for manifest.
+  if not has_formatter(argv[0]): # no need for manifest.
     if vars: raise ValueError(vars) # no wilds in source path, so no vars accepted.
     return open(product_path_for_source(argv[0]) + tmp_ext, 'wb' if binary else 'w')
   if vars in _dst_vars_opened:
     raise Exception(f'file already opened for vars: {vars}')
   _dst_vars_opened.add(vars)
   path = dst_path(argv, vars) + tmp_ext
-  assert not has_wilds(path)
+  assert not has_formatter(path)
   if _manifest_file is None:
     _manifest_file = open(manifest_path(argv), 'w')
   print(path, file=_manifest_file)
@@ -149,7 +150,7 @@ def load(target_path, ext=None, **kwargs):
 
 
 def load_many(format_path, *items, ext=None, **kwargs):
-  for vars, path in paths_from_format_items(format_path, items):
+  for vars, path in paths_from_format_seqs(format_path, items):
     yield vars, load(path, ext=ext, **kwargs)
 
 

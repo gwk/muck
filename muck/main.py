@@ -466,7 +466,7 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
     via = 'manifest'
     tmp_paths = list(line[:-1] for line in f) # strip newlines.
     cleanup_out()
-    if ('%' not in prod_path_tmp) and prod_path_tmp not in tmp_paths:
+    if prod_path_tmp not in tmp_paths:
       error(target_path, f'product does not appear in manifest ({len(tmp_paths)} records): {manif_path}')
     remove_file(manif_path)
   time_msg = f'{time_elapsed:0.2f} seconds ' if ctx.report_times else ''
@@ -576,8 +576,8 @@ def filter_source_names(names, prod_name):
   given product name "x.txt", match all of the following:
   * x.txt.py
   * x.py
-  * %.txt.py
-  * %.py
+  * {}.txt.py
+  * {}.py
 
   There are several concerns that make this matching complex.
   * Muck allows wildcards in script names.
