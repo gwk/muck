@@ -9,7 +9,7 @@ from collections import namedtuple
 from marshal import dumps as to_marshalled, loads as from_marshalled
 from sqlite3 import DatabaseError, IntegrityError, connect, sqlite_version, version as module_version
 from .pithy.fs import path_join
-from .pithy.io import errFL, errSL, failF
+from .pithy.io import errL, errSL
 
 
 TargetRecord = namedtuple('TargetRecord', 'path size mtime hash src deps')
@@ -47,8 +47,8 @@ class DB:
       self.run('SELECT COUNT(*) FROM sqlite_master') # dummy query to check file integrity.
     except DatabaseError as e:
       if e.args[0] == 'file is encrypted or is not a database':
-        failF('muck error: database is outdated or corrupt; run `muck clean-all`.')
-      else: raise #no-cov!
+        exit('muck error: database is outdated or corrupt; run `muck clean-all`.')
+      raise #no-cov!
 
     self.run('''
     CREATE TABLE IF NOT EXISTS targets (
@@ -70,7 +70,7 @@ class DB:
 
   def dbg_query(self, *stmts):
     for stmt in stmts: #no-cov!
-      errFL('\nDBG: {}', stmt)
+      errL(f'\nDBG: {stmt}')
       c = self.run(stmt)
       errSL('COLS:', *[col[0] for col in c.description])
       for row in c.fetchall():

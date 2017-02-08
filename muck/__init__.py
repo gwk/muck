@@ -18,7 +18,7 @@ from typing import Optional
 from urllib.parse import urlparse
 
 from .pithy.path_encode import path_for_url
-from .pithy.io import errF, errFL, failF
+from .pithy.io import errL
 from .pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, path_stem
 from .pithy.json_utils import load_json, load_jsonl, load_jsons
 from .pithy.transform import Transformer
@@ -73,9 +73,9 @@ def open_dep(target_path, binary=False, buffering=-1, encoding=None, errors=None
   try:
     return open(path, mode=('rb' if binary else 'r'), buffering=buffering, encoding=encoding, errors=errors, newline=newline)
   except FileNotFoundError:
-    errFL('muck.open_dep cannot open path: {}', path)
+    errL(f'muck.open_dep cannot open path: {path}')
     if path != target_path:
-      errFL('note: nor does a file exist at source path: {}', target_path)
+      errL(f'note: nor does a file exist at source path: {target_path}')
     raise
 
 
@@ -134,8 +134,8 @@ def load(target_path, ext=None, **kwargs):
   elif not isinstance(ext, str): raise TypeError(ext)
   try: load_fn, std_open_args = _loaders[ext]
   except KeyError:
-    errFL('ERROR: No loader found for target: {!r}', target_path)
-    errFL('NOTE: extension: {!r}', ext)
+    errL(f'ERROR: No loader found for target: {target_path!r}')
+    errL(f'NOTE: extension: {ext!r}')
     raise
   open_args = std_open_args.copy()
   # transfer all matching kwargs to open_args.
@@ -186,7 +186,7 @@ def fetch(url, expected_status_code=200, headers={}, timeout=4, delay=0, delay_r
   "Fetch the data at `url` and save it to a path in the '_fetch' directory derived from the URL."
   path = path_join('_fetch', path_for_url(url))
   if not path_exists(path):
-    errFL('fetch: {}', url)
+    errL(f'fetch: {url}')
     if spoof:
       h = spoofing_headers()
       h.update(headers)

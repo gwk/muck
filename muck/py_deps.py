@@ -3,7 +3,7 @@
 import ast
 import re
 
-from .pithy.io import errF, read_line_from_path
+from .pithy.io import read_line_from_path
 from .pithy.fs import is_file, path_dir, path_join
 from .paths import has_wilds, paths_from_format_items
 

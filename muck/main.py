@@ -146,7 +146,7 @@ def muck_deps(ctx, targets):
 def muck_create_patch(ctx, args):
   '`muck -patch` command.'
   if len(args) != 2:
-    failF('''\
+    exit('''\
 muck -patch error: requires two arguments: [original] [modified].
 This command creates an empty patch called [modified].pat, and copies [original] to _build/[modified].''')
   original, modified = args
@@ -170,12 +170,12 @@ This command creates an empty patch called [modified].pat, and copies [original]
 def muck_update_patch(ctx, args):
   '`muck -update-patch` command.'
   if len(args) != 1:
-    failF('''\
+    exit('''\
 muck -update-patch error: requires one argument, the patch target to update.
 The patch file will be updated with the diff of the previously specified original and _build/[target].''')
   patch_path = args[0]
   if path_ext(patch_path) != '.pat':
-    failF('muck -update-patch error: argument does not specify a .pat file: {!r}', patch_path)
+    exit(f'muck -update-patch error: argument does not specify a .pat file: {patch_path!r}')
   deps = pat_dependencies(patch_path, open(patch_path), {})
   assert len(deps) == 1
   orig_target_path = deps[0]
@@ -224,10 +224,10 @@ def update_dependency(ctx: Ctx, target_path: str, dependent: Optional[str], forc
 
   ctx.statuses[target_path] = Ellipsis # recursion sentinal is replaced before return.
 
-  ctx.dbgF(target_path, 'examining... (dependent={})', dependent)
+  ctx.dbgF(target_path, f'examining... (dependent={dependent})')
   is_product = not path_exists(target_path)
   if is_product and is_link(target_path):
-    errorF(target_path, 'target is a dangling symlink to: {}', read_link(target_path))
+    errorF(target_path, f'target is a dangling symlink to: {read_link(target_path)}')
   actual_path = product_path_for_target(target_path) if is_product else target_path
   size, mtime, old = calc_size_mtime_old(ctx, target_path, actual_path)
   has_old_file = (mtime > 0)
@@ -238,7 +238,7 @@ def update_dependency(ctx: Ctx, target_path: str, dependent: Optional[str], forc
   if has_old_record:
     old_is_product = (old.src is not None)
     if is_product != old_is_product: # nature of the target changed.
-      noteF(target_path, 'target is {} a product.', 'now' if is_product else 'no longer')
+      noteF(target_path, f"target is {'now' if is_product else 'no longer'} a product.")
       is_changed = True
     if not has_old_file:
       noteF(target_path, 'old product was deleted.')
@@ -259,28 +259,27 @@ def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
   # the user might have made an accidental edit and then reverted it,
   # and we would rather compute the hash than report a false problem.
   if size != old.size or (mtime != old.mtime and hash_for_path(actual_path) != old.hash):
-    ctx.dbgF(target_path, 'size: {} -> {}; mtime: {} -> {}', old.size, size, old.mtime, mtime)
+    ctx.dbgF(target_path, f'size: {old.size} -> {size}; mtime: {old.mtime} -> {mtime}')
     # TODO: change language depending on whether product is derived from a patch?
     errorF(target_path, 'existing product has changed; did you mean to update a patch?\n'
-      '  Otherwise, save your changes if necessary and then `muck clean {}`.',
-      target_path)
+      f'  Otherwise, save your changes if necessary and then `muck clean {target_path}`.')
 
 
 def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mtime, old) -> bool:
   ctx.dbgF(target_path, 'update_product')
   src = source_for_target(ctx, target_path)
   validate_target(src) # this should never happen if target is valid, so do not catch.
-  ctx.dbgF(target_path, 'src: {}', src)
+  ctx.dbgF(target_path, f'src: {src}')
   if old.src != src:
     is_changed = True
     if old.src:
-      noteF(target_path, 'source path of target product changed\n  was: {}\n  now: {}', old.src, src)
+      noteF(target_path, f'source path of target product changed\n  was: {old.src}\n  now: {src}')
   is_changed |= update_dependency(ctx, src, dependent=target_path)
 
   if is_changed: # must rebuild product.
     actual_src = actual_path_for_target(src) # source might itself be a product.
     tmp_paths = build_product(ctx, target_path, actual_src, actual_path)
-    ctx.dbgF(target_path, 'tmp_paths: {}', tmp_paths)
+    ctx.dbgF(target_path, f'tmp_paths: {tmp_paths}')
     if tmp_paths:
       is_changed = False # now determine if any product has actually changed.
       for tmp_path in tmp_paths:
@@ -296,7 +295,7 @@ def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mt
 def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str):
   product_path, ext = split_stem_ext(tmp_path)
   if ext not in (out_ext, tmp_ext):
-    errorF(tmp_path, 'product output path has unexpected extension: {!r}', ext)
+    errorF(tmp_path, f'product output path has unexpected extension: {ext!r}')
   if not is_product_path(product_path):
      errorF(product_path, 'product path is not in build dir.')
   target_path = product_path[len(build_dir_slash):]
@@ -306,7 +305,7 @@ def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str):
   if is_changed:
     ctx.db.delete_record(target_path=target_path) # delete metadata if it exists, just before overwrite, in case muck fails before update.
   move_file(tmp_path, product_path, overwrite=True) # move regardless; if not changed, just cleans up the identical tmp file.
-  noteF(target_path, 'product {}; {}.', 'changed' if is_changed else 'did not change', format_byte_count(size))
+  noteF(target_path, f"product {'changed' if is_changed else 'did not change'}; {format_byte_count(size)}.")
   return update_deps_and_record(ctx, target_path, product_path,
     is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=src, old=old)
 
@@ -340,7 +339,7 @@ def update_deps_and_record(ctx, target_path: str, actual_path: str,
   ctx.statuses[target_path] = is_changed # replace sentinal with final value.
   if is_changed:
     record = TargetRecord(path=target_path, size=size, mtime=mtime, hash=file_hash, src=src, deps=deps)
-    ctx.dbgF(target_path, 'updated record:\n  {}', record)
+    ctx.dbgF(target_path, f'updated record:\n  {record}')
     if is_empty_record(old):
       ctx.db.insert_record(record)
     else:
@@ -412,7 +411,7 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
     build_tool = build_tools[src_ext]
   except KeyError:
     # TODO: fall back to generic .deps file.
-    errorF(target_path, 'unsupported source file extension: `{}`', src_ext)
+    errorF(target_path, f'unsupported source file extension: {src_ext!r}')
   prod_path_out = prod_path + out_ext
   prod_path_tmp = prod_path + tmp_ext
   remove_file_if_exists(prod_path_out)
@@ -428,7 +427,7 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
   # Extract args from the combination of wilds in the source and the matching target.
   m = match_wilds(target_path_for_source(src_path), target_path)
   if m is None:
-    errorF(target_path, 'internal error: match failed; src_path: {!r}', src_path)
+    errorF(target_path, f'internal error: match failed; src_path: {src_path!r}')
   argv = [src_path] + list(m.groups())
   cmd = build_tool + argv
 
@@ -439,20 +438,20 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
     custom_env = env_fn()
     env.update(custom_env)
 
-  noteF(target_path, 'building: `{}`', ' '.join(shlex.quote(w) for w in cmd))
+  noteF(target_path, f"building: `{' '.join(shlex.quote(w) for w in cmd)}`")
   out_file = open(prod_path_out, 'wb')
   time_start = time.time()
   code = runC(cmd, env=env, out=out_file)
   time_elapsed = time.time() - time_start
   out_file.close()
   if code != 0:
-    errorF(target_path, 'build failed with code: {}', code)
+    errorF(target_path, f'build failed with code: {code}')
 
   def cleanup_out():
     if file_size(prod_path_out) == 0:
       remove_file(prod_path_out)
     else:
-      warnF(target_path, 'wrote data directly to `{}`;\n  ignoring output captured in `{}`', prod_path_tmp, prod_path_out)
+      warnF(target_path, f'wrote data directly to `{prod_path_tmp}`;\n  ignoring output captured in `{prod_path_out}`')
 
   manif_path = manifest_path(argv)
   try: f = open(manif_path)
@@ -469,8 +468,7 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
     tmp_paths = list(line[:-1] for line in f) # strip newlines.
     cleanup_out()
     if ('%' not in prod_path_tmp) and prod_path_tmp not in tmp_paths:
-      errorF(target_path, 'product does not appear in manifest ({} records): {}',
-        len(tmp_paths), manif_path)
+      errorF(target_path, f'product does not appear in manifest ({len(tmp_paths)} records): {manif_path}')
     remove_file(manif_path)
   time_msg = f'{time_elapsed:0.2f} seconds ' if ctx.report_times else ''
   noteF(target_path, f'finished: {time_msg}(via {via}).')
@@ -526,7 +524,7 @@ def calc_size_mtime_old(ctx: Ctx, target_path: str, actual_path: str) -> tuple:
     size, mtime = file_size_and_mtime(actual_path)
   except FileNotFoundError:
     size, mtime = 0, 0
-  ctx.dbgF(target_path, 'size: {}; mtime: {}', size, mtime)
+  ctx.dbgF(target_path, f'size: {size}; mtime: {mtime}')
   return size, mtime, ctx.db.get_record(target_path=target_path)
 
 
@@ -556,9 +554,9 @@ def source_candidate(ctx, target_path, src_dir, prod_name):
   # error.
   deps = ', '.join(sorted(ctx.dependents[target_path])) or target_path
   if len(candidates) == 0:
-    errorF(deps, 'no source candidates matching `{}` in `{}`', target_path, src_dir)
+    errorF(deps, f'no source candidates matching `{target_path}` in `{src_dir}`')
   else:
-    errorF(deps, 'multiple source candidates matching `{}`: {}', target_path, candidates)
+    errorF(deps, f'multiple source candidates matching `{target_path}`: {candidates}')
 
 
 def list_dir_filtered(src_dir, cache):
