@@ -6,9 +6,11 @@ Muck target path functions.
 
 import re
 from itertools import product
-from .pithy.format import count_formatters, has_formatter, format_to_re
+from .pithy.format import FormatError, count_formatters, has_formatter, format_to_re, parse_formatters
 from .pithy.fs import path_exists, path_ext, path_join, path_name_stem, path_stem
+from .pithy.string_utils import pluralize
 from .constants import build_dir, build_dir_slash, manifest_ext, reserved_exts, reserved_names, reserved_or_ignored_exts
+from typing import *
 
 
 class InvalidTarget(Exception):
@@ -22,7 +24,7 @@ target_invalids_re = re.compile(r'[\s]|\.\.|\./|//')
 
 def validate_target(target):
   if not target:
-    raise InvalidTarget(target, f'empty string.')
+    raise InvalidTarget(target, 'empty string.')
   inv_m  =target_invalids_re.search(target)
   if inv_m:
     raise InvalidTarget(target, f'cannot contain {inv_m.group(0)!r}.')
@@ -33,6 +35,13 @@ def validate_target(target):
     raise InvalidTarget(target, f'name is reserved; please rename the target.\n(reserved names: {reserved_desc}.)')
   if path_ext(target) in reserved_exts:
     raise InvalidTarget(target, 'target name has reserved extension; please rename the target.')
+  try:
+    for name, _, _ in parse_formatters(target):
+      if not name:
+        raise InvalidTarget(target, 'contains unnamed formatter')
+      # TODO: validate the format spec, and that there are no gaps in finditer.
+  except FormatError as e:
+    raise InvalidTarget(target, 'invalid format') from e
 
 
 def validate_target_or_error(target):
@@ -83,56 +92,57 @@ _wildcard_re = re.compile(r'(%+)')
 
 def match_wilds(wildcard_path, string):
   '''
-  Match a string against a wildcard path.
-  The muck wildcard character is '%'.
-  This character was chosen because bash treats it as a plain char.
-  Consecutive wilds indicate required padding.
+  Match a string against a wildcard/format path.
   '''
   r = format_to_re(wildcard_path)
   return r.fullmatch(string)
 
 
 def manifest_path(argv):
-  return dst_path(argv, argv[1:], strict=False) + manifest_ext
+  return dst_path(argv, override_bindings={}) + manifest_ext
 
 
-def format_args(format_path, args):
-  count = count_formatters(format_path)
-  if len(args) != count:
-    raise ValueError(f'format path has {count} formatters; received {len(args)} args: {format_path}')
-  return format_path.format(*args)
+def bindings_for_format(format_path, kwargs):
+  '''
+  Parse `format_path` field names and yield (name, arg) pairs,
+  where `arg` is pulled from `kwargs`.
+  '''
+  for name, _, _ in parse_formatters(format_path):
+    try: arg = kwargs[name]
+    except KeyError as e: raise Exception(f'missing argument for formatter field {name}') from e
+    yield name, arg
 
 
-def pad_sub(wildcard, var):
-  width = len(wildcard)
-  if isinstance(var, int):
-    return f'{var:0{width}}'
-  else:
-    return f'{var:_<{width}}'
+def paths_from_format(format_path: str, seqs: Dict[str, Sequence]) -> Iterable[Tuple[str, Dict[str, str]]]:
+  '''
+  Generate paths from the format path and matching argument sequences.
+  '''
+  # note: relies on python3.6 keys() and values() having the same order.
+  for vals in product(*seqs.values()):
+    args = dict(zip(seqs.keys(), vals))
+    yield format_path.format(**args), args
 
 
-def paths_from_format_seqs(format_path, seqs):
-  for args in product(*seqs):
-    yield args, format_args(format_path, args)
-
-
-def dst_path(argv, vars, strict=True):
-  src = argv[0]
+def match_format_and_args(argv: Tuple[str, ...]) -> Dict[str, str]:
+  '''
+  Given `argv`, return a dictionary pairing formatter names to argument values.'
+  Requires that each formatter is named.
+  '''
+  fmt = argv[0]
   args = argv[1:]
+  formatters = list(parse_formatters(fmt))
+  if len(formatters) != len(args):
+    raise ValueError(f'format expects {pluralize(len(args), "arg")} args but was provided with {len(formatters)}')
+  for i, (name, _, _) in enumerate(formatters):
+    if not name: raise ValueError(f'formatter {i} must specify a field name')
+  return { name : val for (name, _, _), val in zip(formatters, args) }
 
-  class Error(Exception):
-    def __init__(self, msg):
-      super().__init__((f'source: {src}; args: {args}; vars: {vars}; {msg}'))
 
-  if len(vars) != len(args):
-    raise Error(f'expected {len(vars)} vars; received {len(args)}')
-
-  subs = []
-  for i, (a, v) in enumerate(zip(args, vars), 1):
-    if isinstance(v, str) and has_formatter(v):
-      if strict and has_formatter(a):
-        raise Error(f'arg {i}: both arg and var are format strings.')
-      subs.append(a)
-    else:
-      subs.append(v)
-  return format_args(product_path_for_source(src), args=subs)
+def dst_path(argv, override_bindings):
+  src = argv[0]
+  base_bindings = match_format_and_args(argv)
+  bindings = base_bindings.copy()
+  for k, v in override_bindings.items():
+    if k not in bindings: raise Exception(f'source: {src}: binding does not match any field name: {k}')
+    bindings[k] = v
+  return product_path_for_source(src).format(**bindings)

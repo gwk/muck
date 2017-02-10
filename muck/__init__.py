@@ -25,7 +25,7 @@ from .pithy.json_utils import load_json, load_jsonl, load_jsons
 from .pithy.transform import Transformer
 
 from .constants import build_dir, build_dir_slash, tmp_ext
-from .paths import actual_path_for_target, dst_path, manifest_path, paths_from_format_seqs, product_path_for_source
+from .paths import actual_path_for_target, bindings_for_format, dst_path, manifest_path, paths_from_format, product_path_for_source
 
 
 # module exports.
@@ -41,24 +41,26 @@ __all__ = [
   'transform',
 ]
 
-
 _dst_vars_opened = set()
 _manifest_file = None
 
-def dst_file(*vars, binary=False):
+def dst_file(binary=False, **kwargs):
   global _manifest_file
-  if not has_formatter(argv[0]): # no need for manifest.
-    if vars: raise ValueError(vars) # no wilds in source path, so no vars accepted.
-    return open(product_path_for_source(argv[0]) + tmp_ext, 'wb' if binary else 'w')
-  if vars in _dst_vars_opened:
-    raise Exception(f'file already opened for vars: {vars}')
-  _dst_vars_opened.add(vars)
-  path = dst_path(argv, vars) + tmp_ext
-  assert not has_formatter(path)
+  src = argv[0]
+  mode = 'wb' if binary else 'w'
+  if not has_formatter(src): # single destination; no need for manifest.
+    if kwargs:
+      raise Exception(f'source path contains no formatters but bindings provided to `dst_file`: {src}')
+    return open(product_path_for_source(src) + tmp_ext, mode)
+  args = tuple(sorted(kwargs.items())) # need kwargs as a hash key.
+  if args in _dst_vars_opened:
+    raise Exception(f'file already opened for `dst_file` arguments: {args}')
+  _dst_vars_opened.add(args)
+  path = dst_path(argv, kwargs) + tmp_ext
   if _manifest_file is None:
     _manifest_file = open(manifest_path(argv), 'w')
   print(path, file=_manifest_file)
-  return open(path, mode=('wb' if binary else 'w'))
+  return open(path, mode=mode)
 
 
 _open_deps_parameters = { 'binary', 'buffering', 'encoding', 'errors', 'newline' }
@@ -149,9 +151,11 @@ def load(target_path, ext=None, **kwargs):
   return load_fn(file, **kwargs)
 
 
-def load_many(format_path, *items, ext=None, **kwargs):
-  for vars, path in paths_from_format_seqs(format_path, items):
-    yield vars, load(path, ext=ext, **kwargs)
+def load_many(format_path, ext=None, **kwargs):
+  seqs = dict(bindings_for_format(format_path, kwargs))
+  for k in seqs: del kwargs[k] # for clarity, do not pass format sequence items to `load`.
+  for path, args in paths_from_format(format_path, seqs):
+    yield load(path, ext=ext, **kwargs), args
 
 
 class HTTPError(Exception):

@@ -267,7 +267,7 @@ def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
 def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mtime, old) -> bool:
   ctx.dbg(target_path, 'update_product')
   src = source_for_target(ctx, target_path)
-  validate_target(src) # this should never happen if target is valid, so do not catch.
+  validate_target_or_error(src)
   ctx.dbg(target_path, f'src: {src}')
   if old.src != src:
     is_changed = True

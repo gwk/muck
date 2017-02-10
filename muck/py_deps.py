@@ -5,7 +5,7 @@ import re
 
 from .pithy.io import read_line_from_path
 from .pithy.fs import is_file, path_dir, path_join
-from .paths import paths_from_format_seqs
+from .paths import bindings_for_format, paths_from_format
 
 # these functions are recognized by the static analyzer.
 from . import load, load_many, open_dep, transform
@@ -62,19 +62,22 @@ def py_dep_call(src_path, call):
     node_error(src_path, arg0, f'first argument must be a string literal; found {type(arg0).__name__}')
   dep_path = arg0.s # the string value from the ast.Str literal.
   if name == load_many.__name__:
-    items = [eval_arg(src_path, i, arg) for (i, arg) in enumerate(call.args[1:])]
+    kwargs = { kw.arg : kw.value for kw in call.keywords }
+    seqs = { k : eval_seq_arg(src_path, a) for k, a in bindings_for_format(dep_path, kwargs) }
+    #^ pulls out the keyword argument AST nodes that match the format string,
+    #^ then statically evaluate them.
   else:
-    items = []
-  for vars, path in paths_from_format_seqs(format_path=dep_path, seqs=items):
+    seqs = {}
+  for path, _ in paths_from_format(format_path=dep_path, seqs=seqs):
     yield path
 
 
-def eval_arg(src_path, index, arg):
+def eval_seq_arg(src_path, arg):
   if isinstance(arg, ast.Call):
     return eval_call(src_path, arg)
   if isinstance(arg, (ast.List, ast.Set, ast.Tuple)):
     return tuple(eval_el(src_path, el) for el in arg.elts)
-  node_error(src_path, arg, f'argument must be statically evaluable; found {type(arg).__name__}')
+  node_error(src_path, arg, f'sequence argument must be statically evaluable; found {type(arg).__name__}')
 
 
 def eval_el(path, el):
