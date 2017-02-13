@@ -48,7 +48,7 @@ class DB:
     except DatabaseError as e:
       if e.args[0] == 'file is encrypted or is not a database':
         exit('muck error: database is outdated or corrupt; run `muck clean-all`.')
-      raise #no-cov!
+      raise #!cov-ignore.
 
     self.run('''
     CREATE TABLE IF NOT EXISTS targets (
@@ -69,7 +69,7 @@ class DB:
 
 
   def dbg_query(self, *stmts):
-    for stmt in stmts: #no-cov!
+    for stmt in stmts: #!cov-ignore.
       errL(f'\nDBG: {stmt}')
       c = self.run(stmt)
       errSL('COLS:', *[col[0] for col in c.description])
@@ -87,7 +87,7 @@ class DB:
     c = self.run('SELECT * FROM targets WHERE path=:path', path=target_path)
     rows = c.fetchall()
     if len(rows) > 1:
-      raise DBError(f'multiple rows matching target path: {target_path!r}') #no-cov!
+      raise DBError(f'multiple rows matching target path: {target_path!r}') #!cov-ignore.
     if rows:
       r = rows[0]
       return TargetRecord(target_path, r[idx_size], r[idx_mtime], r[idx_hash], r[idx_src], from_marshalled(r[idx_deps]))
@@ -104,7 +104,7 @@ class DB:
     try:
       self.run('INSERT INTO targets (path, size, mtime, hash, src, deps) VALUES (:path, :size, :mtime, :hash, :src, :deps)',
         path=record.path, size=record.size, mtime=record.mtime, hash=record.hash, src=record.src, deps=to_marshalled(record.deps))
-    except IntegrityError as e: #no-cov!
+    except IntegrityError as e: #!cov-ignore.
       raise DBError(f'insert_record: target path is not unique: {record.path}') from e
 
 
