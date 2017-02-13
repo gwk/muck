@@ -120,7 +120,10 @@ def paths_from_format(format_path: str, seqs: Dict[str, Sequence]) -> Iterable[T
   # note: relies on python3.6 keys() and values() having the same order.
   for vals in product(*seqs.values()):
     args = dict(zip(seqs.keys(), vals))
-    yield format_path.format(**args), args
+    try:
+      yield format_path.format(**args), args
+    except KeyError as e:
+      raise Exception(f'format requires field name {e.args[0]!r}; provided args: {args}.')
 
 
 def match_format_and_args(argv: Tuple[str, ...]) -> Dict[str, str]:
@@ -145,4 +148,8 @@ def dst_path(argv, override_bindings):
   for k, v in override_bindings.items():
     if k not in bindings: raise Exception(f'source: {src}: binding does not match any field name: {k}')
     bindings[k] = v
-  return product_path_for_source(src).format(**bindings)
+  try:
+    return product_path_for_source(src).format(**bindings)
+  except KeyError as e:
+     raise Exception(f'format requires field name {e.args[0]!r}; provided bindings: {bindings}.')
+
