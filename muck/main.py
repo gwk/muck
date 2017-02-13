@@ -359,7 +359,7 @@ def calc_dependencies(path, dir_names):
   except KeyError:
     return []
   with open(path) as f:
-    return sorted(dep_fn(path, f, dir_names))
+    return sorted(set(dep_fn(path, f, dir_names)))
 
 
 def list_dependencies(src_path, src_file, dir_names):
