@@ -16,7 +16,11 @@ def src_error(path, line1, col1, msg, text=None):
   pad = ' ' * (col1 - 1)
   if text is None:
     text = read_line_from_path(path, line0=line1-1, default='<MISSING>')
-  exit(f'muck error: {path}:{line1}:{col1}: {msg}.\n  {text}\n  {pad}^')
+  return SystemExit(f'muck error: {path}:{line1}:{col1}: {msg}.\n  {text}\n  {pad}^')
+
+
+def node_error(path, node, msg):
+  return src_error(path, node.lineno, node.col_offset + 1, msg)
 
 
 def py_dependencies(src_path, src_file, dir_names):
@@ -24,7 +28,7 @@ def py_dependencies(src_path, src_file, dir_names):
   src_text = src_file.read()
   try: tree = ast.parse(src_text, filename=src_path)
   except SyntaxError as e:
-    src_error(src_path, e.lineno, e.offset, 'syntax error', e.text.rstrip('\n'))
+    raise src_error(src_path, e.lineno, e.offset, 'syntax error', e.text.rstrip('\n')) from e
   for node in ast.walk(tree):
     if isinstance(node, ast.Call):
       yield from py_dep_call(src_path, node)
@@ -56,10 +60,10 @@ def py_dep_call(src_path, call):
   name = func.attr
   if name not in dep_fn_names: return
   if len(call.args) < 1:
-    node_error(src_path, call, 'first argument must be a string literal; found no arguments')
+    raise node_error(src_path, call, 'first argument must be a string literal; found no arguments')
   arg0 = call.args[0]
   if not isinstance(arg0, ast.Str):
-    node_error(src_path, arg0, f'first argument must be a string literal; found {type(arg0).__name__}')
+    raise node_error(src_path, arg0, f'first argument must be a string literal; found {type(arg0).__name__}')
   dep_path = arg0.s # the string value from the ast.Str literal.
   if name == load_many.__name__:
     kwargs = { kw.arg : kw.value for kw in call.keywords }
@@ -77,40 +81,36 @@ def eval_seq_arg(src_path, arg):
     return eval_call(src_path, arg)
   if isinstance(arg, (ast.List, ast.Set, ast.Tuple)):
     return tuple(eval_el(src_path, el) for el in arg.elts)
-  node_error(src_path, arg, f'sequence argument must be statically evaluable; found {type(arg).__name__}')
+  raise node_error(src_path, arg, f'sequence argument must be statically evaluable; found {type(arg).__name__}')
 
 
 def eval_el(path, el):
   if isinstance(el, ast.Num): return eval_int(path, el)
   if isinstance(el, ast.Str): return el.s
-  node_error(path, el, f'sequence element must be an int or str; found {type(arg).__name__}')
+  raise node_error(path, el, f'sequence element must be an int or str; found {type(arg).__name__}')
 
 
 def eval_call(path, call):
   func = call.func
   if not isinstance(func, ast.Name):
-    node_error(path, func, 'called function must be a statically evaluable name.')
+    raise node_error(path, func, 'called function must be a statically evaluable name.')
   if func.id == 'range':
     args = call.args
     if not (1 <= len(call.args) <= 3):
-      node_error(src_path, call, "'range' requires 1 to 3 arguments.")
+      raise node_error(src_path, call, "'range' requires 1 to 3 arguments.")
     nat_args = tuple(eval_nat(path, a) for a in args)
     return range(*nat_args) # TODO: support negative start, stop.
-  else: node_error(path, func, f"called function must be statically evaluable, i.e. 'range'")
+  else: raise node_error(path, func, f"called function must be statically evaluable, i.e. 'range'")
 
 
 def eval_int(path, num):
   if not (isinstance(num, ast.Num) or not isinstance(num.n, int)):
-    node_error(path, num, f'expected a literal integer; found {type(num).__name__}.')
+    raise node_error(path, num, f'expected a literal integer; found {type(num).__name__}.')
   return num.n
 
 
 def eval_nat(path, num):
   n = eval_int(path, num)
-  if n < 0: node_error(path, num, 'expected a non-negative literal integer.')
+  if n < 0:
+    raise node_error(path, num, 'expected a non-negative literal integer.')
   return n
-
-
-def node_error(path, node, msg):
-  src_error(path, node.lineno, node.col_offset + 1, msg)
-
