@@ -6,7 +6,7 @@ Muck target path functions.
 
 import re
 from itertools import product
-from .pithy.format import FormatError, count_formatters, has_formatter, format_to_re, parse_formatters
+from .pithy.format import FormatError, count_formatters, format_partial, has_formatter, format_to_re, parse_formatters
 from .pithy.fs import path_exists, path_ext, path_join, path_name_stem, path_stem
 from .pithy.string_utils import pluralize
 from .constants import build_dir, build_dir_slash, manifest_ext, reserved_exts, reserved_names, reserved_or_ignored_exts
@@ -39,7 +39,6 @@ def validate_target(target):
     for name, _, _ in parse_formatters(target):
       if not name:
         raise InvalidTarget(target, 'contains unnamed formatter')
-      # TODO: validate the format spec, and that there are no gaps in finditer.
   except FormatError as e:
     raise InvalidTarget(target, 'invalid format') from e
 
@@ -113,20 +112,24 @@ def bindings_for_format(format_path, kwargs):
     yield name, arg
 
 
-def paths_from_format(format_path: str, seqs: Dict[str, Sequence]) -> Iterable[Tuple[str, Dict[str, str]]]:
+def paths_from_format(format_path: str, seqs: Dict[str, Sequence], partial=False) \
+ -> Iterable[Tuple[str, Dict[str, str]]]:
   '''
   Generate paths from the format path and matching argument sequences.
   '''
   # note: relies on python3.6 keys() and values() having the same order.
   for vals in product(*seqs.values()):
     args = dict(zip(seqs.keys(), vals))
-    try:
-      yield format_path.format(**args), args
-    except KeyError as e:
-      raise Exception(f'format requires field name {e.args[0]!r}; provided args: {args}.')
+    if partial:
+      yield format_partial(format_path, **args), args
+    else:
+      try:
+        yield format_path.format(**args), args
+      except KeyError as e:
+        raise Exception(f'format {format_path!r} requires field name {e.args[0]!r}; provided args: {args}') from e
 
 
-def match_format_and_args(argv: Tuple[str, ...]) -> Dict[str, str]:
+def bindings_from_argv(argv: Sequence[str]) -> Dict[str, str]:
   '''
   Given `argv`, return a dictionary pairing formatter names to argument values.'
   Requires that each formatter is named.
@@ -143,13 +146,14 @@ def match_format_and_args(argv: Tuple[str, ...]) -> Dict[str, str]:
 
 def dst_path(argv, override_bindings):
   src = argv[0]
-  base_bindings = match_format_and_args(argv)
+  base_bindings = bindings_from_argv(argv)
   bindings = base_bindings.copy()
   for k, v in override_bindings.items():
     if k not in bindings: raise Exception(f'source: {src}: binding does not match any field name: {k}')
     bindings[k] = v
+  fmt = product_path_for_source(src)
   try:
-    return product_path_for_source(src).format(**bindings)
+    return fmt.format(**bindings)
   except KeyError as e:
-     raise Exception(f'format requires field name {e.args[0]!r}; provided bindings: {bindings}.')
+     raise Exception(f'format {fmt!r} requires field name {e.args[0]!r}; provided bindings: {bindings}') from e
 

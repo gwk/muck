@@ -1,5 +1,5 @@
 {
-  'cmd': '$MUCK -no-times c-many.txt',
+  'cmd': '$MUCK -no-times -deps c-many.txt',
   'code': 0,
   'links': {
     'test/0/multi/a-to-many-{i}.txt.py',

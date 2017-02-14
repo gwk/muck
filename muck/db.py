@@ -12,7 +12,7 @@ from .pithy.fs import path_join
 from .pithy.io import errL, errSL
 
 
-TargetRecord = namedtuple('TargetRecord', 'path size mtime hash src deps')
+TargetRecord = namedtuple('TargetRecord', 'path size mtime hash src deps wild_deps')
 '''
 TargetRecord format:
  path: target path (not product paths prefixed with build_dir).
@@ -24,7 +24,7 @@ TargetRecord format:
 
 
 def empty_record(target_path):
-  return TargetRecord(path=target_path, size=0, mtime=0, hash=None, src=None, deps=())
+  return TargetRecord(path=target_path, size=0, mtime=0, hash=None, src=None, deps=(), wild_deps=())
 
 
 def is_empty_record(record):
@@ -34,7 +34,7 @@ def is_empty_record(record):
 class DBError(Exception): pass
 
 
-idx_id, idx_path, idx_size, idx_mtime, idx_hash, idx_src, idx_deps = range(7)
+idx_id, idx_path, idx_size, idx_mtime, idx_hash, idx_src, idx_deps, idx_wild_deps = range(8)
 
 
 class DB:
@@ -58,7 +58,8 @@ class DB:
       mtime REAL,
       hash BLOB,
       src TEXT,
-      deps BLOB
+      deps BLOB,
+      wild_deps BLOB
     )''')
 
     self.run('CREATE UNIQUE INDEX IF NOT EXISTS target_paths ON targets(path)')
@@ -90,20 +91,24 @@ class DB:
       raise DBError(f'multiple rows matching target path: {target_path!r}') #!cov-ignore.
     if rows:
       r = rows[0]
-      return TargetRecord(target_path, r[idx_size], r[idx_mtime], r[idx_hash], r[idx_src], from_marshalled(r[idx_deps]))
+      return TargetRecord(target_path, r[idx_size], r[idx_mtime], r[idx_hash], r[idx_src],
+        from_marshalled(r[idx_deps]), from_marshalled(r[idx_wild_deps]))
     else:
       return empty_record(target_path)
 
 
   def update_record(self, record: TargetRecord):
-    self.run('UPDATE targets SET size=:size, mtime=:mtime, hash=:hash, src=:src, deps=:deps WHERE path=:path',
-      path=record.path, size=record.size, mtime=record.mtime, hash=record.hash, src=record.src, deps=to_marshalled(record.deps))
+    self.run('UPDATE targets SET size=:size, mtime=:mtime, hash=:hash, src=:src, deps=:deps, wild_deps=:wild_deps WHERE path=:path',
+      path=record.path, size=record.size, mtime=record.mtime, hash=record.hash, src=record.src,
+      deps=to_marshalled(record.deps), wild_deps=to_marshalled(record.wild_deps))
 
 
   def insert_record(self, record: TargetRecord):
     try:
-      self.run('INSERT INTO targets (path, size, mtime, hash, src, deps) VALUES (:path, :size, :mtime, :hash, :src, :deps)',
-        path=record.path, size=record.size, mtime=record.mtime, hash=record.hash, src=record.src, deps=to_marshalled(record.deps))
+      self.run('INSERT INTO targets (path, size, mtime, hash, src, deps, wild_deps)' \
+        'VALUES (:path, :size, :mtime, :hash, :src, :deps, :wild_deps)',
+        path=record.path, size=record.size, mtime=record.mtime, hash=record.hash, src=record.src,
+        deps=to_marshalled(record.deps), wild_deps=to_marshalled(record.wild_deps))
     except IntegrityError as e: #!cov-ignore.
       raise DBError(f'insert_record: target path is not unique: {record.path}') from e
 
@@ -111,11 +116,4 @@ class DB:
   def delete_record(self, target_path: str):
     self.run('DELETE FROM targets WHERE path=:path', path=target_path)
 
-
-  def all_deps_for_target(self, target_path):
-    record = self.get_record(target_path)
-    if record.src is not None:
-      return [record.src] + record.deps
-    else:
-      return record.deps
 

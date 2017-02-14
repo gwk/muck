@@ -3,7 +3,7 @@
 import ast
 import re
 
-from .pithy.io import read_line_from_path
+from .pithy.io import *
 from .pithy.fs import is_file, path_dir, path_join
 from .paths import bindings_for_format, paths_from_format
 
@@ -71,9 +71,14 @@ def py_dep_call(src_path, call):
     #^ pulls out the keyword argument AST nodes that match the format string,
     #^ then statically evaluate them.
   else:
+    if call.keywords:
+      raise node_error(src_path, call, f'unexpected keyword arguments')
     seqs = {}
-  for path, _ in paths_from_format(format_path=dep_path, seqs=seqs):
-    yield path
+  try:
+    for path, _ in paths_from_format(format_path=dep_path, seqs=seqs, partial=True):
+      yield path
+  except Exception as e:
+    raise node_error(src_path, arg0, e.args[0]) from e
 
 
 def eval_seq_arg(src_path, arg):

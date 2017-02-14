@@ -25,7 +25,7 @@ from .pithy.json_utils import load_json, load_jsonl, load_jsons
 from .pithy.transform import Transformer
 
 from .constants import build_dir, build_dir_slash, tmp_ext
-from .paths import actual_path_for_target, bindings_for_format, dst_path, manifest_path, paths_from_format, product_path_for_source
+from .paths import actual_path_for_target, bindings_for_format, bindings_from_argv, dst_path, manifest_path, paths_from_format, product_path_for_source
 
 
 # module exports.
@@ -132,12 +132,14 @@ def load(target_path, ext=None, **kwargs):
   Muck's static analysis looks specifically for this function to infer dependencies;
   `target_path` must be a string literal.
   '''
+  bindings = bindings_from_argv(sys.argv)
+  subs_path = target_path.format(**bindings)
   if ext is None:
-    ext = path_ext(target_path)
+    ext = path_ext(subs_path)
   elif not isinstance(ext, str): raise TypeError(ext)
   try: load_fn, std_open_args = _loaders[ext]
   except KeyError:
-    errL(f'ERROR: No loader found for target: {target_path!r}')
+    errL(f'ERROR: No loader found for target: {subs_path!r}')
     errL(f'NOTE: extension: {ext!r}')
     raise
   open_args = std_open_args.copy()
@@ -147,7 +149,7 @@ def load(target_path, ext=None, **kwargs):
     except KeyError: continue
     open_args[k] = v
     del kwargs[k] # only pass this arg to open_deps; del is safe because kwargs has local lifetime.
-  file = open_dep(target_path, **open_args)
+  file = open_dep(subs_path, **open_args)
   return load_fn(file, **kwargs)
 
 

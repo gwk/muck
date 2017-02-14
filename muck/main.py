@@ -18,8 +18,10 @@ from collections import defaultdict, namedtuple
 from hashlib import sha256
 from typing import Optional
 
+from .pithy.format import has_formatter
 from .pithy.fs import *
 from .pithy.io import *
+from .pithy.iterable import fan_by_pred
 from .pithy.json_utils import load_json, write_json
 from .pithy.string_utils import format_byte_count
 from .pithy.task import runC
@@ -126,17 +128,27 @@ def muck_deps(ctx, targets):
   roots.update(t for t, s in ctx.dependents.items() if len(s) > 1)
 
   def visit(depth, target):
-    deps = ctx.db.all_deps_for_target(target)
+    record = ctx.db.get_record(target)
     dependents = ctx.dependents[target]
+    src = record.src
+    deps = record.deps
+    wilds = record.wild_deps
+    some = bool(src) or bool(deps) or bool(wilds)
     if depth == 0 and len(dependents) > 0:
       suffix = f' (dependents: {" ".join(sorted(dependents))}):'
     elif len(dependents) > 1: suffix = '*'
-    elif len(deps) == 0:      suffix = ''
-    else:                     suffix = ':'
+    elif some: suffix = ':'
+    else: suffix = ''
     outL('  ' * depth, target, suffix)
     if depth > 0 and len(dependents) > 1: return
+    for wild in wilds:
+      outL('  ' * depth, ' ~', wild)
+    if src is not None:
+      visit(depth + 1, src)
     for dep in deps:
       visit(depth + 1, dep)
+    for sub_dep in expanded_wild_deps(ctx, target, src):
+      visit(depth + 1, sub_dep)
 
   for root in sorted(roots):
     outL()
@@ -275,6 +287,9 @@ def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mt
       note(target_path, f'source path of target product changed\n  was: {old.src}\n  now: {src}')
   is_changed |= update_dependency(ctx, src, dependent=target_path)
 
+  for sub_dep in expanded_wild_deps(ctx, target_path, src):
+    is_changed |= update_dependency(ctx, sub_dep, dependent=target_path)
+
   if is_changed: # must rebuild product.
     actual_src = actual_path_for_target(src) # source might itself be a product.
     tmp_paths = build_product(ctx, target_path, actual_src, actual_path)
@@ -289,6 +304,15 @@ def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mt
     file_hash = old.hash
   return update_deps_and_record(ctx, target_path, actual_path,
     is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=src, old=old)
+
+
+def expanded_wild_deps(ctx, target, src):
+  wild_deps = ctx.db.get_record(src).wild_deps
+  if not wild_deps: return
+  m = match_wilds(path_stem(src), target)
+  bindings = m.groupdict()
+  for wild_dep in wild_deps:
+    yield wild_dep.format(**bindings)
 
 
 def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str):
@@ -325,19 +349,21 @@ def update_deps_and_record(ctx, target_path: str, actual_path: str,
   is_changed: bool, size: int, mtime: int, file_hash: Optional[str], src: str, old: TargetRecord) -> bool:
   ctx.dbg(target_path, 'update_deps_and_record')
   if is_changed:
-    deps = calc_dependencies(actual_path, ctx.dir_names)
+    deps, wild_deps = calc_dependencies(actual_path, ctx.dir_names)
     for dep in deps:
       try: validate_target(dep)
       except InvalidTarget as e:
         exit(f'muck error: {target_path}: invalid dependency: {e.target!r}: {e.msg}')
+      # TODO: validate wild_deps? how?
   else:
     deps = old.deps
+    wild_deps = old.wild_deps
   for dep in deps:
     is_changed |= update_dependency(ctx, dep, dependent=target_path)
 
   ctx.statuses[target_path] = is_changed # replace sentinal with final value.
   if is_changed:
-    record = TargetRecord(path=target_path, size=size, mtime=mtime, hash=file_hash, src=src, deps=deps)
+    record = TargetRecord(path=target_path, size=size, mtime=mtime, hash=file_hash, src=src, deps=deps, wild_deps=wild_deps)
     ctx.dbg(target_path, f'updated record:\n  {record}')
     if is_empty_record(old):
       ctx.db.insert_record(record)
@@ -357,9 +383,10 @@ def calc_dependencies(path, dir_names):
   try:
     dep_fn = dependency_fns[ext]
   except KeyError:
-    return []
+    return ([], [])
   with open(path) as f:
-    return sorted(set(dep_fn(path, f, dir_names)))
+    all_deps = dep_fn(path, f, dir_names)
+    return fan_by_pred(sorted(set(all_deps)), has_formatter)
 
 
 def list_dependencies(src_path, src_file, dir_names):
@@ -573,16 +600,17 @@ def list_dir_filtered(src_dir, cache):
 
 def filter_source_names(names, prod_name):
   '''
-  given product name "x.txt", match all of the following:
-  * x.txt.py
-  * x.py
-  * {}.txt.py
-  * {}.py
-
+  Given `prod_name`, find all matching source names.
   There are several concerns that make this matching complex.
-  * Muck allows wildcards in script names.
-    This allows a single script to produce many targets for corresponding sources.
+  * Muck allows named formatters (e.g. '{x}') in script names.
+    This allows a single script to produce many targets for corresponding arguments.
   * A source might itself be the product of another source.
+
+  So, given product name "x.txt", match all of the following:
+  * x.txt.py
+  * {}.txt.py
+  * x.txt.py.py
+  * {}.txt.py.py
   '''
   prod = prod_name.split('.')
   for src_name in names:
