@@ -1,5 +1,5 @@
 {
-  'cmd': '$MUCK -dbg',
+  'cmd': '$MUCK -dbg basic/index.html',
   'code': 0,
   'err-mode': 'match',
 }

@@ -1,3 +1,3 @@
 {
-  'cmd': '$MUCK -deps'
+  'cmd': '$MUCK -deps basic/index.html'
 }

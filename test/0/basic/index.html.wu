@@ -9,7 +9,10 @@ writeup v0
 # Product of a product of a source.
 <embed: c.txt>
 
-
 # Quoted text; does not embed anything.
 `<embed: e.html>`
-`<embed: f.html>`
+
+# Miscellaneous.
+
+## This script uses `import muck` rather than using `from muck import *`.
+<embed: module-import.txt>

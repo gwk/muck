@@ -1,15 +1,18 @@
-muck note: d.txt: building: `python3.6 d.txt.py`
-muck note: d.txt: finished: (via stdout).
-muck note: d.txt: product changed; 6 B.
-muck note: b.txt: building: `python3.6 b.txt.py`
-muck note: b.txt: finished: (via stdout).
-muck note: b.txt: product changed; 19 B.
-muck note: c.txt.py: building: `python3.6 c.txt.py.py`
-muck note: c.txt.py: finished: (via stdout).
-muck note: c.txt.py: product changed; 109 B.
-muck note: c.txt: building: `python3.6 _build/c.txt.py`
-muck note: c.txt: finished: (via stdout).
-muck note: c.txt: product changed; 19 B.
-muck note: index.html: building: `writeup index.html.wu`
-muck note: index.html: finished: (via stdout).
-muck note: index.html: product changed; 4.839 kB.
+muck note: basic/d.txt: building: `python3.6 basic/d.txt.py`
+muck note: basic/d.txt: finished: (via stdout).
+muck note: basic/d.txt: product changed; 6 B.
+muck note: basic/b.txt: building: `python3.6 basic/b.txt.py`
+muck note: basic/b.txt: finished: (via stdout).
+muck note: basic/b.txt: product changed; 19 B.
+muck note: basic/c.txt.py: building: `python3.6 basic/c.txt.py.py`
+muck note: basic/c.txt.py: finished: (via stdout).
+muck note: basic/c.txt.py: product changed; 115 B.
+muck note: basic/c.txt: building: `python3.6 _build/basic/c.txt.py`
+muck note: basic/c.txt: finished: (via stdout).
+muck note: basic/c.txt: product changed; 19 B.
+muck note: basic/module-import.txt: building: `python3.6 basic/module-import.txt.py`
+muck note: basic/module-import.txt: finished: (via stdout).
+muck note: basic/module-import.txt: product changed; 86 B.
+muck note: basic/index.html: building: `writeup basic/index.html.wu`
+muck note: basic/index.html: finished: (via stdout).
+muck note: basic/index.html: product changed; 5.194 kB.

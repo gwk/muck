@@ -1,8 +1,0 @@
-{
-  'cmd': '$MUCK',
-  'files': {
-    '_build/index.html' : {
-      'path': 'test/0/basic/index-expected.html'
-    }
-  },
-}
