@@ -32,3 +32,4 @@ reserved_names = frozenset({
   db_name,
 })
 
+max_hash_size = 1 << 24

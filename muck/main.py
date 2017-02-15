@@ -269,7 +269,8 @@ def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
   # if the mtime changed, check the hash;
   # the user might have made an accidental edit and then reverted it,
   # and we would rather compute the hash than report a false problem.
-  if size != old.size or (mtime != old.mtime and hash_for_path(actual_path) != old.hash):
+  if size != old.size or (mtime != old.mtime and
+    (size > max_hash_size or hash_for_path(actual_path, size, max_hash_size) != old.hash)):
     ctx.dbg(target_path, f'size: {old.size} -> {size}; mtime: {old.mtime} -> {mtime}')
     # TODO: change language depending on whether product is derived from a patch?
     error(target_path, 'existing product has changed; did you mean to update a patch?\n'
@@ -323,8 +324,8 @@ def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str):
      error(product_path, 'product path is not in build dir.')
   target_path = product_path[len(build_dir_slash):]
   size, mtime, old = calc_size_mtime_old(ctx, target_path, tmp_path)
-  file_hash = hash_for_path(tmp_path)
-  is_changed = (size != old.size or file_hash != old.hash)
+  file_hash = hash_for_path(tmp_path, size, max_hash_size)
+  is_changed = (size != old.size or size > max_hash_size or file_hash != old.hash)
   if is_changed:
     ctx.db.delete_record(target_path=target_path) # delete metadata if it exists, just before overwrite, in case muck fails before update.
   move_file(tmp_path, product_path, overwrite=True) # move regardless; if not changed, just cleans up the identical tmp file.
@@ -335,7 +336,7 @@ def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str):
 
 def update_non_product(ctx: Ctx, target_path: str, is_changed: bool, size, mtime, old) -> bool:
   ctx.dbg(target_path, 'update_non_product')
-  file_hash = hash_for_path(target_path) # must be calculated in all cases.
+  file_hash = hash_for_path(target_path, size, max_hash_size) # must be calculated in all cases.
   if not is_changed: # all we know so far is that it exists and status as a source has not changed.
     is_changed = (size != old.size or file_hash != old.hash)
     if is_changed: # this is more interesting; report.
@@ -523,21 +524,33 @@ build_tool_env_fns = {
 # Utilities.
 
 
-def hash_for_path(path: str, max_chunks=sys.maxsize) -> bytes:
+def hash_for_path(path: str, size: int, max_hash_size: int) -> bytes:
   '''
-  return a hash string for the contents of the file at the given path.
+  Return a hash string for the contents of the file at `path`, up to `max_hash_size`.
+  For files larger than `max_hash_size`, hash the first and last `max_hash_size//2` bytes;
+  thus this hash value does not guarantee that changes will be detected,
+  but does a decent job of detecting changes by checking the start and end of the file.
   '''
-  try:
-    f = open(path, 'rb')
-  except IsADirectoryError:
-    error(path, 'expected a file but found a directory')
+  hash_chunk_size = 1 << 16
+  #^ a quick timing experiment suggested that chunk sizes larger than this are not faster.
+  assert max_hash_size % hash_chunk_size == 0
+  max_chunks = max_hash_size // hash_chunk_size
+  try: f = open(path, 'rb')
+  except IsADirectoryError: error(path, 'expected a file but found a directory')
   h = sha256()
-  # a quick timing experiment suggested that chunk sizes larger than this are not faster.
-  chunk_size = 1 << 16
-  for i in range(max_chunks):
-    chunk = f.read(chunk_size)
-    if not chunk: break
-    h.update(chunk)
+  if size <= max_hash_size:
+    for i in range(max_chunks):
+      chunk = f.read(hash_chunk_size)
+      if not chunk: break
+      h.update(chunk)
+  else: # too large; read half from start, half from the end.
+    half_chunks = max_chunks // 2
+    for i in range(half_chunks):
+      h.update(f.read(hash_chunk_size))
+    f.seek(max_hash_size//2, 2) # note: whence=2 seeks backwards from end.
+    #^ TODO: if whence=2 is unsupported, just absorb that exception and read the second half from current pos.
+    for i in range(half_chunks):
+      h.update(f.read(hash_chunk_size))
   return h.digest()
 
 
