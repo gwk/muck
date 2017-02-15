@@ -64,8 +64,6 @@ def py_dependencies(src_path, src_file, dir_names):
       #^ pulls out the keyword argument AST nodes that match the format string,
       #^ then statically evaluate them.
     else:
-      if call.keywords:
-        raise node_error(src_path, call, f'unexpected keyword arguments')
       seqs = {}
     try:
       for path, _ in paths_from_format(format_path=dep_path, seqs=seqs, partial=True):
