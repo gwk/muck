@@ -29,56 +29,58 @@ def py_dependencies(src_path, src_file, dir_names):
   try: tree = ast.parse(src_text, filename=src_path)
   except SyntaxError as e:
     raise src_error(src_path, e.lineno, e.offset, 'syntax error', e.text.rstrip('\n')) from e
+
+  # TODO: track which muck symbols have been imported.
+
+  def walk_import(module_name, dir_names):
+    src_dir = path_dir(src_path)
+    leading_dots_count = re.match('\.*', module_name).end()
+    module_parts = ['..'] * leading_dots_count + module_name[leading_dots_count:].split('.')
+    module_path = path_join(src_dir, *module_parts) + '.py'
+    if is_file(module_path):
+      yield module_path
+
+  def walk_call(call):
+    func = call.func
+    if isinstance(func, ast.Attribute):
+      if not (isinstance(func.value, ast.Name) and func.value.id == 'muck'): return
+      #^ TODO: use whatever name muck was imported with.
+      name = func.attr
+    elif isinstance(func, ast.Name):
+      name = func.id # TODO: validate that this name was actually imported from muck.
+    else: return
+    # TODO: dispatch to handlers for all known functions.
+    # TDOO: add handler for source_url to check that repeated (url, target) pairs are consistent across entire project.
+    if name not in dep_fn_names: return
+    if len(call.args) < 1:
+      raise node_error(src_path, call, 'first argument must be a string literal; found no arguments')
+    arg0 = call.args[0]
+    if not isinstance(arg0, ast.Str):
+      raise node_error(src_path, arg0, f'first argument must be a string literal; found {type(arg0).__name__}')
+    dep_path = arg0.s # the string value from the ast.Str literal.
+    if name == load_many.__name__:
+      kwargs = { kw.arg : kw.value for kw in call.keywords }
+      seqs = { k : eval_seq_arg(src_path, a) for k, a in bindings_for_format(dep_path, kwargs) }
+      #^ pulls out the keyword argument AST nodes that match the format string,
+      #^ then statically evaluate them.
+    else:
+      if call.keywords:
+        raise node_error(src_path, call, f'unexpected keyword arguments')
+      seqs = {}
+    try:
+      for path, _ in paths_from_format(format_path=dep_path, seqs=seqs, partial=True):
+        yield path
+    except Exception as e:
+      raise node_error(src_path, arg0, e.args[0]) from e
+
   for node in ast.walk(tree):
     if isinstance(node, ast.Call):
-      yield from py_dep_call(src_path, node)
+      yield from walk_call(node)
     elif isinstance(node, ast.Import):
       for alias in node.names:
-        yield from py_dep_import(src_path, alias.name, dir_names)
+        yield from walk_import(alias.name, dir_names)
     elif isinstance(node, ast.ImportFrom):
-      yield from py_dep_import(src_path, node.module, dir_names)
-
-
-def py_dep_import(src_path, module_name, dir_names):
-  'Calculate dependencies for a Python ast.Import or ast.ImportFrom node.'
-  src_dir = path_dir(src_path)
-  leading_dots_count = re.match('\.*', module_name).end()
-  module_parts = ['..'] * leading_dots_count + module_name[leading_dots_count:].split('.')
-  module_path = path_join(src_dir, *module_parts) + '.py'
-  if is_file(module_path):
-    yield module_path
-
-
-def py_dep_call(src_path, call):
-  'Calculate dependencies for a Python ast.Call node.'
-  func = call.func
-  if not isinstance(func, ast.Attribute): return
-  if not isinstance(func.value, ast.Name): return
-  # TODO: dispatch to handlers for all known functions.
-  # TDOO: add handler for source_url to check that repeated (url, target) pairs are consistent across entire project.
-  if func.value.id != 'muck': return
-  name = func.attr
-  if name not in dep_fn_names: return
-  if len(call.args) < 1:
-    raise node_error(src_path, call, 'first argument must be a string literal; found no arguments')
-  arg0 = call.args[0]
-  if not isinstance(arg0, ast.Str):
-    raise node_error(src_path, arg0, f'first argument must be a string literal; found {type(arg0).__name__}')
-  dep_path = arg0.s # the string value from the ast.Str literal.
-  if name == load_many.__name__:
-    kwargs = { kw.arg : kw.value for kw in call.keywords }
-    seqs = { k : eval_seq_arg(src_path, a) for k, a in bindings_for_format(dep_path, kwargs) }
-    #^ pulls out the keyword argument AST nodes that match the format string,
-    #^ then statically evaluate them.
-  else:
-    if call.keywords:
-      raise node_error(src_path, call, f'unexpected keyword arguments')
-    seqs = {}
-  try:
-    for path, _ in paths_from_format(format_path=dep_path, seqs=seqs, partial=True):
-      yield path
-  except Exception as e:
-    raise node_error(src_path, arg0, e.args[0]) from e
+      yield from walk_import(node.module, dir_names)
 
 
 def eval_seq_arg(src_path, arg):

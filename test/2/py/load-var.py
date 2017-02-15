@@ -1,4 +1,4 @@
-import muck
+from muck import *
 
 x = 'x.txt'
-muck.load(x)
+load(x)

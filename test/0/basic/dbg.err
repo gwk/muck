@@ -51,7 +51,7 @@
 | muck dbg: basic/module-import.txt: update_product
 | muck dbg: basic/module-import.txt: src: basic/module-import.txt.py
 | muck dbg: basic/module-import.txt.py: examining... (dependent=basic/module-import.txt)
-~ muck dbg: basic/module-import.txt.py: size: 79; mtime: .+
+~ muck dbg: basic/module-import.txt.py: size: 137; mtime: .+
 | muck dbg: basic/module-import.txt.py: update_non_product
 | muck dbg: basic/module-import.txt.py: update_deps_and_record
 | muck dbg: basic/module-import.txt: update_deps_and_record

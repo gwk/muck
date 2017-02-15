@@ -1,3 +1,4 @@
+# test `import muck`, as opposed to `from muck import *`.
 
 import muck
 

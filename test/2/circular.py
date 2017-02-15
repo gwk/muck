@@ -1,3 +1,3 @@
-import muck
+from muck import *
 
-muck.load('circular')
+load('circular')
