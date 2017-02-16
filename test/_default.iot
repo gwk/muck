@@ -1,6 +1,7 @@
 {
   'coverage': [
     '__main__',
+    'muck',
     'muck.__init__',
     'muck.constants',
     'muck.db',
