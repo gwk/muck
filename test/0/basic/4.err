@@ -1,6 +1,6 @@
-muck note: basic/b.txt: building: `python3.6 basic/b.txt.py`
-muck note: basic/b.txt: finished: (via stdout).
-muck note: basic/b.txt: product changed; 19 B.
-muck note: basic/index.html: building: `writeup basic/index.html.wu`
-muck note: basic/index.html: finished: (via stdout).
-muck note: basic/index.html: product did not change; 5.194 kB.
+muck note: b.txt: building: `python3.6 b.txt.py`
+muck note: b.txt: finished: (via stdout).
+muck note: b.txt: product changed; 19 B.
+muck note: index.html: building: `writeup index.html.wu`
+muck note: index.html: finished: (via stdout).
+muck note: index.html: product did not change; 5.144 kB.

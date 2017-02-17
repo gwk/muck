@@ -2,4 +2,4 @@
 
 import muck
 
-print('module-import loaded:', muck.load('basic/a.txt'), end='')
+print('module-import loaded:', muck.load('a.txt').read(), end='')

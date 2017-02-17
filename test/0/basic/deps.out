@@ -1,20 +1,20 @@
 
-basic/a.txt (dependents: basic/index.html.wu basic/module-import.txt.py):
+a.txt (dependents: index.html.wu module-import.txt.py):
 
-basic/d.txt (dependents: basic/b.txt.py basic/c.txt.py):
-  basic/d.txt.py:
-    basic/basic_lib.py
+d.txt (dependents: b.txt.py c.txt.py):
+  d.txt.py:
+    basic_lib.py
 
-basic/index.html:
-  basic/index.html.wu:
-    basic/a.txt*
-    basic/b.txt:
-      basic/b.txt.py:
-        basic/d.txt*
-    basic/c.txt:
-      basic/c.txt.py:
-        basic/c.txt.py.py
-        basic/d.txt*
-    basic/module-import.txt:
-      basic/module-import.txt.py:
-        basic/a.txt*
+index.html:
+  index.html.wu:
+    a.txt*
+    b.txt:
+      b.txt.py:
+        d.txt*
+    c.txt:
+      c.txt.py:
+        c.txt.py.py
+        d.txt*
+    module-import.txt:
+      module-import.txt.py:
+        a.txt*

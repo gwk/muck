@@ -1,11 +1,19 @@
 {
   'desc': 'initial',
-  'cmd': '$MUCK -no-times basic/index.html',
+  'cmd': '$MUCK -no-times',
   'code': 0,
   'files': {
-    '_build/basic/index.html' : {
+    '_build/index.html' : {
       'path': 'test/0/basic/index-exp.html'
     },
   },
-  'links': { 'test/0/basic' }
+  'links': {
+    'test/0/basic/a.txt',
+    'test/0/basic/b.txt.py',
+    'test/0/basic/basic_lib.py',
+    'test/0/basic/c.txt.py.py',
+    'test/0/basic/d.txt.py',
+    'test/0/basic/index.html.wu',
+    'test/0/basic/module-import.txt.py',
+  }
 }
