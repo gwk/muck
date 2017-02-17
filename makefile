@@ -25,7 +25,7 @@ pip-uninstall:
 pypi-dist:
 	python3 setup.py sdist
 
-pypi-upload: pypi-dist
+pypi-upload:
 	python3 setup.py sdist upload
 
 test:
