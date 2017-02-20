@@ -14,6 +14,7 @@
     'test/0/basic/c.txt.py.py',
     'test/0/basic/d.txt.py',
     'test/0/basic/index.html.wu',
+    'test/0/basic/linked-src.html',
     'test/0/basic/module-import.txt.py',
   }
 }

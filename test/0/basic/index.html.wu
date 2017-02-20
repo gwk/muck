@@ -16,3 +16,6 @@ writeup v0
 
 ## This script uses `import muck` rather than using `from muck import *`.
 <embed: module-import.txt>
+
+## Link to a source document. This requires that Muck symlink sources into the build directory.
+<link: linked-src.html>

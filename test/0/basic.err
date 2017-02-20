@@ -15,4 +15,4 @@ muck note: module-import.txt: finished: (via stdout).
 muck note: module-import.txt: product changed; 42 B.
 muck note: index.html: building: `writeup index.html.wu`
 muck note: index.html: finished: (via stdout).
-muck note: index.html: product changed; 5.144 kB.
+muck note: index.html: product changed; 5.388 kB.

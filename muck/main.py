@@ -337,7 +337,9 @@ def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str):
 def update_non_product(ctx: Ctx, target_path: str, is_changed: bool, size, mtime, old) -> bool:
   ctx.dbg(target_path, 'update_non_product')
   file_hash = hash_for_path(target_path, size, max_hash_size) # must be calculated in all cases.
-  if not is_changed: # all we know so far is that it exists and status as a source has not changed.
+  if is_changed:
+    make_link(target_path, product_path_for_target(target_path), make_dirs=True)
+  else: # all we know so far is that it exists and status as a source has not changed.
     is_changed = (size != old.size or file_hash != old.hash)
     if is_changed: # this is more interesting; report.
       note(target_path, 'source changed.')
