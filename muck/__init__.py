@@ -24,7 +24,7 @@ from .pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, pat
 from .pithy.json_utils import load_json, load_jsonl, load_jsons
 from .pithy.transform import Transformer
 
-from .constants import build_dir, build_dir_slash, tmp_ext
+from .constants import tmp_ext
 from .paths import actual_path_for_target, bindings_for_format, bindings_from_argv, dst_path, manifest_path, paths_from_format, product_path_for_source
 
 
