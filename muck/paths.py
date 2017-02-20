@@ -71,11 +71,8 @@ def product_path_for_target(target_path):
 
 def product_path_for_source(source_path):
   'Retern the product path for `sourc_path` (which may itself be a product).'
-  path = path_stem(source_path) # strip off source ext.
-  if is_product_path(path): # source might be a product.
-    return path
-  else:
-    return path_join(build_dir, path)
+  assert not is_product_path(source_path)
+  return path_stem(source_path) # strip off source ext.
 
 
 def target_path_for_source(source_path):

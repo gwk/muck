@@ -17,7 +17,9 @@ cov:
 	iotest -fail-fast -coverage
 
 docs:
-	writeup doc/index.html.wu docs/index.html
+	(cd doc && muck)
+	rm docs/*
+	cp doc/_build/*.html docs
 
 pip-develop:
 	pip3 install -e .

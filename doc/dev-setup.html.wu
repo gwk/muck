@@ -1,0 +1,35 @@
+writeup v0
+
+# Developer Setup
+
+This is a somewhat anecdotal guide to running muck on various platforms. Muck is developed principally on macOS 10.12, but has been successfully used with Ubuntu Linux as well, including the Ubuntu shell in Windows 10.
+
+# Installation on Ubuntu.
+
+Basic requirements:
+| $ sudo apt-get install git
+
+Need python3.5 and pip:
+| $ sudo apt-get python3.5
+
+If you are using an older version of Ubuntu (e.g. 14.04), the python3.5 package may not be available by default.
+In that case you can rely on Felix Krull's `deadsnakes` PPA (personal package archive):
+| $ sudo add-apt-repository ppa:fkrull/deadsnakes
+| $ sudo apt-get update
+| $ sudo apt-get install python3.5
+
+Install pip for python3.5. Note that you might already have a pip3, but this will install libraries into your system python3.
+| $ curl -O https://bootstrap.pypa.io/get-pip.py
+| $ python3.5 ./get-pip.py
+| $ rm get-pip.py
+
+Check out each of the repositories, side-by-side in a directory of your choice, e.g. '~/work'.
+Use pip3.5 to install each python package in "editable" (developer) mode.
+| $ for repo in pithy utest iotest pat writeup muck; do
+| $   git clone git@github.com:gwk/$repo.git
+| $   pip3.5 install -e $repo # might need to be run with sudo.
+| $ done
+
+Fetch the submodules and install the dependencies:
+| $ git submodule update --init --recursive
+| $ pip3 install --upgrade -r requirements.txt

@@ -25,7 +25,7 @@ from .pithy.json_utils import load_json, load_jsonl, load_jsons
 from .pithy.transform import Transformer
 
 from .constants import tmp_ext
-from .paths import actual_path_for_target, bindings_for_format, bindings_from_argv, dst_path, manifest_path, paths_from_format, product_path_for_source
+from .paths import bindings_for_format, bindings_from_argv, dst_path, manifest_path, paths_from_format
 
 
 # module exports.
@@ -72,14 +72,7 @@ def open_dep(target_path, binary=False, buffering=-1, encoding=None, errors=None
   Muck's static analysis looks specifically for this function to infer dependencies;
   `target_path` must be a string literal.
   '''
-  path = actual_path_for_target(target_path)
-  try:
-    return open(path, mode=('rb' if binary else 'r'), buffering=buffering, encoding=encoding, errors=errors, newline=newline)
-  except FileNotFoundError:
-    errL(f'muck.open_dep cannot open path: {path}')
-    if path != target_path:
-      errL(f'note: nor does a file exist at source path: {target_path}')
-    raise
+  return open(target_path, mode=('rb' if binary else 'r'), buffering=buffering, encoding=encoding, errors=errors, newline=newline)
 
 
 _loaders = {}

@@ -7,7 +7,7 @@ muck note: b.txt: product changed; 19 B.
 muck note: c.txt.py: building: `python3.6 c.txt.py.py`
 muck note: c.txt.py: finished: (via stdout).
 muck note: c.txt.py: product changed; 111 B.
-muck note: c.txt: building: `python3.6 _build/c.txt.py`
+muck note: c.txt: building: `python3.6 c.txt.py`
 muck note: c.txt: finished: (via stdout).
 muck note: c.txt: product changed; 19 B.
 muck note: module-import.txt: building: `python3.6 module-import.txt.py`

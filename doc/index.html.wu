@@ -36,7 +36,7 @@ For more information, see: <http://askubuntu.com/questions/682869/how-do-i-insta
 Muck should be installable with a single command: `pip3 install muck`. Once installed, it should be available on the command line. If it is not, it may be that the `PATH` environment variable in your shell is not configured to point to console scripts installed by pip.
 
 ## Development
-See <link:docs/dev-setup.html dev-setup>.
+See <link:dev-setup.html dev-setup>.
 
 # Usage
 

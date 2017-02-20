@@ -292,8 +292,7 @@ def update_product(ctx: Ctx, target: str, actual_path, is_changed, size, mtime, 
     is_changed |= update_dependency(ctx, sub_dep, dependent=target)
 
   if is_changed: # must rebuild product.
-    actual_src = actual_path_for_target(src) # source might itself be a product.
-    tmp_paths = build_product(ctx, target, actual_src, actual_path)
+    tmp_paths = build_product(ctx, target, src, actual_path)
     ctx.dbg(target, f'tmp_paths: {tmp_paths}')
     if tmp_paths:
       is_changed = False # now determine if any product has actually changed.
@@ -339,7 +338,9 @@ def update_non_product(ctx: Ctx, target: str, is_changed: bool, size, mtime, old
   ctx.dbg(target, 'update_non_product')
   file_hash = hash_for_path(target, size, max_hash_size) # must be calculated in all cases.
   if is_changed:
-    make_link(target, product_path_for_target(target), make_dirs=True)
+    product = product_path_for_target(target)
+    remove_file_if_exists(product)
+    make_link(target, product, make_dirs=True)
   else: # all we know so far is that it exists and status as a source has not changed.
     is_changed = (size != old.size or file_hash != old.hash)
     if is_changed: # this is more interesting; report.
@@ -471,7 +472,7 @@ def build_product(ctx, target: str, src_path: str, prod_path: str) -> bool:
   note(target, f"building: `{' '.join(shlex.quote(w) for w in cmd)}`")
   out_file = open(prod_path_out, 'wb')
   time_start = time.time()
-  code = runC(cmd, env=env, out=out_file)
+  code = runC(cmd, cwd=build_dir, env=env, out=out_file)
   time_elapsed = time.time() - time_start
   out_file.close()
   if code != 0:
@@ -483,21 +484,23 @@ def build_product(ctx, target: str, src_path: str, prod_path: str) -> bool:
     else:
       warn(target, f'wrote data directly to `{prod_path_tmp}`;\n  ignoring output captured in `{prod_path_out}`')
 
-  manif_path = manifest_path(argv)
+  manif_path = build_dir_slash + manifest_path(argv)
   try: f = open(manif_path)
-  except FileNotFoundError: # no list.
-    if not path_exists(prod_path_tmp):
-      via = 'stdout'
-      tmp_paths = [prod_path_out]
-    else:
+  except FileNotFoundError: # no manifest.
+    if path_exists(prod_path_tmp):
       via = 'tmp'
       tmp_paths = [prod_path_tmp]
       cleanup_out()
-  else:
+    else: # no tmp; use captured stdout.
+      via = 'stdout'
+      tmp_paths = [prod_path_out]
+  else: # found manifest.
     via = 'manifest'
-    tmp_paths = list(line[:-1] for line in f) # strip newlines.
+    tmp_paths = list(product_path_for_target(line.rstrip('\n')) for line in f)
     cleanup_out()
     if prod_path_tmp not in tmp_paths:
+      errL('prod_path_tmp: ', prod_path_tmp)
+      errSL(*tmp_paths)
       error(target, f'product does not appear in manifest ({len(tmp_paths)} records): {manif_path}')
     remove_file(manif_path)
   time_msg = f'{time_elapsed:0.2f} seconds ' if ctx.report_times else ''
