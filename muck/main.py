@@ -90,9 +90,9 @@ def main():
 
 Ctx = namedtuple('Ctx', 'db statuses dir_names dependents report_times dbg')
 # db: DB.
-# statuses: dict (target_path: str => is_changed: bool|Ellipsis).
+# statuses: dict (target: str => is_changed: bool|Ellipsis).
 # dir_names: dict (dir_path: str => names: [str]).
-# dependents: defaultdict(set) (target_path: str => depedents).
+# dependents: defaultdict(set) (target: str => depedents).
 # report_times: bool.
 # dbg: debug printing function.
 
@@ -109,12 +109,12 @@ def muck_clean(ctx, args):
   '`muck -clean [targets...]` command.'
   assert args
   for target in args:
-    if not ctx.db.contains_record(target_path=target):
+    if not ctx.db.contains_record(target=target):
       errFL('muck clean note: {}: skipping unknown target.', target)
       continue
     prod_path = product_path_for_target(target)
     remove_file_if_exists(prod_path)
-    ctx.db.delete_record(target_path=target)
+    ctx.db.delete_record(target=target)
 
 
 def muck_deps(ctx, targets):
@@ -193,16 +193,16 @@ The patch file will be updated with the diff of the previously specified origina
   orig_target_path = deps[0]
   update_dependency(ctx, orig_target_path, dependent=None)
   orig_path = actual_path_for_target(orig_target_path)
-  target_path = path_stem(patch_path)
-  prod_path = product_path_for_target(target_path)
+  target = path_stem(patch_path)
+  prod_path = product_path_for_target(target)
   patch_path_tmp = patch_path + tmp_ext
   cmd = ['pat', 'diff', orig_path, prod_path, patch_path_tmp]
   errFL('muck -update-patch note: diffing: `{}`', ' '.join(shlex.quote(w) for w in cmd))
   code = runC(cmd)
   # need to remove or update the target record to avoid the 'did you mean to patch?' safeguard.
   # for now, just delete it to be safe; this makes the target look stale.
-  # TODO: update target_path instead.
-  ctx.db.delete_record(target_path=target_path) # no-op if does not exist.
+  # TODO: update target instead.
+  ctx.db.delete_record(target=target) # no-op if does not exist.
 
 
 command_fns = {
@@ -216,31 +216,31 @@ command_fns = {
 # Default update functionality.
 
 
-def update_dependency(ctx: Ctx, target_path: str, dependent: Optional[str], force=False) -> bool:
+def update_dependency(ctx: Ctx, target: str, dependent: Optional[str], force=False) -> bool:
   '''
   returns is_changed.
   '''
-  validate_target(target_path)
+  validate_target(target)
 
   if dependent is not None:
-    ctx.dependents[target_path].add(dependent)
+    ctx.dependents[target].add(dependent)
 
   try: # if in ctx.statuses, this path has already been visited on this run.
-    status = ctx.statuses[target_path]
+    status = ctx.statuses[target]
     if status is Ellipsis: # recursion sentinal.
       involved_paths = sorted(path for path, status in ctx.statuses.items() if status is Ellipsis)
-      error(target_path, 'target has circular dependency; involved paths:', *('\n  ' + p for p in involved_paths))
+      error(target, 'target has circular dependency; involved paths:', *('\n  ' + p for p in involved_paths))
     return status
   except KeyError: pass
 
-  ctx.statuses[target_path] = Ellipsis # recursion sentinal is replaced before return.
+  ctx.statuses[target] = Ellipsis # recursion sentinal is replaced before return.
 
-  ctx.dbg(target_path, f'examining... (dependent={dependent})')
-  is_product = not path_exists(target_path)
-  if is_product and is_link(target_path):
-    error(target_path, f'target is a dangling symlink to: {read_link(target_path)}')
-  actual_path = product_path_for_target(target_path) if is_product else target_path
-  size, mtime, old = calc_size_mtime_old(ctx, target_path, actual_path)
+  ctx.dbg(target, f'examining... (dependent={dependent})')
+  is_product = not path_exists(target)
+  if is_product and is_link(target):
+    error(target, f'target is a dangling symlink to: {read_link(target)}')
+  actual_path = product_path_for_target(target) if is_product else target
+  size, mtime, old = calc_size_mtime_old(ctx, target, actual_path)
   has_old_file = (mtime > 0)
   has_old_record = not is_empty_record(old)
 
@@ -249,20 +249,20 @@ def update_dependency(ctx: Ctx, target_path: str, dependent: Optional[str], forc
   if has_old_record:
     old_is_product = (old.src is not None)
     if is_product != old_is_product: # nature of the target changed.
-      note(target_path, f"target is {'now' if is_product else 'no longer'} a product.")
+      note(target, f"target is {'now' if is_product else 'no longer'} a product.")
       is_changed = True
     if not has_old_file:
-      note(target_path, 'old product was deleted.')
+      note(target, 'old product was deleted.')
 
   if is_product:
     if has_old_file and has_old_record:
-      check_product_not_modified(ctx, target_path, actual_path, size=size, mtime=mtime, old=old)
-    return update_product(ctx, target_path, actual_path, is_changed=is_changed, size=size, mtime=mtime, old=old)
+      check_product_not_modified(ctx, target, actual_path, size=size, mtime=mtime, old=old)
+    return update_product(ctx, target, actual_path, is_changed=is_changed, size=size, mtime=mtime, old=old)
   else:
-    return update_non_product(ctx, target_path, is_changed=is_changed, size=size, mtime=mtime, old=old)
+    return update_non_product(ctx, target, is_changed=is_changed, size=size, mtime=mtime, old=old)
 
 
-def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
+def check_product_not_modified(ctx, target, actual_path, size, mtime, old):
   # existing product should not have been modified since record was stored.
   # if the size changed then it was definitely modified.
   # otherwise, if the mtime is unchanged, assume that the file is ok, for speed.
@@ -271,30 +271,30 @@ def check_product_not_modified(ctx, target_path, actual_path, size, mtime, old):
   # and we would rather compute the hash than report a false problem.
   if size != old.size or (mtime != old.mtime and
     (size > max_hash_size or hash_for_path(actual_path, size, max_hash_size) != old.hash)):
-    ctx.dbg(target_path, f'size: {old.size} -> {size}; mtime: {old.mtime} -> {mtime}')
+    ctx.dbg(target, f'size: {old.size} -> {size}; mtime: {old.mtime} -> {mtime}')
     # TODO: change language depending on whether product is derived from a patch?
-    error(target_path, 'existing product has changed; did you mean to update a patch?\n'
-      f'  Otherwise, save your changes if necessary and then `muck clean {target_path}`.')
+    error(target, 'existing product has changed; did you mean to update a patch?\n'
+      f'  Otherwise, save your changes if necessary and then `muck clean {target}`.')
 
 
-def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mtime, old) -> bool:
-  ctx.dbg(target_path, 'update_product')
-  src = source_for_target(ctx, target_path)
+def update_product(ctx: Ctx, target: str, actual_path, is_changed, size, mtime, old) -> bool:
+  ctx.dbg(target, 'update_product')
+  src = source_for_target(ctx, target)
   validate_target_or_error(src)
-  ctx.dbg(target_path, f'src: {src}')
+  ctx.dbg(target, f'src: {src}')
   if old.src != src:
     is_changed = True
     if old.src:
-      note(target_path, f'source path of target product changed\n  was: {old.src}\n  now: {src}')
-  is_changed |= update_dependency(ctx, src, dependent=target_path)
+      note(target, f'source path of target product changed\n  was: {old.src}\n  now: {src}')
+  is_changed |= update_dependency(ctx, src, dependent=target)
 
-  for sub_dep in expanded_wild_deps(ctx, target_path, src):
-    is_changed |= update_dependency(ctx, sub_dep, dependent=target_path)
+  for sub_dep in expanded_wild_deps(ctx, target, src):
+    is_changed |= update_dependency(ctx, sub_dep, dependent=target)
 
   if is_changed: # must rebuild product.
     actual_src = actual_path_for_target(src) # source might itself be a product.
-    tmp_paths = build_product(ctx, target_path, actual_src, actual_path)
-    ctx.dbg(target_path, f'tmp_paths: {tmp_paths}')
+    tmp_paths = build_product(ctx, target, actual_src, actual_path)
+    ctx.dbg(target, f'tmp_paths: {tmp_paths}')
     if tmp_paths:
       is_changed = False # now determine if any product has actually changed.
       for tmp_path in tmp_paths:
@@ -303,7 +303,7 @@ def update_product(ctx: Ctx, target_path: str, actual_path, is_changed, size, mt
     size, mtime, file_hash = 0, 0, None # no product.
   else: # not is_changed.
     file_hash = old.hash
-  return update_deps_and_record(ctx, target_path, actual_path,
+  return update_deps_and_record(ctx, target, actual_path,
     is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=src, old=old)
 
 
@@ -322,52 +322,52 @@ def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str):
     error(tmp_path, f'product output path has unexpected extension: {ext!r}')
   if not is_product_path(product_path):
      error(product_path, 'product path is not in build dir.')
-  target_path = product_path[len(build_dir_slash):]
-  size, mtime, old = calc_size_mtime_old(ctx, target_path, tmp_path)
+  target = product_path[len(build_dir_slash):]
+  size, mtime, old = calc_size_mtime_old(ctx, target, tmp_path)
   file_hash = hash_for_path(tmp_path, size, max_hash_size)
   is_changed = (size != old.size or size > max_hash_size or file_hash != old.hash)
   if is_changed:
-    ctx.db.delete_record(target_path=target_path) # delete metadata if it exists, just before overwrite, in case muck fails before update.
+    ctx.db.delete_record(target=target) # delete metadata if it exists, just before overwrite, in case muck fails before update.
   move_file(tmp_path, product_path, overwrite=True) # move regardless; if not changed, just cleans up the identical tmp file.
-  note(target_path, f"product {'changed' if is_changed else 'did not change'}; {format_byte_count(size)}.")
-  return update_deps_and_record(ctx, target_path, product_path,
+  note(target, f"product {'changed' if is_changed else 'did not change'}; {format_byte_count(size)}.")
+  return update_deps_and_record(ctx, target, product_path,
     is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=src, old=old)
 
 
-def update_non_product(ctx: Ctx, target_path: str, is_changed: bool, size, mtime, old) -> bool:
-  ctx.dbg(target_path, 'update_non_product')
-  file_hash = hash_for_path(target_path, size, max_hash_size) # must be calculated in all cases.
+def update_non_product(ctx: Ctx, target: str, is_changed: bool, size, mtime, old) -> bool:
+  ctx.dbg(target, 'update_non_product')
+  file_hash = hash_for_path(target, size, max_hash_size) # must be calculated in all cases.
   if is_changed:
-    make_link(target_path, product_path_for_target(target_path), make_dirs=True)
+    make_link(target, product_path_for_target(target), make_dirs=True)
   else: # all we know so far is that it exists and status as a source has not changed.
     is_changed = (size != old.size or file_hash != old.hash)
     if is_changed: # this is more interesting; report.
-      note(target_path, 'source changed.')
+      note(target, 'source changed.')
 
-  return update_deps_and_record(ctx, target_path, target_path,
+  return update_deps_and_record(ctx, target, target,
     is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=None, old=old)
 
 
-def update_deps_and_record(ctx, target_path: str, actual_path: str,
+def update_deps_and_record(ctx, target: str, actual_path: str,
   is_changed: bool, size: int, mtime: int, file_hash: Optional[str], src: str, old: TargetRecord) -> bool:
-  ctx.dbg(target_path, 'update_deps_and_record')
+  ctx.dbg(target, 'update_deps_and_record')
   if is_changed:
     deps, wild_deps = calc_dependencies(actual_path, ctx.dir_names)
     for dep in deps:
       try: validate_target(dep)
       except InvalidTarget as e:
-        exit(f'muck error: {target_path}: invalid dependency: {e.target!r}: {e.msg}')
+        exit(f'muck error: {target}: invalid dependency: {e.target!r}: {e.msg}')
       # TODO: validate wild_deps? how?
   else:
     deps = old.deps
     wild_deps = old.wild_deps
   for dep in deps:
-    is_changed |= update_dependency(ctx, dep, dependent=target_path)
+    is_changed |= update_dependency(ctx, dep, dependent=target)
 
-  ctx.statuses[target_path] = is_changed # replace sentinal with final value.
+  ctx.statuses[target] = is_changed # replace sentinal with final value.
   if is_changed:
-    record = TargetRecord(path=target_path, size=size, mtime=mtime, hash=file_hash, src=src, deps=deps, wild_deps=wild_deps)
-    ctx.dbg(target_path, f'updated record:\n  {record}')
+    record = TargetRecord(path=target, size=size, mtime=mtime, hash=file_hash, src=src, deps=deps, wild_deps=wild_deps)
+    ctx.dbg(target, f'updated record:\n  {record}')
     if is_empty_record(old):
       ctx.db.insert_record(record)
     else:
@@ -430,7 +430,7 @@ dependency_fns = {
 # Build.
 
 
-def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
+def build_product(ctx, target: str, src_path: str, prod_path: str) -> bool:
   '''
   Run a source file, producing zero or more products.
   Return a list of produced product paths.
@@ -440,23 +440,23 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
     build_tool = build_tools[src_ext]
   except KeyError:
     # TODO: fall back to generic .deps file.
-    error(target_path, f'unsupported source file extension: {src_ext!r}')
+    error(target, f'unsupported source file extension: {src_ext!r}')
   prod_path_out = prod_path + out_ext
   prod_path_tmp = prod_path + tmp_ext
   remove_file_if_exists(prod_path_out)
   remove_file_if_exists(prod_path_tmp)
 
   if not build_tool:
-    note(target_path, 'no op.')
+    note(target, 'no op.')
     return False # no product.
 
   prod_dir = path_dir(prod_path)
   make_dirs(prod_dir)
 
   # Extract args from the combination of wilds in the source and the matching target.
-  m = match_wilds(target_path_for_source(src_path), target_path)
+  m = match_wilds(target_path_for_source(src_path), target)
   if m is None:
-    error(target_path, f'internal error: match failed; src_path: {src_path!r}')
+    error(target, f'internal error: match failed; src_path: {src_path!r}')
   argv = [src_path] + list(m.groups())
   cmd = build_tool + argv
 
@@ -467,20 +467,20 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
     custom_env = env_fn()
     env.update(custom_env)
 
-  note(target_path, f"building: `{' '.join(shlex.quote(w) for w in cmd)}`")
+  note(target, f"building: `{' '.join(shlex.quote(w) for w in cmd)}`")
   out_file = open(prod_path_out, 'wb')
   time_start = time.time()
   code = runC(cmd, env=env, out=out_file)
   time_elapsed = time.time() - time_start
   out_file.close()
   if code != 0:
-    error(target_path, f'build failed with code: {code}')
+    error(target, f'build failed with code: {code}')
 
   def cleanup_out():
     if file_size(prod_path_out) == 0:
       remove_file(prod_path_out)
     else:
-      warn(target_path, f'wrote data directly to `{prod_path_tmp}`;\n  ignoring output captured in `{prod_path_out}`')
+      warn(target, f'wrote data directly to `{prod_path_tmp}`;\n  ignoring output captured in `{prod_path_out}`')
 
   manif_path = manifest_path(argv)
   try: f = open(manif_path)
@@ -497,10 +497,10 @@ def build_product(ctx, target_path: str, src_path: str, prod_path: str) -> bool:
     tmp_paths = list(line[:-1] for line in f) # strip newlines.
     cleanup_out()
     if prod_path_tmp not in tmp_paths:
-      error(target_path, f'product does not appear in manifest ({len(tmp_paths)} records): {manif_path}')
+      error(target, f'product does not appear in manifest ({len(tmp_paths)} records): {manif_path}')
     remove_file(manif_path)
   time_msg = f'{time_elapsed:0.2f} seconds ' if ctx.report_times else ''
-  note(target_path, f'finished: {time_msg}(via {via}).')
+  note(target, f'finished: {time_msg}(via {via}).')
   return tmp_paths
 
 
@@ -560,13 +560,13 @@ def hash_string(hash: bytes) -> str:
   return base64.urlsafe_b64encode(hash).decode()
 
 
-def calc_size_mtime_old(ctx: Ctx, target_path: str, actual_path: str) -> tuple:
+def calc_size_mtime_old(ctx: Ctx, target: str, actual_path: str) -> tuple:
   try:
     size, mtime = file_size_and_mtime(actual_path)
   except FileNotFoundError:
     size, mtime = 0, 0
-  ctx.dbg(target_path, f'size: {size}; mtime: {mtime}')
-  return size, mtime, ctx.db.get_record(target_path=target_path)
+  ctx.dbg(target, f'size: {size}; mtime: {mtime}')
+  return size, mtime, ctx.db.get_record(target=target)
 
 
 def file_size_and_mtime(path):
@@ -574,30 +574,30 @@ def file_size_and_mtime(path):
   return (stats.st_size, stats.st_mtime)
 
 
-def source_for_target(ctx, target_path):
+def source_for_target(ctx, target):
   '''
-  Find the unique source path whose name matches `target_path`, or else error.
+  Find the unique source path whose name matches `target`, or else error.
   '''
-  src_dir, prod_name = split_dir_name(target_path)
-  src_name = source_candidate(ctx, target_path, src_dir, prod_name)
+  src_dir, prod_name = split_dir_name(target)
+  src_name = source_candidate(ctx, target, src_dir, prod_name)
   src = path_join(src_dir, src_name)
-  assert src != target_path
+  assert src != target
   return src
 
 
-def source_candidate(ctx, target_path, src_dir, prod_name):
+def source_candidate(ctx, target, src_dir, prod_name):
   src_dir = src_dir or '.'
   try: src_dir_names = list_dir_filtered(src_dir, cache=ctx.dir_names)
-  except FileNotFoundError: error(target_path, f'no such source directory: `{src_dir}`')
+  except FileNotFoundError: error(target, f'no such source directory: `{src_dir}`')
   candidates = list(filter_source_names(src_dir_names, prod_name))
   if len(candidates) == 1:
     return candidates[0]
   # error.
-  deps = ', '.join(sorted(ctx.dependents[target_path])) or target_path
+  deps = ', '.join(sorted(ctx.dependents[target])) or target
   if len(candidates) == 0:
-    error(deps, f'no source candidates matching `{target_path}` in `{src_dir}`')
+    error(deps, f'no source candidates matching `{target}` in `{src_dir}`')
   else:
-    error(deps, f'multiple source candidates matching `{target_path}`: {candidates}')
+    error(deps, f'multiple source candidates matching `{target}`: {candidates}')
 
 
 def list_dir_filtered(src_dir, cache):

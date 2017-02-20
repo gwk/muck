@@ -23,8 +23,8 @@ TargetRecord format:
 '''
 
 
-def empty_record(target_path):
-  return TargetRecord(path=target_path, size=0, mtime=0, hash=None, src=None, deps=(), wild_deps=())
+def empty_record(target):
+  return TargetRecord(path=target, size=0, mtime=0, hash=None, src=None, deps=(), wild_deps=())
 
 
 def is_empty_record(record):
@@ -78,23 +78,23 @@ class DB:
         errSL('  ', *['{k}:{v!r}' for k, v in zip(row.keys(), row)])
 
 
-  def contains_record(self, target_path):
-    c = self.run('SELECT COUNT(*) FROM targets WHERE path=:path', path=target_path)
+  def contains_record(self, target):
+    c = self.run('SELECT COUNT(*) FROM targets WHERE path=:path', path=target)
     count = c.fetchone()[0]
     return bool(count)
 
 
-  def get_record(self, target_path):
-    c = self.run('SELECT * FROM targets WHERE path=:path', path=target_path)
+  def get_record(self, target):
+    c = self.run('SELECT * FROM targets WHERE path=:path', path=target)
     rows = c.fetchall()
     if len(rows) > 1:
-      raise DBError(f'multiple rows matching target path: {target_path!r}') #!cov-ignore.
+      raise DBError(f'multiple rows matching target path: {target!r}') #!cov-ignore.
     if rows:
       r = rows[0]
-      return TargetRecord(target_path, r[idx_size], r[idx_mtime], r[idx_hash], r[idx_src],
+      return TargetRecord(target, r[idx_size], r[idx_mtime], r[idx_hash], r[idx_src],
         from_marshalled(r[idx_deps]), from_marshalled(r[idx_wild_deps]))
     else:
-      return empty_record(target_path)
+      return empty_record(target)
 
 
   def update_record(self, record: TargetRecord):
@@ -113,7 +113,7 @@ class DB:
       raise DBError(f'insert_record: target path is not unique: {record.path}') from e
 
 
-  def delete_record(self, target_path: str):
-    self.run('DELETE FROM targets WHERE path=:path', path=target_path)
+  def delete_record(self, target: str):
+    self.run('DELETE FROM targets WHERE path=:path', path=target)
 
 
