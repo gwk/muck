@@ -298,13 +298,14 @@ def update_product(ctx: Ctx, target: str, actual_path, is_changed, size, mtime, 
     if tmp_paths:
       is_changed = False # now determine if any product has actually changed.
       for tmp_path in tmp_paths:
-        is_changed |= update_product_with_tmp(ctx, src, tmp_path)
+        is_changed |= update_product_with_tmp(ctx, src=src, tmp_path=tmp_path)
       return is_changed
-    size, mtime, file_hash = 0, 0, None # no product.
+    else: # no tmp paths; this is a weird corner case that we always treat as changed.
+      return update_deps_and_record(ctx, target=target, actual_path=actual_path,
+        is_changed=True, size=0, mtime=0, file_hash=None, src=src, old=old)
   else: # not is_changed.
-    file_hash = old.hash
-  return update_deps_and_record(ctx, target, actual_path,
-    is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=src, old=old)
+    return update_deps_and_record(ctx, target=target, actual_path=actual_path,
+      is_changed=is_changed, size=size, mtime=mtime, file_hash=old.hash, src=src, old=old)
 
 
 def expanded_wild_deps(ctx, target, src):
@@ -330,7 +331,7 @@ def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str):
     ctx.db.delete_record(target=target) # delete metadata if it exists, just before overwrite, in case muck fails before update.
   move_file(tmp_path, product_path, overwrite=True) # move regardless; if not changed, just cleans up the identical tmp file.
   note(target, f"product {'changed' if is_changed else 'did not change'}; {format_byte_count(size)}.")
-  return update_deps_and_record(ctx, target, product_path,
+  return update_deps_and_record(ctx, target=target, actual_path=product_path,
     is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=src, old=old)
 
 
