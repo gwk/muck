@@ -9,25 +9,25 @@ This is a somewhat anecdotal guide to running muck on various platforms. Muck is
 Basic requirements:
 | $ sudo apt-get install git
 
-Need python3.5 and pip:
-| $ sudo apt-get python3.5
+Need python3.6 and pip:
+| $ sudo apt-get python3.6
 
-If you are using an older version of Ubuntu (e.g. 14.04), the python3.5 package may not be available by default.
+Depending on your version of Ubuntu, the python3.6 package may not be available by default.
 In that case you can rely on Felix Krull's `deadsnakes` PPA (personal package archive):
 | $ sudo add-apt-repository ppa:fkrull/deadsnakes
 | $ sudo apt-get update
-| $ sudo apt-get install python3.5
+| $ sudo apt-get install python3.6
 
-Install pip for python3.5. Note that you might already have a pip3, but this will install libraries into your system python3.
+Install pip for python3.6. Note that you might already have a pip3, but this will install libraries into your system python3.
 | $ curl -O https://bootstrap.pypa.io/get-pip.py
-| $ python3.5 ./get-pip.py
+| $ python3.6 ./get-pip.py
 | $ rm get-pip.py
 
 Check out each of the repositories, side-by-side in a directory of your choice, e.g. '~/work'.
-Use pip3.5 to install each python package in "editable" (developer) mode.
+Use pip3.6 to install each python package in "editable" (developer) mode.
 | $ for repo in pithy utest iotest pat writeup muck; do
 | $   git clone git@github.com:gwk/$repo.git
-| $   pip3.5 install -e $repo # might need to be run with sudo.
+| $   pip3.6 install -e $repo # might need to be run with sudo.
 | $ done
 
 Fetch the submodules and install the dependencies:

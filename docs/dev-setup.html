@@ -68,13 +68,13 @@ window.onkeypress = function(e) {
 <pre>
 $ sudo apt-get install git</pre>
   <p>
-    Need python3.5 and pip:
+    Need python3.6 and pip:
 
   </p>
 <pre>
-$ sudo apt-get python3.5</pre>
+$ sudo apt-get python3.6</pre>
   <p>
-    If you are using an older version of Ubuntu (e.g. 14.04), the python3.5 package may not be available by default.
+    Depending on your version of Ubuntu, the python3.6 package may not be available by default.
 
   <br />
     In that case you can rely on Felix Krull's <code>deadsnakes</code> PPA (personal package archive):
@@ -83,26 +83,26 @@ $ sudo apt-get python3.5</pre>
 <pre>
 $ sudo add-apt-repository ppa:fkrull/deadsnakes
 $ sudo apt-get update
-$ sudo apt-get install python3.5</pre>
+$ sudo apt-get install python3.6</pre>
   <p>
-    Install pip for python3.5. Note that you might already have a pip3, but this will install libraries into your system python3.
+    Install pip for python3.6. Note that you might already have a pip3, but this will install libraries into your system python3.
 
   </p>
 <pre>
 $ curl -O https://bootstrap.pypa.io/get-pip.py
-$ python3.5 ./get-pip.py
+$ python3.6 ./get-pip.py
 $ rm get-pip.py</pre>
   <p>
     Check out each of the repositories, side-by-side in a directory of your choice, e.g. '~/work'.
 
   <br />
-    Use pip3.5 to install each python package in "editable" (developer) mode.
+    Use pip3.6 to install each python package in "editable" (developer) mode.
 
   </p>
 <pre>
 $ for repo in pithy utest iotest pat writeup muck; do
 $   git clone git@github.com:gwk/$repo.git
-$   pip3.5 install -e $repo # might need to be run with sudo.
+$   pip3.6 install -e $repo # might need to be run with sudo.
 $ done</pre>
   <p>
     Fetch the submodules and install the dependencies:
