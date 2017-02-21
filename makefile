@@ -17,9 +17,10 @@ cov:
 	iotest -fail-fast -coverage
 
 docs:
+	set -o pipefail
 	(cd doc && muck)
-	rm docs/*
-	cp doc/_build/*.html docs
+	find docs -type f | xargs rm
+	(cd doc && muck -prod-list | grep -E '.*\.(css|html)$$' | xargs -J % cp % ../docs) # double bling to escape in makefile.
 
 pip-develop:
 	pip3 install -e .

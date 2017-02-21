@@ -43,7 +43,9 @@ def main():
   def add_cmd(cmd, help): group.add_argument('-' + cmd, dest='cmds', action='append_const', const=cmd, help=help)
 
   add_cmd('clean', help='clean the specified targets or the entire build folder.')
-  add_cmd('deps',  help='print dependencies of targets.')
+  add_cmd('deps',  help='print targets and their dependencies as a visual hierarchy.')
+  add_cmd('deps-list',  help='print targets and their dependencies as a list.')
+  add_cmd('prod-list',  help='print products as a list.')
   add_cmd('patch', help='create a patch; usage: [original] [modified.pat]')
   add_cmd('update-patch', help='update a patch: usage: [target.pat]')
 
@@ -101,7 +103,7 @@ Ctx = namedtuple('Ctx', 'db statuses dir_names dependents report_times dbg')
 
 
 def muck_clean_all():
-  '`muck -clean` command with no arguments.'
+  '`muck -clean` command (no arguments).'
   remove_dir_contents(build_dir)
 
 
@@ -118,7 +120,7 @@ def muck_clean(ctx, args):
 
 
 def muck_deps(ctx, targets):
-  '`muck -deps [targets...]` command: print dependency information.'
+  '`muck -deps [targets...]` command.'
   if not targets: targets = ['index.html']
 
   for target in sorted(targets):
@@ -153,6 +155,26 @@ def muck_deps(ctx, targets):
   for root in sorted(roots):
     outL()
     visit(0, root)
+
+
+def muck_deps_list(ctx, targets):
+  '`muck -deps-list [targets...]` command.'
+  if not targets: targets = ['index.html']
+
+  for target in sorted(targets):
+    update_dependency(ctx, target, dependent=None)
+
+  outLL(*sorted(ctx.statuses))
+
+
+def muck_prod_list(ctx, targets):
+  '`muck -deps-list [targets...]` command.'
+  if not targets: targets = ['index.html']
+
+  for target in sorted(targets):
+    update_dependency(ctx, target, dependent=None)
+
+  outLL(*sorted(product_path_for_target(t) for t in ctx.statuses))
 
 
 def muck_create_patch(ctx, args):
@@ -208,7 +230,9 @@ The patch file will be updated with the diff of the previously specified origina
 command_fns = {
   'clean'         : muck_clean,
   'deps'          : muck_deps,
+  'deps-list'     : muck_deps_list,
   'patch'         : muck_create_patch,
+  'prod-list'     : muck_prod_list,
   'update-patch'  : muck_update_patch,
 }
 
@@ -225,13 +249,13 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[str], force=Fal
   if dependent is not None:
     ctx.dependents[target].add(dependent)
 
-  try: # if in ctx.statuses, this path has already been visited on this run.
-    status = ctx.statuses[target]
+  try: status = ctx.statuses[target]
+  except KeyError: pass
+  else: # if in ctx.statuses, this path has already been visited on this run.
     if status is Ellipsis: # recursion sentinal.
       involved_paths = sorted(path for path, status in ctx.statuses.items() if status is Ellipsis)
       error(target, 'target has circular dependency; involved paths:', *('\n  ' + p for p in involved_paths))
     return status
-  except KeyError: pass
 
   ctx.statuses[target] = Ellipsis # recursion sentinal is replaced before return.
 
