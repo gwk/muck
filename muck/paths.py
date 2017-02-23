@@ -13,8 +13,11 @@ from .constants import build_dir, build_dir_slash, manifest_ext, reserved_exts, 
 from typing import *
 
 
-def product_path_for_source(source_path):
-  'Return the product path for `source_path` (which may itself be a product).'
+def dflt_prod_path_for_source(source_path):
+  '''
+  Return the default product path for `source_path` (which may itself be a product),
+  as implied by the source stem.
+  '''
   return path_stem(source_path) # strip off source ext.
 
 
@@ -72,7 +75,7 @@ def dst_path(argv, override_bindings):
   for k, v in override_bindings.items():
     if k not in bindings: raise Exception(f'source: {src}: binding does not match any field name: {k}')
     bindings[k] = v
-  fmt = product_path_for_source(src)
+  fmt = dflt_prod_path_for_source(src)
   try:
     return fmt.format(**bindings)
   except KeyError as e:

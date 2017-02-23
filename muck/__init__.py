@@ -51,7 +51,7 @@ def dst_file(binary=False, **kwargs):
   if not has_formatter(src): # single destination; no need for manifest.
     if kwargs:
       raise Exception(f'source path contains no formatters but bindings provided to `dst_file`: {src}')
-    return open(product_path_for_source(src) + tmp_ext, mode)
+    return open(dflt_prod_path_for_source(src) + tmp_ext, mode)
   args = tuple(sorted(kwargs.items())) # need kwargs as a hash key.
   if args in _dst_vars_opened:
     raise Exception(f'file already opened for `dst_file` arguments: {args}')
@@ -243,5 +243,5 @@ def transform(target_path, ext=None, **kwargs):
   `target_path` must be a string literal.
   '''
   seq = load(target_path, ext=ext, **kwargs)
-  product = product_path_for_source(argv[0]) # TODO: needs to process wildcards.
+  product = dflt_prod_path_for_source(argv[0]) # TODO: needs to process wildcards.
   return Transformer(seq, log_stem=path_stem(product) + '.')
