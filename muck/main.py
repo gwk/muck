@@ -18,7 +18,7 @@ from collections import defaultdict, namedtuple
 from hashlib import sha256
 from typing import Optional
 
-from .pithy.format import has_formatter
+from .pithy.format import FormatError, has_formatter, format_to_re, parse_formatters
 from .pithy.fs import *
 from .pithy.io import *
 from .pithy.iterable import fan_by_pred
@@ -549,6 +549,84 @@ def py_env():
 build_tool_env_fns = {
   '.py' : py_env
 }
+
+
+# Targets and paths.
+
+
+class InvalidTarget(Exception):
+  def __init__(self, target, msg):
+    super().__init__(target, msg)
+    self.target = target
+    self.msg = msg
+
+
+target_invalids_re = re.compile(r'[\s]|\.\.|\./|//')
+
+def validate_target(target):
+  if not target:
+    raise InvalidTarget(target, 'empty string.')
+  inv_m  =target_invalids_re.search(target)
+  if inv_m:
+    raise InvalidTarget(target, f'cannot contain {inv_m.group(0)!r}.')
+  if target[0] == '.' or target[-1] == '.':
+    raise InvalidTarget(target, "cannot begin or end with '.'.")
+  if path_name_stem(target) in reserved_names:
+    reserved_desc = ', '.join(sorted(reserved_names))
+    raise InvalidTarget(target, f'name is reserved; please rename the target.\n(reserved names: {reserved_desc}.)')
+  if path_ext(target) in reserved_exts:
+    raise InvalidTarget(target, 'target name has reserved extension; please rename the target.')
+  try:
+    for name, _, _ in parse_formatters(target):
+      if not name:
+        raise InvalidTarget(target, 'contains unnamed formatter')
+  except FormatError as e:
+    raise InvalidTarget(target, 'invalid format') from e
+
+
+def validate_target_or_error(target):
+  try: validate_target(target)
+  except InvalidTarget as e:
+    exit(f'muck error: invalid target: {e.target!r}; {e.msg}')
+
+
+def actual_path_for_target(target_path):
+  '''
+  returns the target_path if it exists (indicating that it is a source file),
+  or else the corresponding product path.
+  '''
+  if path_exists(target_path):
+    return target_path
+  return product_path_for_target(target_path)
+
+
+def is_product_path(path):
+  return path.startswith(build_dir_slash)
+
+
+def product_path_for_target(target_path):
+  if target_path == build_dir or is_product_path(target_path):
+    raise ValueError(f'provided target path is prefixed with build dir: {target_path}')
+  return path_join(build_dir, target_path)
+
+
+def target_path_for_source(source_path):
+  'Return the target path for `source_path` (which may itself be a product).'
+  path = path_stem(source_path) # strip off source ext.
+  if is_product_path(path): # source might be a product.
+    return path[len(build_dir_slash):]
+  else:
+    return path
+
+
+_wildcard_re = re.compile(r'(%+)')
+
+def match_wilds(wildcard_path, string):
+  '''
+  Match a string against a wildcard/format path.
+  '''
+  r = format_to_re(wildcard_path)
+  return r.fullmatch(string)
 
 
 # Utilities.
