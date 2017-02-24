@@ -15,7 +15,7 @@ from .pithy.io import errL, errSL
 TargetRecord = namedtuple('TargetRecord', 'path size mtime hash src deps wild_deps')
 '''
 TargetRecord format:
- path: target path (not product paths prefixed with build_dir).
+ path: target path (not product paths prefixed with build dir).
  size: int (0 for empty/missing records, but can also be 0 for legitimate records).
  mtime: float (0 for empty/missing records).
  src: Optional[str]; None for non-product sources.

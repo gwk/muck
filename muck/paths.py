@@ -7,9 +7,9 @@ Muck target path functions.
 import re
 from itertools import product
 from .pithy.format import format_partial, parse_formatters
-from .pithy.fs import path_exists, path_ext, path_join, path_stem
+from .pithy.fs import path_stem
 from .pithy.string_utils import pluralize
-from .constants import build_dir, build_dir_slash, manifest_ext, reserved_exts, reserved_names, reserved_or_ignored_exts
+from .constants import manifest_ext
 from typing import *
 
 

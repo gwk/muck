@@ -69,10 +69,16 @@ def main():
     muck_clean_all()
     exit()
 
-  for t in args.targets: validate_target_or_error(t)
+  reserved_names = frozenset({
+    'muck',
+    build_dir,
+    db_name,
+  })
 
   ctx = Ctx(db=DB(path=db_path), statuses={}, dir_names={}, dependents=defaultdict(set),
-    report_times=(not args.no_times), dbg=dbg)
+    reserved_names=reserved_names, report_times=(not args.no_times), dbg=dbg)
+
+  for t in args.targets: validate_target_or_error(ctx, t)
 
   if cmd:
     command_fns[cmd](ctx, args.targets)
@@ -90,7 +96,7 @@ def main():
 
 
 
-Ctx = namedtuple('Ctx', 'db statuses dir_names dependents report_times dbg')
+Ctx = namedtuple('Ctx', 'db statuses dir_names dependents reserved_names report_times dbg')
 # db: DB.
 # statuses: dict (target: str => is_changed: bool|Ellipsis).
 # dir_names: dict (dir_path: str => names: [str]).
@@ -244,7 +250,7 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[str], force=Fal
   '''
   returns is_changed.
   '''
-  validate_target(target)
+  validate_target(ctx, target)
 
   if dependent is not None:
     ctx.dependents[target].add(dependent)
@@ -304,7 +310,7 @@ def check_product_not_modified(ctx, target, actual_path, size, mtime, old):
 def update_product(ctx: Ctx, target: str, actual_path, is_changed, size, mtime, old) -> bool:
   ctx.dbg(target, 'update_product')
   src = source_for_target(ctx, target)
-  validate_target_or_error(src)
+  validate_target_or_error(ctx, src)
   ctx.dbg(target, f'src: {src}')
   if old.src != src:
     is_changed = True
@@ -380,7 +386,7 @@ def update_deps_and_record(ctx, target: str, actual_path: str,
   if is_changed:
     deps, wild_deps = calc_dependencies(actual_path, ctx.dir_names)
     for dep in deps:
-      try: validate_target(dep)
+      try: validate_target(ctx, dep)
       except InvalidTarget as e:
         exit(f'muck error: {target}: invalid dependency: {e.target!r}: {e.msg}')
       # TODO: validate wild_deps? how?
@@ -563,7 +569,7 @@ class InvalidTarget(Exception):
 
 target_invalids_re = re.compile(r'[\s]|\.\.|\./|//')
 
-def validate_target(target):
+def validate_target(ctx, target):
   if not target:
     raise InvalidTarget(target, 'empty string.')
   inv_m  =target_invalids_re.search(target)
@@ -571,8 +577,8 @@ def validate_target(target):
     raise InvalidTarget(target, f'cannot contain {inv_m.group(0)!r}.')
   if target[0] == '.' or target[-1] == '.':
     raise InvalidTarget(target, "cannot begin or end with '.'.")
-  if path_name_stem(target) in reserved_names:
-    reserved_desc = ', '.join(sorted(reserved_names))
+  if path_name_stem(target) in ctx.reserved_names:
+    reserved_desc = ', '.join(sorted(ctx.reserved_names))
     raise InvalidTarget(target, f'name is reserved; please rename the target.\n(reserved names: {reserved_desc}.)')
   if path_ext(target) in reserved_exts:
     raise InvalidTarget(target, 'target name has reserved extension; please rename the target.')
@@ -584,8 +590,8 @@ def validate_target(target):
     raise InvalidTarget(target, 'invalid format') from e
 
 
-def validate_target_or_error(target):
-  try: validate_target(target)
+def validate_target_or_error(ctx, target):
+  try: validate_target(ctx, target)
   except InvalidTarget as e:
     exit(f'muck error: invalid target: {e.target!r}; {e.msg}')
 
@@ -693,7 +699,7 @@ def source_for_target(ctx, target):
 
 def source_candidate(ctx, target, src_dir, prod_name):
   src_dir = src_dir or '.'
-  try: src_dir_names = list_dir_filtered(src_dir, cache=ctx.dir_names)
+  try: src_dir_names = list_dir_filtered(ctx, src_dir)
   except FileNotFoundError: raise error(target, f'no such source directory: `{src_dir}`')
   candidates = list(filter_source_names(src_dir_names, prod_name))
   if len(candidates) == 1:
@@ -706,16 +712,16 @@ def source_candidate(ctx, target, src_dir, prod_name):
     raise error(deps, f'multiple source candidates matching `{target}`: {candidates}')
 
 
-def list_dir_filtered(src_dir, cache):
+def list_dir_filtered(ctx, src_dir):
   '''
-  Given src_dir, Cache and return the list of names that might be source files.
+  Given src_dir, cache and return the list of names that might be source files.
   TODO: eventually this should be replaced by using os.scandir.
   '''
-  try: return cache[src_dir]
+  try: return ctx.dir_names[src_dir]
   except KeyError: pass
   names = [n for n in list_dir(src_dir, hidden=False)
-    if n not in reserved_names and path_ext(n) not in reserved_or_ignored_exts]
-  cache[dir] = names
+    if n not in ctx.reserved_names and path_ext(n) not in reserved_or_ignored_exts]
+  ctx.dir_names[dir] = names
   return names
 
 
@@ -749,3 +755,9 @@ def warn(path, *items):
 
 def error(path, *items):
   return SystemExit(''.join((f'muck error: {path}: ',) + items))
+
+
+build_dir = '_build'
+build_dir_slash = build_dir + '/'
+db_name = '_muck'
+db_path = build_dir_slash + db_name

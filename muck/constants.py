@@ -1,14 +1,8 @@
 # Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
 
 '''
-Muck program constants.
+Muck constants.
 '''
-
-
-build_dir = '_build'
-build_dir_slash = build_dir + '/'
-db_name = '_muck'
-db_path = build_dir_slash + db_name
 
 out_ext = '.out'
 tmp_ext = '.tmp'
@@ -25,11 +19,5 @@ reserved_exts = frozenset({
 })
 
 reserved_or_ignored_exts = reserved_exts | ignored_exts
-
-reserved_names = frozenset({
-  'muck',
-  build_dir,
-  db_name,
-})
 
 max_hash_size = 1 << 24
