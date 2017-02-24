@@ -56,29 +56,24 @@ window.onkeypress = function(e) {
   <h1 id="h1">Developer Setup</h1>
   <p>
     This is a somewhat anecdotal guide to running muck on various platforms. Muck is developed principally on macOS 10.12, but has been successfully used with Ubuntu Linux as well, including the Ubuntu shell in Windows 10.
-
   </p>
 </section>
 <section class="S1" id="s2">
   <h1 id="h2">Installation on Ubuntu.</h1>
   <p>
     Basic requirements:
-
   </p>
 <pre>
 $ sudo apt-get install git</pre>
   <p>
     Need python3.6 and pip:
-
   </p>
 <pre>
 $ sudo apt-get python3.6</pre>
   <p>
     Depending on your version of Ubuntu, the python3.6 package may not be available by default.
-
   <br />
     In that case you can rely on Felix Krull's <code>deadsnakes</code> PPA (personal package archive):
-
   </p>
 <pre>
 $ sudo add-apt-repository ppa:fkrull/deadsnakes
@@ -86,7 +81,6 @@ $ sudo apt-get update
 $ sudo apt-get install python3.6</pre>
   <p>
     Install pip for python3.6. Note that you might already have a pip3, but this will install libraries into your system python3.
-
   </p>
 <pre>
 $ curl -O https://bootstrap.pypa.io/get-pip.py
@@ -94,10 +88,8 @@ $ python3.6 ./get-pip.py
 $ rm get-pip.py</pre>
   <p>
     Check out each of the repositories, side-by-side in a directory of your choice, e.g. '~/work'.
-
   <br />
     Use pip3.6 to install each python package in "editable" (developer) mode.
-
   </p>
 <pre>
 $ for repo in pithy utest iotest pat writeup muck; do
@@ -106,7 +98,6 @@ $   pip3.6 install -e $repo # might need to be run with sudo.
 $ done</pre>
   <p>
     Fetch the submodules and install the dependencies:
-
   </p>
 <pre>
 $ git submodule update --init --recursive

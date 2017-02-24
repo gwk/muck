@@ -56,31 +56,24 @@ window.onkeypress = function(e) {
   <h1 id="h1">Muck</h1>
   <p>
     Muck is a build tool for data projects. Given a target (a file to be built), it looks in the current directory tree for a source file with a matching name, determines its dependencies, recursively builds those, and then builds the target. Unlike Make and other traditional build systems, Muck does not use a "makefile". Instead, Muck determines the dependencies of a given file by analyzing its contents.
-
   </p>
   <p>
     With Muck, programmers can organize projects into discrete steps with arbitrary dependencies between them. When the source code for a particular step changes, Muck will rebuild that step and all dependent ("downstream") steps, but will not redo any work that is not affected by the change. This incremental rebuild behavior can speed up the development process dramatically, and helps prevent errors due to stale product files getting used by accident.
-
   </p>
   <p>
     The project is hosted at <a href=https://github.com/gwk/muck>https://github.com/gwk/muck</a>, with documentation at <a href=https://gwk.github.io/muck>https://gwk.github.io/muck</a>.
-
   </p>
   <p>
     The development of this project is sponsored by the <a href=https://towcenter.org>Tow Center for Digital Journalism</a>.
-
   </p>
   <p>
     Muck is limited to source languages that it understands, and to source code written using Muck conventions. In particular, Muck provides a few functions that scripts must use to make data dependencies explicit to the analyzer.
-
   </p>
   <p>
     By choosing sensible names for each step, the programmer can make the purpose of each step clear. Muck can print the entire dependency graph of the project, resulting in a precise, high-level description of how the code is organized.
-
   </p>
   <p>
     Muck is a good choice for projects where the products can be given descriptive, discrete names.
-
   </p>
 </section>
 <section class="S1" id="s2">
@@ -89,7 +82,6 @@ window.onkeypress = function(e) {
     <h2 id="h2.1">Python 3.6</h2>
     <p>
       Muck requires Python 3.6. (In the future it will support running project scripts in any available version).
-
     </p>
     <ul class="L1">
       <li>macOS: install from http://python.org, or perhaps use Homebrew.</li>
@@ -105,21 +97,18 @@ $ sudo apt-get update
 $ sudo apt-get install python3.6</pre>
     <p>
       For more information, see: <a href=http://askubuntu.com/questions/682869/how-do-i-install-newer-python-versions-using-apt-get>http://askubuntu.com/questions/682869/how-do-i-install-newer-python-versions-using-apt-get</a>
-
     </p>
   </section>
   <section class="S2" id="s2.2">
     <h2 id="h2.2">Pip</h2>
     <p>
       Muck should be installable with a single command: <code>pip3&nbsp;install&nbsp;muck</code>. Once installed, it should be available on the command line. If it is not, it may be that the <code>PATH</code> environment variable in your shell is not configured to point to console scripts installed by pip.
-
     </p>
   </section>
   <section class="S2" id="s2.3">
     <h2 id="h2.3">Development</h2>
     <p>
       See <a href=dev-setup.html>dev-setup</a>.
-
     </p>
   </section>
 </section>
@@ -127,10 +116,8 @@ $ sudo apt-get install python3.6</pre>
   <h1 id="h3">Usage</h1>
   <p>
     <code>muck</code> takes a list of targets as command line arguments. If no targets are provided it defaults to <code>index.html</code>.
-
   <br />
     Given a target <code>dir/stem.ext</code>, muck tries to produce the target file using the following steps:
-
   </p>
   <ul class="L1">
     <li>If the target exists as named, then it does nothing.</li>
@@ -139,14 +126,12 @@ $ sudo apt-get install python3.6</pre>
   </ul>
   <p>
     When a script is run, it is first analyzed by Muck for any dependencies, which will be built before running the script. Dependency analysis is limited to the conventions that Muck understands.
-
   </p>
 </section>
 <section class="S1" id="s4">
   <h1 id="h4">An Example</h1>
   <p>
     Suppose we want to produce a document that contains two charts, A and B. Each of these is derived from some data that we scrape from the web. A typical Muck project to achieve this would consist of four files:
-
   </p>
   <ul class="L1">
     <li><code>document.html.wu</code>, referencing <code>chartA.svg</code> and <code>chartB.svg</code>.</li>
@@ -156,11 +141,9 @@ $ sudo apt-get install python3.6</pre>
   </ul>
   <p>
     This project has a dependency graph whose shape is essentially a diamond, with <code>document.html</code> at the root, and <code>data.csv.py</code> having no dependencies.
-
   </p>
   <p>
     The programmer can build the document by invoking <code>muck&nbsp;document.html</code> on the command line. Muck will then take the following steps:
-
   </p>
   <ul class="L1">
     <li><code>document.html</code>: does not exist; infer source: <code>document.html.wu</code>.</li>
