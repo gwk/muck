@@ -10,7 +10,9 @@ __pycache__/
 # Project.
 _build/
 _misc/
-gh-pages/
+docs/_muck
+docs/*.wu
+
 todo.txt
 
 # Muck.

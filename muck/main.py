@@ -38,6 +38,7 @@ def main():
   arg_parser.add_argument('-no-times', action='store_true', help='do not report process times.')
   arg_parser.add_argument('-dbg', action='store_true', help='log lots of details to stderr.')
   arg_parser.add_argument('-force', action='store_true', help='rebuild specified targets even if they are up to date.')
+  arg_parser.add_argument('-build-dir', default='_build', help="specify build directory; defaults to '_build'.")
 
   group = arg_parser.add_argument_group('special commands')
   def add_cmd(cmd, help): group.add_argument('-' + cmd, dest='cmds', action='append_const', const=cmd, help=help)
@@ -51,6 +52,10 @@ def main():
 
   args = arg_parser.parse_args()
   cmds = args.cmds or []
+  build_dir = args.build_dir.rstrip('/')
+  build_dir_slash = build_dir + '/'
+  db_name = '_muck'
+  db_path = build_dir_slash + db_name
 
   if args.dbg:
     def dbg(path, *items):
@@ -66,7 +71,7 @@ def main():
 
   cmd = cmds[0] if cmds else None
   if cmd == 'clean' and not args.targets:
-    muck_clean_all()
+    muck_clean_all(build_dir)
     exit()
 
   reserved_names = frozenset({
@@ -76,6 +81,7 @@ def main():
   })
 
   ctx = Ctx(db=DB(path=db_path), statuses={}, dir_names={}, dependents=defaultdict(set),
+    build_dir=build_dir, build_dir_slash=build_dir_slash,
     reserved_names=reserved_names, report_times=(not args.no_times), dbg=dbg)
 
   for t in args.targets: validate_target_or_error(ctx, t)
@@ -96,7 +102,7 @@ def main():
 
 
 
-Ctx = namedtuple('Ctx', 'db statuses dir_names dependents reserved_names report_times dbg')
+Ctx = namedtuple('Ctx', 'db statuses dir_names dependents build_dir build_dir_slash reserved_names report_times dbg')
 # db: DB.
 # statuses: dict (target: str => is_changed: bool|Ellipsis).
 # dir_names: dict (dir_path: str => names: [str]).
@@ -108,7 +114,7 @@ Ctx = namedtuple('Ctx', 'db statuses dir_names dependents reserved_names report_
 # Commands.
 
 
-def muck_clean_all():
+def muck_clean_all(build_dir):
   '`muck -clean` command (no arguments).'
   remove_dir_contents(build_dir)
 
@@ -120,7 +126,7 @@ def muck_clean(ctx, args):
     if not ctx.db.contains_record(target=target):
       errFL('muck clean note: {}: skipping unknown target.', target)
       continue
-    prod_path = product_path_for_target(target)
+    prod_path = product_path_for_target(ctx, target)
     remove_file_if_exists(prod_path)
     ctx.db.delete_record(target=target)
 
@@ -180,7 +186,7 @@ def muck_prod_list(ctx, targets):
   for target in sorted(targets):
     update_dependency(ctx, target, dependent=None)
 
-  outLL(*sorted(product_path_for_target(t) for t in ctx.statuses))
+  outLL(*sorted(product_path_for_target(ctx, t) for t in ctx.statuses))
 
 
 def muck_create_patch(ctx, args):
@@ -200,8 +206,8 @@ This command creates an empty patch called [modified].pat, and copies [original]
   if path_exists(patch) or ctx.db.contains_record(patch):
     exit(f"muck -patch error: patch is an existing target: {patch}")
   update_dependency(ctx, original, dependent=None)
-  orig_path = actual_path_for_target(original)
-  mod_path = product_path_for_target(modified)
+  orig_path = actual_path_for_target(ctx, original)
+  mod_path = product_path_for_target(ctx, modified)
   cmd = ['pat', 'create', orig_path, mod_path, patch]
   errFL('muck -patch note: creating patch: `{}`', ' '.join(shlex.quote(w) for w in cmd))
   exit(runC(cmd))
@@ -220,9 +226,9 @@ The patch file will be updated with the diff of the previously specified origina
   assert len(deps) == 1
   orig_target_path = deps[0]
   update_dependency(ctx, orig_target_path, dependent=None)
-  orig_path = actual_path_for_target(orig_target_path)
+  orig_path = actual_path_for_target(ctx, orig_target_path)
   target = path_stem(patch_path)
-  prod_path = product_path_for_target(target)
+  prod_path = product_path_for_target(ctx, target)
   patch_path_tmp = patch_path + tmp_ext
   cmd = ['pat', 'diff', orig_path, prod_path, patch_path_tmp]
   errFL('muck -update-patch note: diffing: `{}`', ' '.join(shlex.quote(w) for w in cmd))
@@ -269,7 +275,7 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[str], force=Fal
   is_product = not path_exists(target)
   if is_product and is_link(target):
     raise error(target, f'target is a dangling symlink to: {read_link(target)}')
-  actual_path = product_path_for_target(target) if is_product else target
+  actual_path = product_path_for_target(ctx, target) if is_product else target
   size, mtime, old = calc_size_mtime_old(ctx, target, actual_path)
   has_old_file = (mtime > 0)
   has_old_record = not is_empty_record(old)
@@ -350,9 +356,9 @@ def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str):
   product_path, ext = split_stem_ext(tmp_path)
   if ext not in (out_ext, tmp_ext):
     raise error(tmp_path, f'product output path has unexpected extension: {ext!r}')
-  if not is_product_path(product_path):
+  if not is_product_path(ctx, product_path):
      raise error(product_path, 'product path is not in build dir.')
-  target = product_path[len(build_dir_slash):]
+  target = product_path[len(ctx.build_dir_slash):]
   size, mtime, old = calc_size_mtime_old(ctx, target, tmp_path)
   file_hash = hash_for_path(tmp_path, size, max_hash_size)
   is_changed = (size != old.size or size > max_hash_size or file_hash != old.hash)
@@ -368,7 +374,7 @@ def update_non_product(ctx: Ctx, target: str, is_changed: bool, size, mtime, old
   ctx.dbg(target, 'update_non_product')
   file_hash = hash_for_path(target, size, max_hash_size) # must be calculated in all cases.
   if is_changed:
-    product = product_path_for_target(target)
+    product = product_path_for_target(ctx, target)
     remove_file_if_exists(product)
     make_link(target, product, make_dirs=True)
   else: # all we know so far is that it exists and status as a source has not changed.
@@ -486,7 +492,7 @@ def build_product(ctx, target: str, src_path: str, prod_path: str) -> bool:
   make_dirs(prod_dir)
 
   # Extract args from the combination of wilds in the source and the matching target.
-  m = match_wilds(target_path_for_source(src_path), target)
+  m = match_wilds(target_path_for_source(ctx, src_path), target)
   if m is None:
     raise error(target, f'internal error: match failed; src_path: {src_path!r}')
   argv = [src_path] + list(m.groups())
@@ -502,7 +508,7 @@ def build_product(ctx, target: str, src_path: str, prod_path: str) -> bool:
   note(target, f"building: `{' '.join(shlex.quote(w) for w in cmd)}`")
   out_file = open(prod_path_out, 'wb')
   time_start = time.time()
-  code = runC(cmd, cwd=build_dir, env=env, out=out_file)
+  code = runC(cmd, cwd=ctx.build_dir, env=env, out=out_file)
   time_elapsed = time.time() - time_start
   out_file.close()
   if code != 0:
@@ -514,7 +520,7 @@ def build_product(ctx, target: str, src_path: str, prod_path: str) -> bool:
     else:
       warn(target, f'wrote data directly to `{prod_path_tmp}`;\n  ignoring output captured in `{prod_path_out}`')
 
-  manif_path = build_dir_slash + manifest_path(argv)
+  manif_path = ctx.build_dir_slash + manifest_path(argv)
   try: f = open(manif_path)
   except FileNotFoundError: # no manifest.
     if path_exists(prod_path_tmp):
@@ -526,7 +532,7 @@ def build_product(ctx, target: str, src_path: str, prod_path: str) -> bool:
       tmp_paths = [prod_path_out]
   else: # found manifest.
     via = 'manifest'
-    tmp_paths = list(product_path_for_target(line.rstrip('\n')) for line in f)
+    tmp_paths = list(product_path_for_target(ctx, line.rstrip('\n')) for line in f)
     cleanup_out()
     if prod_path_tmp not in tmp_paths:
       errL('prod_path_tmp: ', prod_path_tmp)
@@ -596,31 +602,31 @@ def validate_target_or_error(ctx, target):
     exit(f'muck error: invalid target: {e.target!r}; {e.msg}')
 
 
-def actual_path_for_target(target_path):
+def actual_path_for_target(ctx, target_path):
   '''
   returns the target_path if it exists (indicating that it is a source file),
   or else the corresponding product path.
   '''
   if path_exists(target_path):
     return target_path
-  return product_path_for_target(target_path)
+  return product_path_for_target(ctx, target_path)
 
 
-def is_product_path(path):
-  return path.startswith(build_dir_slash)
+def is_product_path(ctx, path):
+  return path.startswith(ctx.build_dir_slash)
 
 
-def product_path_for_target(target_path):
-  if target_path == build_dir or is_product_path(target_path):
+def product_path_for_target(ctx, target_path):
+  if target_path == ctx.build_dir or is_product_path(ctx, target_path):
     raise ValueError(f'provided target path is prefixed with build dir: {target_path}')
-  return path_join(build_dir, target_path)
+  return path_join(ctx.build_dir, target_path)
 
 
-def target_path_for_source(source_path):
+def target_path_for_source(ctx, source_path):
   'Return the target path for `source_path` (which may itself be a product).'
   path = path_stem(source_path) # strip off source ext.
-  if is_product_path(path): # source might be a product.
-    return path[len(build_dir_slash):]
+  if is_product_path(ctx, path): # source might be a product.
+    return path[len(ctx.build_dir_slash):]
   else:
     return path
 
@@ -755,9 +761,3 @@ def warn(path, *items):
 
 def error(path, *items):
   return SystemExit(''.join((f'muck error: {path}: ',) + items))
-
-
-build_dir = '_build'
-build_dir_slash = build_dir + '/'
-db_name = '_muck'
-db_path = build_dir_slash + db_name
