@@ -65,7 +65,7 @@ def bindings_from_argv(argv: Sequence[str]) -> Dict[str, str]:
     raise ValueError(f'format expects {pluralize(len(args), "arg")} args but was provided with {len(formatters)}')
   for i, (name, _, _, _) in enumerate(formatters):
     if not name: raise ValueError(f'formatter {i} must specify a field name')
-  return { name : val for (name, _, _, _), val in zip(formatters, args) }
+  return { name : type_(val) for (name, _, _, type_), val in zip(formatters, args) }
 
 
 def dst_path(argv, override_bindings):

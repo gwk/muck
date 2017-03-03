@@ -101,6 +101,7 @@ def load_txt(f, clip_ends=False):
 
 
 _default_loaders = (
+  ('.css',   load_txt, {}),
   ('.csv',   csv_reader, dict(newline='')),
   ('.json',  load_json, dict(encoding=None)),
   ('.jsonl', load_jsonl, dict(encoding=None)),

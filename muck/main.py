@@ -349,7 +349,10 @@ def expanded_wild_deps(ctx, target, src):
   m = match_wilds(path_stem(src), target)
   bindings = m.groupdict()
   for wild_dep in wild_deps:
-    yield wild_dep.format(**bindings)
+    b = bindings.copy()
+    for name, _, _, value_type in parse_formatters(wild_dep):
+      b[name] = value_type(bindings[name])
+    yield wild_dep.format(**b)
 
 
 def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str):
