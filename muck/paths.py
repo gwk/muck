@@ -30,9 +30,9 @@ def bindings_for_format(format_path, kwargs):
   Parse `format_path` field names and yield (name, arg) pairs,
   where `arg` is pulled from `kwargs`.
   '''
-  for name, _, _ in parse_formatters(format_path):
+  for name, _, _, _ in parse_formatters(format_path):
     try: arg = kwargs[name]
-    except KeyError as e: raise Exception(f'missing argument for formatter field {name}') from e
+    except KeyError as e: raise Exception(f'missing argument for formatter field {name!r} in path: {format_path!r}') from e
     yield name, arg
 
 
@@ -63,9 +63,9 @@ def bindings_from_argv(argv: Sequence[str]) -> Dict[str, str]:
   formatters = list(parse_formatters(fmt))
   if len(formatters) != len(args):
     raise ValueError(f'format expects {pluralize(len(args), "arg")} args but was provided with {len(formatters)}')
-  for i, (name, _, _) in enumerate(formatters):
+  for i, (name, _, _, _) in enumerate(formatters):
     if not name: raise ValueError(f'formatter {i} must specify a field name')
-  return { name : val for (name, _, _), val in zip(formatters, args) }
+  return { name : val for (name, _, _, _), val in zip(formatters, args) }
 
 
 def dst_path(argv, override_bindings):

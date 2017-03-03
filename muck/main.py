@@ -589,7 +589,7 @@ def validate_target(ctx, target):
   if path_ext(target) in reserved_exts:
     raise InvalidTarget(target, 'target name has reserved extension; please rename the target.')
   try:
-    for name, _, _ in parse_formatters(target):
+    for name, _, _, _ in parse_formatters(target):
       if not name:
         raise InvalidTarget(target, 'contains unnamed formatter')
   except FormatError as e:
