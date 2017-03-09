@@ -9,7 +9,7 @@ tmp_ext = '.tmp'
 manifest_ext = '.tmp_manifest'
 
 ignored_exts = frozenset({
-  '.err', '.iot', '.out', # iotest extensions.
+  '.err', '.iot', '.out', '.expected', # iotest extensions.
 })
 
 reserved_exts = frozenset({

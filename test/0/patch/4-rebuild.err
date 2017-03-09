@@ -1,3 +1,4 @@
+muck note: patched.txt.pat: source changed.
 muck note: patched.txt: building: `pat apply patched.txt.pat`
 muck note: patched.txt: finished: (via stdout).
 muck note: patched.txt: product changed; 15 B.

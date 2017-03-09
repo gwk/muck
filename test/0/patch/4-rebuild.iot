@@ -2,5 +2,10 @@
   'desc': 'rebuild.',
   'compile': ['$MUCK -clean patched.txt'],
   'cmd': '$MUCK -no-times patched.txt',
-  'code': 0
+  'code': 0,
+  'files': {
+    '_build/patched.txt': {
+      'val': 'modified text.\n'
+    }
+  }
 }

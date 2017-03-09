@@ -7,6 +7,10 @@
       'val': '''\
 pat v0
 orig.txt
+
+|^
+- original text.
++ modified text.
 '''
     }
   }

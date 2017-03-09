@@ -206,12 +206,10 @@ This command creates an empty patch called [modified].pat, and copies [original]
   if path_exists(patch) or ctx.db.contains_record(patch):
     exit(f"muck -patch error: patch is an existing target: {patch}")
   update_dependency(ctx, original, dependent=None)
-  orig_path = actual_path_for_target(ctx, original)
-  mod_path = product_path_for_target(ctx, modified)
-  cmd = ['pat', 'create', orig_path, mod_path, patch]
+  cmd = ['pat', 'create', original, modified, '../' + patch]
   cmd_str = ' '.join(shlex.quote(w) for w in cmd)
   errL(f'muck -patch note: creating patch: `{cmd_str}`')
-  exit(runC(cmd))
+  exit(runC(cmd, cwd=ctx.build_dir))
 
 
 def muck_update_patch(ctx, args):
@@ -225,20 +223,20 @@ The patch file will be updated with the diff of the previously specified origina
     exit(f'muck -update-patch error: argument does not specify a .pat file: {patch_path!r}')
   deps = pat_dependencies(patch_path, open(patch_path), {})
   assert len(deps) == 1
-  orig_target_path = deps[0]
-  update_dependency(ctx, orig_target_path, dependent=None)
-  orig_path = actual_path_for_target(ctx, orig_target_path)
+  orig_path = deps[0]
+  update_dependency(ctx, orig_path, dependent=None)
   target = path_stem(patch_path)
-  prod_path = product_path_for_target(ctx, target)
   patch_path_tmp = patch_path + tmp_ext
-  cmd = ['pat', 'diff', orig_path, prod_path, patch_path_tmp]
+  cmd = ['pat', 'diff', orig_path, target, '../' + patch_path_tmp]
   cmd_str = ' '.join(shlex.quote(w) for w in cmd)
   errL(f'muck -update-patch note: diffing: `{cmd_str}`')
-  code = runC(cmd)
-  # need to remove or update the target record to avoid the 'did you mean to patch?' safeguard.
-  # for now, just delete it to be safe; this makes the target look stale.
-  # TODO: update target instead.
+  code = runC(cmd, cwd=ctx.build_dir)
+  if code: exit(code)
+  move_file(patch_path_tmp, patch_path, overwrite=True)
   ctx.db.delete_record(target=target) # no-op if does not exist.
+  #^ need to remove or update the target record to avoid the 'did you mean to patch?' safeguard.
+  #^ for now, just delete it to be safe; this makes the target look stale.
+  #^ TODO: update target instead.
 
 
 command_fns = {
@@ -605,16 +603,6 @@ def validate_target_or_error(ctx, target):
   try: validate_target(ctx, target)
   except InvalidTarget as e:
     exit(f'muck error: invalid target: {e.target!r}; {e.msg}')
-
-
-def actual_path_for_target(ctx, target_path):
-  '''
-  returns the target_path if it exists (indicating that it is a source file),
-  or else the corresponding product path.
-  '''
-  if path_exists(target_path):
-    return target_path
-  return product_path_for_target(ctx, target_path)
 
 
 def is_product_path(ctx, path):
