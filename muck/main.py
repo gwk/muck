@@ -124,7 +124,7 @@ def muck_clean(ctx, args):
   assert args
   for target in args:
     if not ctx.db.contains_record(target=target):
-      errFL('muck clean note: {}: skipping unknown target.', target)
+      errL(f'muck clean note: {target}: skipping unknown target.')
       continue
     prod_path = product_path_for_target(ctx, target)
     remove_file_if_exists(prod_path)
@@ -209,7 +209,8 @@ This command creates an empty patch called [modified].pat, and copies [original]
   orig_path = actual_path_for_target(ctx, original)
   mod_path = product_path_for_target(ctx, modified)
   cmd = ['pat', 'create', orig_path, mod_path, patch]
-  errFL('muck -patch note: creating patch: `{}`', ' '.join(shlex.quote(w) for w in cmd))
+  cmd_str = ' '.join(shlex.quote(w) for w in cmd)
+  errL(f'muck -patch note: creating patch: `{cmd_str}`')
   exit(runC(cmd))
 
 
@@ -231,7 +232,8 @@ The patch file will be updated with the diff of the previously specified origina
   prod_path = product_path_for_target(ctx, target)
   patch_path_tmp = patch_path + tmp_ext
   cmd = ['pat', 'diff', orig_path, prod_path, patch_path_tmp]
-  errFL('muck -update-patch note: diffing: `{}`', ' '.join(shlex.quote(w) for w in cmd))
+  cmd_str = ' '.join(shlex.quote(w) for w in cmd)
+  errL(f'muck -update-patch note: diffing: `{cmd_str}`')
   code = runC(cmd)
   # need to remove or update the target record to avoid the 'did you mean to patch?' safeguard.
   # for now, just delete it to be safe; this makes the target look stale.
