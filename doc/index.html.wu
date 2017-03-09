@@ -17,6 +17,8 @@ By choosing sensible names for each step, the programmer can make the purpose of
 
 Muck is a good choice for projects where the products can be given descriptive, discrete names.
 
+## License
+All of the source code and documentation is dedicated to the public domain under CC0: <https://creativecommons.org/.publicdomain/zero/1.0/>.
 
 
 # Installation

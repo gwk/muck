@@ -18,6 +18,7 @@ cov:
 
 docs:
 	(cd doc && muck -build-dir=../docs)
+	writeup -bare -section Muck doc/index.html.wu readme.md
 
 pip-develop:
 	pip3 install -e .
