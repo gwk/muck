@@ -15,7 +15,7 @@ from csv import reader as csv_reader
 from http import HTTPStatus
 from sys import argv
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 from .pithy.path_encode import path_for_url
 from .pithy.io import errL
@@ -183,9 +183,14 @@ def _fetch(url, timeout, headers, expected_status_code):
   return r
 
 
-def fetch(url, expected_status_code=200, headers={}, timeout=4, delay=0, delay_range=0, spoof=False):
+def fetch(url, cache_path=None, params={}, headers={}, expected_status_code=200, timeout=4, delay=0, delay_range=0, spoof=False):
   "Fetch the data at `url` and save it to a path in the '_fetch' directory derived from the URL."
-  path = path_join('_fetch', path_for_url(url))
+  if params:
+    if '?' in url: raise ValueError("params specified but url already contains '?'")
+    url += '?' + urlencode(params)
+  if not cache_path:
+    cache_path = path_for_url(url)
+  path = path_join('../_fetch', cache_path)
   if not path_exists(path):
     errL(f'fetch: {url}')
     if spoof:
@@ -204,7 +209,7 @@ def fetch(url, expected_status_code=200, headers={}, timeout=4, delay=0, delay_r
   return path
 
 
-def load_url(url, ext=None, expected_status_code=200, headers={}, timeout=4, delay=0, delay_range=0, spoof=False, **kwargs):
+def load_url(url, ext=None, cache_path=None, params={}, headers={}, expected_status_code=200, timeout=4, delay=0, delay_range=0, spoof=False, **kwargs):
   'Fetch the data at `url` and then load using `muck.load`.'
   # note: implementing uncached requests efficiently requires new versions of the source functions;
   # these will take a text argument instead of a path argument.
@@ -215,9 +220,12 @@ def load_url(url, ext=None, expected_status_code=200, headers={}, timeout=4, del
     # extract the extension from the url path;
     # load will try to extract it from the encoded path,
     # which may have url path/parameters/query/fragment.
-    parts = urlparse(url)
-    ext = path_ext(parts.path)
-  path = fetch(url, expected_status_code=expected_status_code, headers=headers,
+    if cache_path:
+      ext = path_ext(cache_path)
+    else:
+      parts = urlparse(url)
+      ext = path_ext(parts.path)
+  path = fetch(url, cache_path=cache_path, params=params, headers=headers, expected_status_code=expected_status_code,
     timeout=timeout, delay=delay, delay_range=delay_range, spoof=spoof)
   return load(path, ext=ext, **kwargs)
 
