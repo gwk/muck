@@ -45,6 +45,12 @@ _dst_vars_opened = set()
 _manifest_file = None
 
 def dst_file(binary=False, **kwargs):
+  '''
+  Open an output file for writing, expanding target path formatters with `kwargs`.
+
+  This function can be used to get a binary output file handle using the `binary` parameter.
+  It can also be used to output many files from a single script.
+  '''
   global _manifest_file
   src = argv[0]
   mode = 'wb' if binary else 'w'
