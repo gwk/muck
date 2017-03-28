@@ -10,10 +10,6 @@ __pycache__/
 # Project.
 _build/
 _misc/
+docs/_muck
 docs/*.wu
 todo.txt
-
-
-# Muck.
-_muck
-_fetch/
