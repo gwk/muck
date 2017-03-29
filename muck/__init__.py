@@ -14,7 +14,8 @@ import requests
 from csv import reader as csv_reader
 from http import HTTPStatus
 from sys import argv
-from typing import Optional
+from typing import *
+from typing import IO, TextIO
 from urllib.parse import urlencode, urlparse
 
 from .pithy.path_encode import path_for_url
@@ -25,7 +26,7 @@ from .pithy.json_utils import load_json, load_jsonl, load_jsons
 from .pithy.transform import Transformer
 
 from .constants import tmp_ext
-from .paths import bindings_for_format, bindings_from_argv, dst_path, manifest_path, paths_from_format
+from .paths import bindings_for_format, bindings_from_argv, dflt_prod_path_for_source, dst_path, manifest_path, paths_from_format
 
 
 # module exports.
@@ -41,10 +42,10 @@ __all__ = [
   'transform',
 ]
 
-_dst_vars_opened = set()
+_dst_vars_opened: Set[Tuple[Tuple[str, str], ...]] = set()
 _manifest_file = None
 
-def dst_file(binary=False, **kwargs):
+def dst_file(binary=False, **kwargs: str) -> IO:
   '''
   Open an output file for writing, expanding target path formatters with `kwargs`.
 
@@ -71,7 +72,7 @@ def dst_file(binary=False, **kwargs):
 
 _open_deps_parameters = { 'binary', 'buffering', 'encoding', 'errors', 'newline' }
 
-def open_dep(target_path, binary=False, buffering=-1, encoding=None, errors=None, newline=None):
+def open_dep(target_path: str, binary=False, buffering=-1, encoding=None, errors=None, newline=None) -> IO:
   '''
   Open a dependency for reading.
 
@@ -81,9 +82,9 @@ def open_dep(target_path, binary=False, buffering=-1, encoding=None, errors=None
   return open(target_path, mode=('rb' if binary else 'r'), buffering=buffering, encoding=encoding, errors=errors, newline=newline)
 
 
-_loaders = {}
+_loaders: Dict[str, Tuple[Callable[..., Any], Dict[str, Any]]] = {}
 
-def add_loader(ext, fn, **open_dep_kwargs):
+def add_loader(ext: str, fn: Callable[..., Any], **open_dep_kwargs) -> None:
   '''
   Register a loader function, which will be called by `muck.load` for matching `ext`.
   Any keyword arguments passed here will be used as defaults when calling `open_dep`,
@@ -101,12 +102,12 @@ def add_loader(ext, fn, **open_dep_kwargs):
   _loaders[ext] = (fn, open_dep_kwargs)
 
 
-def load_txt(f, clip_ends=False):
+def load_txt(f: TextIO, clip_ends=False) -> Iterable[str]:
   if clip_ends: return (line.rstrip('\n') for line in f)
   return f
 
 
-_default_loaders = (
+_default_loaders: Tuple[Tuple[str, Callable[..., Any], Dict[str, Any]], ...] = (
   ('.css',   load_txt, {}),
   ('.csv',   csv_reader, dict(newline='')),
   ('.json',  load_json, dict(encoding=None)),
@@ -118,7 +119,7 @@ _default_loaders = (
 for ext, fn, args in _default_loaders:
   add_loader(ext, fn, **args)
 
-def load(target_path, ext=None, **kwargs):
+def load(target_path: str, ext=None, **kwargs: Any) -> Any:
   '''
   Select an appropriate loader based on the file extension, or `ext` if specified.
 
@@ -153,7 +154,7 @@ def load(target_path, ext=None, **kwargs):
   return load_fn(file, **kwargs)
 
 
-def load_many(format_path, ext=None, **kwargs):
+def load_many(format_path: str, ext=None, **kwargs: Any) -> Iterable[Any]:
   seqs = dict(bindings_for_format(format_path, kwargs))
   for k in seqs: del kwargs[k] # for clarity, do not pass format sequence items to `load`.
   for path, args in paths_from_format(format_path, seqs):
@@ -161,13 +162,13 @@ def load_many(format_path, ext=None, **kwargs):
 
 
 class HTTPError(Exception):
-  def __init__(self, msg, request):
+  def __init__(self, msg: str, request: Any) -> None:
     super().__init__(msg)
     self.request = request
     self.status_code = 0 if request is None else request.status_code
 
 
-def _fetch(url, timeout, headers, expected_status_code):
+def _fetch(url: str, timeout: int, headers: Dict[str, str], expected_status_code: int) -> Any:
   '''
   wrap the call to `get` with try/except that flattens any exception trace into an HTTPError.
   without this, a backtrace due to a network failure is massive, involves multiple exceptions,
@@ -189,7 +190,7 @@ def _fetch(url, timeout, headers, expected_status_code):
   return r
 
 
-def fetch(url, cache_path=None, params={}, headers={}, expected_status_code=200, timeout=4, delay=0, delay_range=0, spoof=False):
+def fetch(url: str, cache_path: str=None, params: Dict[str, str]={}, headers: Dict[str, str]={}, expected_status_code=200, timeout=4, delay=0, delay_range=0, spoof=False) -> str:
   "Fetch the data at `url` and save it to a path in the '_fetch' directory derived from the URL."
   if params:
     if '?' in url: raise ValueError("params specified but url already contains '?'")
@@ -215,7 +216,7 @@ def fetch(url, cache_path=None, params={}, headers={}, expected_status_code=200,
   return path
 
 
-def load_url(url, ext=None, cache_path=None, params={}, headers={}, expected_status_code=200, timeout=4, delay=0, delay_range=0, spoof=False, **kwargs):
+def load_url(url: str, ext: str=None, cache_path: str=None, params: Dict[str, str]={}, headers: Dict[str, str]={}, expected_status_code=200, timeout=4, delay=0, delay_range=0, spoof=False, **kwargs: Any) -> Any:
   'Fetch the data at `url` and then load using `muck.load`.'
   # note: implementing uncached requests efficiently requires new versions of the source functions;
   # these will take a text argument instead of a path argument.
@@ -236,7 +237,7 @@ def load_url(url, ext=None, cache_path=None, params={}, headers={}, expected_sta
   return load(path, ext=ext, **kwargs)
 
 
-def spoofing_headers():
+def spoofing_headers() -> Dict[str, str]:
   # Headers that Safari currently sends. TODO: allow imitating other browsers?
   return {
     'DNT': '1',
@@ -247,7 +248,7 @@ def spoofing_headers():
   }
 
 
-def transform(target_path, ext=None, **kwargs):
+def transform(target_path: str, ext: str=None, **kwargs: Any) -> Transformer:
   '''
   Open a dependency using muck.load and then transform it using pithy.Transformer.
 

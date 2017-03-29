@@ -16,7 +16,8 @@ import time
 from argparse import ArgumentParser
 from collections import defaultdict, namedtuple
 from hashlib import sha256
-from typing import Optional
+from typing import *
+from typing import BinaryIO, Match, TextIO
 
 from .pithy.format import FormatError, has_formatter, format_to_re, parse_formatters
 from .pithy.fs import *
@@ -32,7 +33,7 @@ from .paths import *
 from .py_deps import py_dependencies
 
 
-def main():
+def main() -> None:
   arg_parser = ArgumentParser(description=__doc__)
   arg_parser.add_argument('targets', nargs='*', default=[], help="target file names; defaults to 'index.html'.")
   arg_parser.add_argument('-no-times', action='store_true', help='do not report process times.')
@@ -41,7 +42,8 @@ def main():
   arg_parser.add_argument('-build-dir', default='_build', help="specify build directory; defaults to '_build'.")
 
   group = arg_parser.add_argument_group('special commands')
-  def add_cmd(cmd, help): group.add_argument('-' + cmd, dest='cmds', action='append_const', const=cmd, help=help)
+  def add_cmd(cmd: str, help: str) -> None:
+    group.add_argument('-' + cmd, dest='cmds', action='append_const', const=cmd, help=help)
 
   add_cmd('clean', help='clean the specified targets or the entire build folder.')
   add_cmd('deps',  help='print targets and their dependencies as a visual hierarchy.')
@@ -58,10 +60,10 @@ def main():
   db_path = build_dir_slash + db_name
 
   if args.dbg:
-    def dbg(path, *items):
+    def dbg(path: str, *items: str) -> None:
       errL(f'muck dbg: {path}: ', *items)
   else:
-    def dbg(path, *items): pass
+    def dbg(path: str, *items: str) -> None: pass
 
   if len(cmds) > 1:
     desc = ', '.join(repr('-' + c) for c in cmds)
@@ -114,12 +116,12 @@ Ctx = namedtuple('Ctx', 'db statuses dir_names dependents build_dir build_dir_sl
 # Commands.
 
 
-def muck_clean_all(build_dir):
+def muck_clean_all(build_dir: str) -> None:
   '`muck -clean` command (no arguments).'
   remove_dir_contents(build_dir)
 
 
-def muck_clean(ctx, args):
+def muck_clean(ctx: Ctx, args: List[str]) -> None:
   '`muck -clean [targets...]` command.'
   assert args
   for target in args:
@@ -131,7 +133,7 @@ def muck_clean(ctx, args):
     ctx.db.delete_record(target=target)
 
 
-def muck_deps(ctx, targets):
+def muck_deps(ctx: Ctx, targets: List[str]) -> None:
   '`muck -deps [targets...]` command.'
   if not targets: targets = ['index.html']
 
@@ -141,7 +143,7 @@ def muck_deps(ctx, targets):
   roots = set(targets)
   roots.update(t for t, s in ctx.dependents.items() if len(s) > 1)
 
-  def visit(depth, target):
+  def visit(depth: int, target: str) -> None:
     record = ctx.db.get_record(target)
     dependents = ctx.dependents[target]
     src = record.src
@@ -169,7 +171,7 @@ def muck_deps(ctx, targets):
     visit(0, root)
 
 
-def muck_deps_list(ctx, targets):
+def muck_deps_list(ctx: Ctx, targets: List[str]) -> None:
   '`muck -deps-list [targets...]` command.'
   if not targets: targets = ['index.html']
 
@@ -179,7 +181,7 @@ def muck_deps_list(ctx, targets):
   outLL(*sorted(ctx.statuses))
 
 
-def muck_prod_list(ctx, targets):
+def muck_prod_list(ctx: Ctx, targets: List[str]) -> None:
   '`muck -deps-list [targets...]` command.'
   if not targets: targets = ['index.html']
 
@@ -189,7 +191,7 @@ def muck_prod_list(ctx, targets):
   outLL(*sorted(product_path_for_target(ctx, t) for t in ctx.statuses))
 
 
-def muck_create_patch(ctx, args):
+def muck_create_patch(ctx: Ctx, args: List[str]) -> None:
   '`muck -patch` command.'
   if len(args) != 2:
     exit('''\
@@ -212,7 +214,7 @@ This command creates an empty patch called [modified].pat, and copies [original]
   exit(runC(cmd, cwd=ctx.build_dir))
 
 
-def muck_update_patch(ctx, args):
+def muck_update_patch(ctx: Ctx, args: List[str]) -> None:
   '`muck -update-patch` command.'
   if len(args) != 1:
     exit('''\
@@ -239,7 +241,7 @@ The patch file will be updated with the diff of the previously specified origina
   #^ TODO: update target instead.
 
 
-command_fns = {
+command_fns: Dict[str, Callable[[Ctx, List[str]], None]] = {
   'clean'         : muck_clean,
   'deps'          : muck_deps,
   'deps-list'     : muck_deps_list,
@@ -298,7 +300,7 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[str], force=Fal
     return update_non_product(ctx, target, is_changed=is_changed, size=size, mtime=mtime, old=old)
 
 
-def check_product_not_modified(ctx, target, actual_path, size, mtime, old):
+def check_product_not_modified(ctx: Ctx, target: str, actual_path: str, size: int, mtime: float, old: TargetRecord) -> None:
   # existing product should not have been modified since record was stored.
   # if the size changed then it was definitely modified.
   # otherwise, if the mtime is unchanged, assume that the file is ok, for speed.
@@ -313,7 +315,7 @@ def check_product_not_modified(ctx, target, actual_path, size, mtime, old):
       f'  Otherwise, save your changes if necessary and then `muck clean {target}`.')
 
 
-def update_product(ctx: Ctx, target: str, actual_path, is_changed, size, mtime, old) -> bool:
+def update_product(ctx: Ctx, target: str, actual_path: str, is_changed: bool, size: int, mtime: float, old: TargetRecord) -> bool:
   ctx.dbg(target, 'update_product')
   src = source_for_target(ctx, target)
   validate_target_or_error(ctx, src)
@@ -343,7 +345,7 @@ def update_product(ctx: Ctx, target: str, actual_path, is_changed, size, mtime, 
       is_changed=is_changed, size=size, mtime=mtime, file_hash=old.hash, src=src, old=old)
 
 
-def expanded_wild_deps(ctx, target, src):
+def expanded_wild_deps(ctx: Ctx, target: str, src: str) -> Iterable[str]:
   wild_deps = ctx.db.get_record(src).wild_deps
   if not wild_deps: return
   m = match_wilds(path_stem(src), target)
@@ -355,7 +357,7 @@ def expanded_wild_deps(ctx, target, src):
     yield wild_dep.format(**b)
 
 
-def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str):
+def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str) -> bool:
   product_path, ext = split_stem_ext(tmp_path)
   if ext not in (out_ext, tmp_ext):
     raise error(tmp_path, f'product output path has unexpected extension: {ext!r}')
@@ -390,7 +392,7 @@ def update_non_product(ctx: Ctx, target: str, is_changed: bool, size, mtime, old
 
 
 def update_deps_and_record(ctx, target: str, actual_path: str,
-  is_changed: bool, size: int, mtime: int, file_hash: Optional[str], src: str, old: TargetRecord) -> bool:
+  is_changed: bool, size: int, mtime: float, file_hash: Optional[bytes], src: Optional[str], old: TargetRecord) -> bool:
   ctx.dbg(target, 'update_deps_and_record')
   if is_changed:
     deps, wild_deps = calc_dependencies(actual_path, ctx.dir_names)
@@ -424,7 +426,7 @@ def update_deps_and_record(ctx, target: str, actual_path: str,
 
 # Dependency calculation.
 
-def calc_dependencies(path, dir_names):
+def calc_dependencies(path: str, dir_names: Dict[str, Tuple[str, ...]]) -> Tuple[List[str], List[str]]:
   '''
   Infer the dependencies for the file at `path`.
   '''
@@ -438,13 +440,13 @@ def calc_dependencies(path, dir_names):
     return fan_by_pred(sorted(set(all_deps)), has_formatter)
 
 
-def list_dependencies(src_path, src_file, dir_names):
+def list_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
   'Calculate dependencies for .list files.'
   lines = (line.strip() for line in src_file)
   return [l for l in lines if l and not l.startswith('#')]
 
 
-def mush_dependencies(src_path, src_file, dir_names):
+def mush_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> Iterable[str]:
   'Calculate dependencies for .mush files.'
   for line in src_file:
     for token in shlex.split(line):
@@ -476,7 +478,7 @@ dependency_fns = {
 # Build.
 
 
-def build_product(ctx, target: str, src_path: str, prod_path: str) -> bool:
+def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> List[str]:
   '''
   Run a source file, producing zero or more products.
   Return a list of produced product paths.
@@ -522,7 +524,7 @@ def build_product(ctx, target: str, src_path: str, prod_path: str) -> bool:
   if code != 0:
     raise error(target, f'build failed with code: {code}')
 
-  def cleanup_out():
+  def cleanup_out() -> None:
     if file_size(prod_path_out) == 0:
       remove_file(prod_path_out)
     else:
@@ -553,7 +555,7 @@ def build_product(ctx, target: str, src_path: str, prod_path: str) -> bool:
 
 
 _pythonV_V = 'python' + '.'.join(str(v) for v in sys.version_info[:2])
-build_tools = {
+build_tools: Dict[str, List[str]] = {
   '.list' : [], # no-op.
   '.mush' : ['mush'],
   '.pat' : ['pat', 'apply'],
@@ -563,7 +565,7 @@ build_tools = {
 }
 
 
-def py_env():
+def py_env() -> Dict[str, str]:
   return { 'PYTHONPATH' : current_dir() }
 
 build_tool_env_fns = {
@@ -575,7 +577,7 @@ build_tool_env_fns = {
 
 
 class InvalidTarget(Exception):
-  def __init__(self, target, msg):
+  def __init__(self, target: str, msg: str) -> None:
     super().__init__(target, msg)
     self.target = target
     self.msg = msg
@@ -583,7 +585,7 @@ class InvalidTarget(Exception):
 
 target_invalids_re = re.compile(r'[\s]|\.\.|\./|//')
 
-def validate_target(ctx, target):
+def validate_target(ctx: Ctx, target: str) -> None:
   if not target:
     raise InvalidTarget(target, 'empty string.')
   inv_m  =target_invalids_re.search(target)
@@ -597,30 +599,30 @@ def validate_target(ctx, target):
   if path_ext(target) in reserved_exts:
     raise InvalidTarget(target, 'target name has reserved extension; please rename the target.')
   try:
-    for name, _, _, _ in parse_formatters(target):
+    for name, _, _, _t in parse_formatters(target):
       if not name:
         raise InvalidTarget(target, 'contains unnamed formatter')
   except FormatError as e:
     raise InvalidTarget(target, 'invalid format') from e
 
 
-def validate_target_or_error(ctx, target):
+def validate_target_or_error(ctx: Ctx, target: str) -> None:
   try: validate_target(ctx, target)
   except InvalidTarget as e:
     exit(f'muck error: invalid target: {e.target!r}; {e.msg}')
 
 
-def is_product_path(ctx, path):
+def is_product_path(ctx: Ctx, path: str) -> bool:
   return path.startswith(ctx.build_dir_slash)
 
 
-def product_path_for_target(ctx, target_path):
+def product_path_for_target(ctx: Ctx, target_path: str) -> str:
   if target_path == ctx.build_dir or is_product_path(ctx, target_path):
     raise ValueError(f'provided target path is prefixed with build dir: {target_path}')
   return path_join(ctx.build_dir, target_path)
 
 
-def target_path_for_source(ctx, source_path):
+def target_path_for_source(ctx: Ctx, source_path: str) -> str:
   'Return the target path for `source_path` (which may itself be a product).'
   path = path_stem(source_path) # strip off source ext.
   if is_product_path(ctx, path): # source might be a product.
@@ -631,7 +633,7 @@ def target_path_for_source(ctx, source_path):
 
 _wildcard_re = re.compile(r'(%+)')
 
-def match_wilds(wildcard_path, string):
+def match_wilds(wildcard_path: str, string: str) -> Optional[Match[str]]:
   '''
   Match a string against a wildcard/format path.
   '''
@@ -685,12 +687,12 @@ def calc_size_mtime_old(ctx: Ctx, target: str, actual_path: str) -> tuple:
   return size, mtime, ctx.db.get_record(target=target)
 
 
-def file_size_and_mtime(path):
+def file_size_and_mtime(path: str) -> Tuple[int, float]:
   stats = os.stat(path)
   return (stats.st_size, stats.st_mtime)
 
 
-def source_for_target(ctx, target):
+def source_for_target(ctx: Ctx, target: str) -> str:
   '''
   Find the unique source path whose name matches `target`, or else error.
   '''
@@ -701,7 +703,7 @@ def source_for_target(ctx, target):
   return src
 
 
-def source_candidate(ctx, target, src_dir, prod_name):
+def source_candidate(ctx: Ctx, target: str, src_dir: str, prod_name: str) -> str:
   src_dir = src_dir or '.'
   try: src_dir_names = list_dir_filtered(ctx, src_dir)
   except FileNotFoundError: raise error(target, f'no such source directory: `{src_dir}`')
@@ -716,7 +718,7 @@ def source_candidate(ctx, target, src_dir, prod_name):
     raise error(deps, f'multiple source candidates matching `{target}`: {candidates}')
 
 
-def list_dir_filtered(ctx, src_dir):
+def list_dir_filtered(ctx: Ctx, src_dir: str) -> List[str]:
   '''
   Given src_dir, cache and return the list of names that might be source files.
   TODO: eventually this should be replaced by using os.scandir.
@@ -729,7 +731,7 @@ def list_dir_filtered(ctx, src_dir):
   return names
 
 
-def filter_source_names(names, prod_name):
+def filter_source_names(names: Iterable[str], prod_name: str) -> Iterable[str]:
   '''
   Given `prod_name`, find all matching source names.
   There are several concerns that make this matching complex.
@@ -751,11 +753,11 @@ def filter_source_names(names, prod_name):
       yield '.'.join(src[:len(prod)+1]) # the immediate source name has just one extension added.
 
 
-def note(path, *items):
+def note(path: str, *items: Any) -> None:
   errL(f'muck note: {path}: ', *items)
 
-def warn(path, *items):
+def warn(path: str, *items: Any) -> None:
   errL(f'muck WARNING: {path}: ', *items)
 
-def error(path, *items):
+def error(path: str, *items: Any) -> SystemExit:
   return SystemExit(''.join((f'muck error: {path}: ',) + items))
