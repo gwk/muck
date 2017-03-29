@@ -103,14 +103,16 @@ def main() -> None:
       update_dependency(ctx, target, dependent=None, force=args.force)
 
 
-
-Ctx = namedtuple('Ctx', 'db statuses dir_names dependents build_dir build_dir_slash reserved_names report_times dbg')
-# db: DB.
-# statuses: dict (target: str => is_changed: bool|Ellipsis).
-# dir_names: dict (dir_path: str => names: [str]).
-# dependents: defaultdict(set) (target: str => depedents).
-# report_times: bool.
-# dbg: debug printing function.
+class Ctx(NamedTuple):
+  db: DB
+  statuses: Dict[str, Optional[bool]]
+  dir_names: Dict[str, List[str]]
+  dependents: DefaultDict[str, Set[str]]
+  build_dir: str
+  build_dir_slash: str
+  reserved_names: FrozenSet
+  report_times: bool
+  dbg: Callable[..., None]
 
 
 # Commands.
