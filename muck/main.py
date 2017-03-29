@@ -498,7 +498,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> List[
 
   if not build_tool:
     note(target, 'no op.')
-    return False # no product.
+    return [] # no product.
 
   prod_dir = path_dir(prod_path)
   make_dirs(prod_dir)
