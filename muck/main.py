@@ -261,15 +261,15 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[str], force=Fal
   if dependent is not None:
     ctx.dependents[target].add(dependent)
 
-  try: status = ctx.statuses[target]
+  try: status: Optional[bool] = ctx.statuses[target]
   except KeyError: pass
-  else: # if in ctx.statuses, this path has already been visited on this run.
-    if status is Ellipsis: # recursion sentinal.
-      involved_paths = sorted(path for path, status in ctx.statuses.items() if status is Ellipsis)
+  else: # if in ctx.statuses, this path has already been visited during this build process run.
+    if status is None: # recursion sentinal.
+      involved_paths = sorted(path for path, status in ctx.statuses.items() if status is None)
       raise error(target, 'target has circular dependency; involved paths:', *('\n  ' + p for p in involved_paths))
     return status
 
-  ctx.statuses[target] = Ellipsis # recursion sentinal is replaced before return.
+  ctx.statuses[target] = None # recursion sentinal is replaced before return by update_deps_and_record.
 
   ctx.dbg(target, f'examining... (dependent={dependent})')
   is_product = not path_exists(target)
@@ -405,6 +405,11 @@ def update_deps_and_record(ctx, target: str, actual_path: str,
   for dep in deps:
     is_changed |= update_dependency(ctx, dep, dependent=target)
 
+  assert ctx.statuses.get(target) is None
+  #^ use get (which defaults to None) because when a script generates multiple outputs,
+  # this function gets called without a preceding call to update_dependency.
+  # TODO: is there a case where two different scripts could generate the same named file,
+  # causing this assertion to fail?
   ctx.statuses[target] = is_changed # replace sentinal with final value.
   if is_changed:
     record = TargetRecord(path=target, size=size, mtime=mtime, hash=file_hash, src=src, deps=deps, wild_deps=wild_deps)
