@@ -11,6 +11,7 @@ import base64
 import json
 import os
 import shlex
+import re
 import time
 
 from argparse import ArgumentParser
@@ -29,7 +30,7 @@ from .pithy.task import runC
 
 from .db import TargetRecord, empty_record, is_empty_record, DB, DBError
 from .constants import *
-from .paths import *
+from .paths import manifest_path
 from .py_deps import py_dependencies
 
 
@@ -351,6 +352,7 @@ def expanded_wild_deps(ctx: Ctx, target: str, src: str) -> Iterable[str]:
   wild_deps = ctx.db.get_record(src).wild_deps
   if not wild_deps: return
   m = match_wilds(path_stem(src), target)
+  assert m is not None
   bindings = m.groupdict()
   for wild_dep in wild_deps:
     b = bindings.copy()
