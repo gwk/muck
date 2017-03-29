@@ -733,7 +733,7 @@ def list_dir_filtered(ctx: Ctx, src_dir: str) -> List[str]:
   except KeyError: pass
   names = [n for n in list_dir(src_dir, hidden=False)
     if n not in ctx.reserved_names and path_ext(n) not in reserved_or_ignored_exts]
-  ctx.dir_names[dir] = names
+  ctx.dir_names[src_dir] = names
   return names
 
 
