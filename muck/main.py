@@ -326,10 +326,10 @@ def update_product(ctx: Ctx, target: str, actual_path: str, is_changed: bool, si
     is_changed = True
     if old.src:
       note(target, f'source path of target product changed\n  was: {old.src}\n  now: {src}')
-  is_changed |= update_dependency(ctx, src, dependent=target)
+  is_changed = update_dependency(ctx, src, dependent=target) or is_changed
 
   for sub_dep in expanded_wild_deps(ctx, target, src):
-    is_changed |= update_dependency(ctx, sub_dep, dependent=target)
+    is_changed = update_dependency(ctx, sub_dep, dependent=target) or is_changed
 
   if is_changed: # must rebuild product.
     tmp_paths = build_product(ctx, target, src, actual_path)
@@ -337,7 +337,7 @@ def update_product(ctx: Ctx, target: str, actual_path: str, is_changed: bool, si
     if tmp_paths:
       is_changed = False # now determine if any product has actually changed.
       for tmp_path in tmp_paths:
-        is_changed |= update_product_with_tmp(ctx, src=src, tmp_path=tmp_path)
+        is_changed = update_product_with_tmp(ctx, src=src, tmp_path=tmp_path) or is_changed
       return is_changed
     else: # no tmp paths; this is a weird corner case that we always treat as changed.
       return update_deps_and_record(ctx, target=target, actual_path=actual_path,
@@ -407,7 +407,7 @@ def update_deps_and_record(ctx, target: str, actual_path: str,
     deps = old.deps
     wild_deps = old.wild_deps
   for dep in deps:
-    is_changed |= update_dependency(ctx, dep, dependent=target)
+    is_changed = update_dependency(ctx, dep, dependent=target) or is_changed
 
   assert ctx.statuses.get(target) is None
   #^ use get (which defaults to None) because when a script generates multiple outputs,
