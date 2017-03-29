@@ -456,15 +456,15 @@ def mush_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tupl
         yield token
 
 
-try: from pat import pat_dependencies
+try: from pat import pat_dependencies # type: ignore
 except ImportError:
-  def pat_dependencies(src_path, src_file, dir_names):
+  def pat_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
     raise error(src_path, '`pat` is not installed; run `pip install pat-tool`.')
 
 
-try: from writeup.v0 import writeup_dependencies
+try: from writeup.v0 import writeup_dependencies # type: ignore
 except ImportError:
-  def writeup_dependencies(src_path, src_file, dir_names):
+  def writeup_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
     raise error(src_path, '`writeup` is not installed; run `pip install writeup-tool`.')
 
 
@@ -510,15 +510,17 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> List[
   argv = [src_path] + list(m.groups())
   cmd = build_tool + argv
 
-  try: env_fn = build_tool_env_fns[src_ext]
-  except KeyError: env = None
+  try:
+    env_fn: Callable[[], Dict[str, str]] = build_tool_env_fns[src_ext]
+  except KeyError:
+    env: Optional[Dict[str, str]] = None
   else:
     env = os.environ.copy()
     custom_env = env_fn()
     env.update(custom_env)
 
   note(target, f"building: `{' '.join(shlex.quote(w) for w in cmd)}`")
-  out_file = open(prod_path_out, 'wb')
+  out_file = cast(BinaryIO, open(prod_path_out, 'wb'))
   time_start = time.time()
   code = runC(cmd, cwd=ctx.build_dir, env=env, out=out_file)
   time_elapsed = time.time() - time_start
