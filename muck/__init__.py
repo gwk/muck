@@ -7,6 +7,7 @@ Muck client libary functions.
 import sys
 assert sys.version_info.major == 3 # python 2 is not supported.
 
+import os
 import random
 import time
 import requests
@@ -18,11 +19,11 @@ from typing import *
 from typing import IO, TextIO
 from urllib.parse import urlencode, urlparse
 
-from .pithy.path_encode import path_for_url
-from .pithy.io import errL
 from .pithy.format import has_formatter
 from .pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, path_stem
+from .pithy.io import errL
 from .pithy.json_utils import load_json, load_jsonl, load_jsons
+from .pithy.path_encode import path_for_url
 from .pithy.transform import Transformer
 
 from .constants import tmp_ext
@@ -72,6 +73,9 @@ def dst_file(binary=False, **kwargs: str) -> IO:
 
 _open_deps_parameters = { 'binary', 'buffering', 'encoding', 'errors', 'newline' }
 
+_deps_recv: Optional[TextIO] = None
+_deps_send: Optional[TextIO] = None
+
 def open_dep(target_path: str, binary=False, buffering=-1, encoding=None, errors=None, newline=None) -> IO:
   '''
   Open a dependency for reading.
@@ -79,6 +83,19 @@ def open_dep(target_path: str, binary=False, buffering=-1, encoding=None, errors
   Muck's static analysis looks specifically for this function to infer dependencies;
   `target_path` must be a string literal.
   '''
+  global _deps_recv, _deps_send
+  if _deps_recv is None:
+    try:
+      recv = int(os.environ['DEPS_RECV'])
+      send = int(os.environ['DEPS_SEND'])
+    except KeyError: pass # not running as child of muck build process.
+    else:
+      _deps_recv = cast(TextIO, open(int(recv), 'r'))
+      _deps_send = cast(TextIO, open(int(send), 'w'))
+  if _deps_recv:
+    print(target_path, file=_deps_send, flush=True)
+    ack = _deps_recv.readline()
+    if ack != target_path + '\n': raise Exception(f'muck.open_dep: dependency {target_path} was not acknowledged: {ack!r}')
   return open(target_path, mode=('rb' if binary else 'r'), buffering=buffering, encoding=encoding, errors=errors, newline=newline)
 
 

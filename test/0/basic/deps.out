@@ -1,7 +1,7 @@
 
-a.txt (dependents: index.html.wu module-import.txt.py):
+a.txt (dependents: index.html.wu module-import.txt):
 
-d.txt (dependents: b.txt.py c.txt.py):
+d.txt (dependents: b.txt c.txt):
   d.txt.py:
     basic_lib.py
 
@@ -9,13 +9,13 @@ index.html:
   index.html.wu:
     a.txt*
     b.txt:
-      b.txt.py:
-        d.txt*
+      b.txt.py
+      d.txt*
     c.txt:
       c.txt.py:
         c.txt.py.py
-        d.txt*
+      d.txt*
     linked-src.html
     module-import.txt:
-      module-import.txt.py:
-        a.txt*
+      module-import.txt.py
+      a.txt*

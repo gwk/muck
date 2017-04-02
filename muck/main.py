@@ -18,15 +18,16 @@ from argparse import ArgumentParser
 from collections import defaultdict, namedtuple
 from hashlib import sha256
 from typing import *
-from typing import BinaryIO, Match, TextIO
+from typing import BinaryIO, IO, Match, TextIO
 
 from .pithy.format import FormatError, has_formatter, format_to_re, parse_formatters
 from .pithy.fs import *
 from .pithy.io import *
 from .pithy.iterable import fan_by_pred
 from .pithy.json_utils import load_json, write_json
+from .pithy.pipe import DuplexPipe
 from .pithy.string_utils import format_byte_count
-from .pithy.task import runC
+from .pithy.task import launch, runC
 
 from .db import TargetRecord, empty_record, is_empty_record, DB, DBError
 from .constants import *
@@ -151,8 +152,9 @@ def muck_deps(ctx: Ctx, targets: List[str]) -> None:
     dependents = ctx.dependents[target]
     src = record.src
     deps = record.deps
+    dyn_deps = record.dyn_deps
     wilds = record.wild_deps
-    some = bool(src) or bool(deps) or bool(wilds)
+    some = bool(src) or bool(deps) or bool(dyn_deps) or bool(wilds)
     if depth == 0 and len(dependents) > 0:
       suffix = f' (dependents: {" ".join(sorted(dependents))}):'
     elif len(dependents) > 1: suffix = '*'
@@ -166,8 +168,11 @@ def muck_deps(ctx: Ctx, targets: List[str]) -> None:
       visit(depth + 1, src)
     for dep in deps:
       visit(depth + 1, dep)
-    for sub_dep in expanded_wild_deps(ctx, target, src):
-      visit(depth + 1, sub_dep)
+    for dyn_dep in dyn_deps:
+      visit(depth + 1, dyn_dep)
+    if src is not None:
+      for sub_dep in expanded_wild_deps(ctx, target, src):
+        visit(depth + 1, sub_dep)
 
   for root in sorted(roots):
     outL()
@@ -329,23 +334,27 @@ def update_product(ctx: Ctx, target: str, actual_path: str, is_changed: bool, si
       note(target, f'source path of target product changed\n  was: {old.src}\n  now: {src}')
   is_changed = update_dependency(ctx, src, dependent=target) or is_changed
 
+  if not is_changed:
+    for dyn_dep in old.dyn_deps:
+      is_changed = update_dependency(ctx, dyn_dep, dependent=target) or is_changed
+
   for sub_dep in expanded_wild_deps(ctx, target, src):
     is_changed = update_dependency(ctx, sub_dep, dependent=target) or is_changed
 
   if is_changed: # must rebuild product.
-    tmp_paths = build_product(ctx, target, src, actual_path)
+    dyn_deps, tmp_paths = build_product(ctx, target, src, actual_path)
     ctx.dbg(target, f'tmp_paths: {tmp_paths}')
     if tmp_paths:
       is_changed = False # now determine if any product has actually changed.
       for tmp_path in tmp_paths:
-        is_changed = update_product_with_tmp(ctx, src=src, tmp_path=tmp_path) or is_changed
+        is_changed = update_product_with_tmp(ctx, src=src, dyn_deps=dyn_deps, tmp_path=tmp_path) or is_changed
       return is_changed
     else: # no tmp paths; this is a weird corner case that we always treat as changed.
       return update_deps_and_record(ctx, target=target, actual_path=actual_path,
-        is_changed=True, size=0, mtime=0, file_hash=None, src=src, old=old)
+        is_changed=True, size=0, mtime=0, file_hash=None, src=src, dyn_deps=dyn_deps, old=old)
   else: # not is_changed.
     return update_deps_and_record(ctx, target=target, actual_path=actual_path,
-      is_changed=is_changed, size=size, mtime=mtime, file_hash=old.hash, src=src, old=old)
+      is_changed=is_changed, size=size, mtime=mtime, file_hash=old.hash, src=src, dyn_deps=old.dyn_deps, old=old)
 
 
 def expanded_wild_deps(ctx: Ctx, target: str, src: str) -> Iterable[str]:
@@ -361,7 +370,7 @@ def expanded_wild_deps(ctx: Ctx, target: str, src: str) -> Iterable[str]:
     yield wild_dep.format(**b)
 
 
-def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str) -> bool:
+def update_product_with_tmp(ctx: Ctx, src: str, dyn_deps: Tuple[str, ...], tmp_path: str) -> bool:
   product_path, ext = split_stem_ext(tmp_path)
   if ext not in (out_ext, tmp_ext):
     raise error(tmp_path, f'product output path has unexpected extension: {ext!r}')
@@ -376,7 +385,7 @@ def update_product_with_tmp(ctx: Ctx, src: str, tmp_path: str) -> bool:
   move_file(tmp_path, product_path, overwrite=True) # move regardless; if not changed, just cleans up the identical tmp file.
   note(target, f"product {'changed' if is_changed else 'did not change'}; {format_byte_count(size)}.")
   return update_deps_and_record(ctx, target=target, actual_path=product_path,
-    is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=src, old=old)
+    is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=src, dyn_deps=dyn_deps, old=old)
 
 
 def update_non_product(ctx: Ctx, target: str, is_changed: bool, size, mtime, old) -> bool:
@@ -392,11 +401,11 @@ def update_non_product(ctx: Ctx, target: str, is_changed: bool, size, mtime, old
       note(target, 'source changed.')
 
   return update_deps_and_record(ctx, target, target,
-    is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=None, old=old)
+    is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=None, dyn_deps=(), old=old)
 
 
-def update_deps_and_record(ctx, target: str, actual_path: str,
-  is_changed: bool, size: int, mtime: float, file_hash: Optional[bytes], src: Optional[str], old: TargetRecord) -> bool:
+def update_deps_and_record(ctx, target: str, actual_path: str, is_changed: bool,
+ size: int, mtime: float, file_hash: Optional[bytes], src: Optional[str], dyn_deps: Tuple[str, ...], old: TargetRecord) -> bool:
   ctx.dbg(target, 'update_deps_and_record')
   if is_changed:
     deps, wild_deps = calc_dependencies(actual_path, ctx.dir_names)
@@ -418,7 +427,7 @@ def update_deps_and_record(ctx, target: str, actual_path: str,
   # causing this assertion to fail?
   ctx.statuses[target] = is_changed # replace sentinal with final value.
   if is_changed:
-    record = TargetRecord(path=target, size=size, mtime=mtime, hash=file_hash, src=src, deps=deps, wild_deps=wild_deps)
+    record = TargetRecord(path=target, size=size, mtime=mtime, hash=file_hash, src=src, deps=deps, dyn_deps=dyn_deps, wild_deps=wild_deps)
     ctx.dbg(target, f'updated record:\n  {record}')
     if is_empty_record(old):
       ctx.db.insert_record(record)
@@ -430,7 +439,7 @@ def update_deps_and_record(ctx, target: str, actual_path: str,
 
 # Dependency calculation.
 
-def calc_dependencies(path: str, dir_names: Dict[str, Tuple[str, ...]]) -> Tuple[List[str], List[str]]:
+def calc_dependencies(path: str, dir_names: Dict[str, Tuple[str, ...]]) -> Tuple[Tuple[str, ...], Tuple[str, ...]]:
   '''
   Infer the dependencies for the file at `path`.
   '''
@@ -438,10 +447,11 @@ def calc_dependencies(path: str, dir_names: Dict[str, Tuple[str, ...]]) -> Tuple
   try:
     dep_fn = dependency_fns[ext]
   except KeyError:
-    return ([], [])
+    return ((), ())
   with open(path) as f:
     all_deps = dep_fn(path, f, dir_names)
-    return fan_by_pred(sorted(set(all_deps)), has_formatter)
+    deps, wild_deps = fan_by_pred(sorted(set(all_deps)), has_formatter)
+    return tuple(deps), tuple(wild_deps)
 
 
 def list_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
@@ -482,7 +492,7 @@ dependency_fns = {
 # Build.
 
 
-def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> List[str]:
+def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple[Tuple[str, ...], List[str]]:
   '''
   Run a source file, producing zero or more products.
   Return a list of produced product paths.
@@ -500,7 +510,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> List[
 
   if not build_tool:
     note(target, 'no op.')
-    return [] # no product.
+    return (), [] # no product.
 
   prod_dir = path_dir(prod_path)
   make_dirs(prod_dir)
@@ -512,21 +522,38 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> List[
   argv = [src_path] + list(m.groups())
   cmd = build_tool + argv
 
+  env = os.environ.copy()
   try:
     env_fn: Callable[[], Dict[str, str]] = build_tool_env_fns[src_ext]
-  except KeyError:
-    env: Optional[Dict[str, str]] = None
+  except KeyError: pass
   else:
-    env = os.environ.copy()
-    custom_env = env_fn()
-    env.update(custom_env)
+    env.update(env_fn())
 
   note(target, f"building: `{' '.join(shlex.quote(w) for w in cmd)}`")
-  out_file = cast(BinaryIO, open(prod_path_out, 'wb'))
-  time_start = time.time()
-  code = runC(cmd, cwd=ctx.build_dir, env=env, out=out_file)
-  time_elapsed = time.time() - time_start
-  out_file.close()
+  dyn_deps: List[str] = []
+  with cast(BinaryIO, open(prod_path_out, 'wb')) as out_file, DuplexPipe() as pipe:
+    deps_recv, deps_send = pipe.left_files()
+    env.update(zip(('DEPS_RECV', 'DEPS_SEND'), [str(fd) for fd in pipe.right_fds]))
+    assert env['DEPS_RECV'] is not None
+    assert env['DEPS_SEND'] is not None
+    time_start = time.time()
+    proc, _ = launch(cmd, cwd=ctx.build_dir, env=env, out=out_file, files=pipe.right_fds)
+    pipe.close_right()
+    while True:
+      dep_line = deps_recv.readline()
+      if not dep_line: break
+      dep = dep_line.rstrip('\n')
+      ctx.dbg(target, 'dep: ', dep)
+      dyn_deps.append(dep)
+      try:
+        update_dependency(ctx, dep, dependent=target) # at this point, ignore is_changed return value.
+      except (Exception, SystemExit):
+        proc.kill() # this avoids a confusing exception message from the script when muck fails.
+        raise
+      print(dep, file=deps_send, flush=True)
+    code = proc.wait()
+    time_elapsed = time.time() - time_start
+
   if code != 0:
     raise error(target, f'build failed with code: {code}')
 
@@ -557,7 +584,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> List[
     remove_file(manif_path)
   time_msg = f'{time_elapsed:0.2f} seconds ' if ctx.report_times else ''
   note(target, f'finished: {time_msg}(via {via}).')
-  return tmp_paths
+  return tuple(dyn_deps), tmp_paths
 
 
 _pythonV_V = 'python' + '.'.join(str(v) for v in sys.version_info[:2])

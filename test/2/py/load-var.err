@@ -1,3 +1,0 @@
-muck error: test/2/py/load-var.py:4:6: first argument must be a string literal; found Name.
-  load(x)
-       ^
