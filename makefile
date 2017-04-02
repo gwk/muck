@@ -8,7 +8,7 @@
 .PHONY: _default clean cov docs pip-develop pip-uninstall pypi-dist pypi-upload test typecheck
 
 # First target of a makefile is the default.
-_default: test
+_default: test typecheck
 
 clean:
 	rm -rf _build/*
