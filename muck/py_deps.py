@@ -4,9 +4,10 @@ import ast
 import re
 
 from typing import *
+from typing import TextIO
 
-from .pithy.io import *
 from .pithy.fs import is_file, path_dir, path_join
+from .pithy.io import read_line_from_path
 
 
 def src_error(path: str, line1: int, col1: int, msg: str, text: str=None) -> SystemExit:

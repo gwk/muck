@@ -20,11 +20,10 @@ class TargetRecord(NamedTuple):
   src: Optional[str] # None for non-product sources.
   deps: Tuple[str, ...] # sorted tuple of target path strings.
   dyn_deps: Tuple[str, ...]
-  wild_deps: Tuple[str, ...]
 
 
 def empty_record(target: str) -> TargetRecord:
-  return TargetRecord(path=target, size=0, mtime=0, hash=None, src=None, deps=(), dyn_deps=(), wild_deps=())
+  return TargetRecord(path=target, size=0, mtime=0, hash=None, src=None, deps=(), dyn_deps=())
 
 
 def is_empty_record(record: TargetRecord) -> bool:
@@ -34,7 +33,7 @@ def is_empty_record(record: TargetRecord) -> bool:
 class DBError(Exception): pass
 
 
-idx_id, idx_path, idx_size, idx_mtime, idx_hash, idx_src, idx_deps, idx_dyn_deps, idx_wild_deps = range(9)
+idx_id, idx_path, idx_size, idx_mtime, idx_hash, idx_src, idx_deps, idx_dyn_deps = range(8)
 
 
 class DB:
@@ -59,8 +58,7 @@ class DB:
       hash BLOB,
       src TEXT,
       deps BLOB,
-      dyn_deps BLOB,
-      wild_deps BLOB
+      dyn_deps BLOB
     )''')
 
     self.run('CREATE UNIQUE INDEX IF NOT EXISTS target_paths ON targets(path)')
@@ -93,7 +91,7 @@ class DB:
     if rows:
       r = rows[0]
       return TargetRecord(target, r[idx_size], r[idx_mtime], r[idx_hash], r[idx_src],
-        from_marshalled(r[idx_deps]), from_marshalled(r[idx_dyn_deps]), from_marshalled(r[idx_wild_deps]))
+        from_marshalled(r[idx_deps]), from_marshalled(r[idx_dyn_deps]))
     else:
       return empty_record(target)
 
@@ -101,21 +99,20 @@ class DB:
   def update_record(self, record: TargetRecord) -> None:
     self.run(
       'UPDATE targets SET '
-      'size=:size, mtime=:mtime, hash=:hash, src=:src, '
-      'deps=:deps, dyn_deps=:dyn_deps, wild_deps=:wild_deps '
+      'size=:size, mtime=:mtime, hash=:hash, src=:src, deps=:deps, dyn_deps=:dyn_deps '
       'WHERE path=:path',
       size=record.size, mtime=record.mtime, hash=record.hash, src=record.src,
-      deps=to_marshalled(record.deps), dyn_deps=to_marshalled(record.dyn_deps), wild_deps=to_marshalled(record.wild_deps),
+      deps=to_marshalled(record.deps), dyn_deps=to_marshalled(record.dyn_deps),
       path=record.path)
 
 
   def insert_record(self, record: TargetRecord) -> None:
     try:
       self.run(
-        'INSERT INTO targets (path, size, mtime, hash, src, deps, dyn_deps, wild_deps) '
-        'VALUES (:path, :size, :mtime, :hash, :src, :deps, :dyn_deps, :wild_deps)',
+        'INSERT INTO targets (path, size, mtime, hash, src, deps, dyn_deps) '
+        'VALUES (:path, :size, :mtime, :hash, :src, :deps, :dyn_deps)',
         path=record.path, size=record.size, mtime=record.mtime, hash=record.hash, src=record.src,
-        deps=to_marshalled(record.deps), dyn_deps=to_marshalled(record.dyn_deps), wild_deps=to_marshalled(record.wild_deps))
+        deps=to_marshalled(record.deps), dyn_deps=to_marshalled(record.dyn_deps))
     except IntegrityError as e: #!cov-ignore.
       raise DBError(f'insert_record: target path is not unique: {record.path}') from e
 

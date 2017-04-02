@@ -20,7 +20,7 @@ from hashlib import sha256
 from typing import *
 from typing import BinaryIO, IO, Match, TextIO
 
-from .pithy.format import FormatError, has_formatter, format_to_re, parse_formatters
+from .pithy.format import FormatError, format_to_re, parse_formatters
 from .pithy.fs import *
 from .pithy.io import *
 from .pithy.iterable import fan_by_pred
@@ -153,8 +153,7 @@ def muck_deps(ctx: Ctx, targets: List[str]) -> None:
     src = record.src
     deps = record.deps
     dyn_deps = record.dyn_deps
-    wilds = record.wild_deps
-    some = bool(src) or bool(deps) or bool(dyn_deps) or bool(wilds)
+    some = bool(src) or bool(deps) or bool(dyn_deps)
     if depth == 0 and len(dependents) > 0:
       suffix = f' (dependents: {" ".join(sorted(dependents))}):'
     elif len(dependents) > 1: suffix = '*'
@@ -162,17 +161,12 @@ def muck_deps(ctx: Ctx, targets: List[str]) -> None:
     else: suffix = ''
     outL('  ' * depth, target, suffix)
     if depth > 0 and len(dependents) > 1: return
-    for wild in wilds:
-      outL('  ' * depth, ' ~', wild)
     if src is not None:
       visit(depth + 1, src)
     for dep in deps:
       visit(depth + 1, dep)
     for dyn_dep in dyn_deps:
       visit(depth + 1, dyn_dep)
-    if src is not None:
-      for sub_dep in expanded_wild_deps(ctx, target, src):
-        visit(depth + 1, sub_dep)
 
   for root in sorted(roots):
     outL()
@@ -338,9 +332,6 @@ def update_product(ctx: Ctx, target: str, actual_path: str, is_changed: bool, si
     for dyn_dep in old.dyn_deps:
       is_changed = update_dependency(ctx, dyn_dep, dependent=target) or is_changed
 
-  for sub_dep in expanded_wild_deps(ctx, target, src):
-    is_changed = update_dependency(ctx, sub_dep, dependent=target) or is_changed
-
   if is_changed: # must rebuild product.
     dyn_deps, tmp_paths = build_product(ctx, target, src, actual_path)
     ctx.dbg(target, f'tmp_paths: {tmp_paths}')
@@ -355,19 +346,6 @@ def update_product(ctx: Ctx, target: str, actual_path: str, is_changed: bool, si
   else: # not is_changed.
     return update_deps_and_record(ctx, target=target, actual_path=actual_path,
       is_changed=is_changed, size=size, mtime=mtime, file_hash=old.hash, src=src, dyn_deps=old.dyn_deps, old=old)
-
-
-def expanded_wild_deps(ctx: Ctx, target: str, src: str) -> Iterable[str]:
-  wild_deps = ctx.db.get_record(src).wild_deps
-  if not wild_deps: return
-  m = match_wilds(path_stem(src), target)
-  assert m is not None
-  bindings = m.groupdict()
-  for wild_dep in wild_deps:
-    b = bindings.copy()
-    for name, _, _, value_type in parse_formatters(wild_dep):
-      b[name] = value_type(bindings[name])
-    yield wild_dep.format(**b)
 
 
 def update_product_with_tmp(ctx: Ctx, src: str, dyn_deps: Tuple[str, ...], tmp_path: str) -> bool:
@@ -408,15 +386,13 @@ def update_deps_and_record(ctx, target: str, actual_path: str, is_changed: bool,
  size: int, mtime: float, file_hash: Optional[bytes], src: Optional[str], dyn_deps: Tuple[str, ...], old: TargetRecord) -> bool:
   ctx.dbg(target, 'update_deps_and_record')
   if is_changed:
-    deps, wild_deps = calc_dependencies(actual_path, ctx.dir_names)
+    deps = calc_dependencies(actual_path, ctx.dir_names)
     for dep in deps:
       try: validate_target(ctx, dep)
       except InvalidTarget as e:
         exit(f'muck error: {target}: invalid dependency: {e.target!r}: {e.msg}')
-      # TODO: validate wild_deps? how?
   else:
     deps = old.deps
-    wild_deps = old.wild_deps
   for dep in deps:
     is_changed = update_dependency(ctx, dep, dependent=target) or is_changed
 
@@ -427,7 +403,7 @@ def update_deps_and_record(ctx, target: str, actual_path: str, is_changed: bool,
   # causing this assertion to fail?
   ctx.statuses[target] = is_changed # replace sentinal with final value.
   if is_changed:
-    record = TargetRecord(path=target, size=size, mtime=mtime, hash=file_hash, src=src, deps=deps, dyn_deps=dyn_deps, wild_deps=wild_deps)
+    record = TargetRecord(path=target, size=size, mtime=mtime, hash=file_hash, src=src, deps=deps, dyn_deps=dyn_deps)
     ctx.dbg(target, f'updated record:\n  {record}')
     if is_empty_record(old):
       ctx.db.insert_record(record)
@@ -439,7 +415,7 @@ def update_deps_and_record(ctx, target: str, actual_path: str, is_changed: bool,
 
 # Dependency calculation.
 
-def calc_dependencies(path: str, dir_names: Dict[str, Tuple[str, ...]]) -> Tuple[Tuple[str, ...], Tuple[str, ...]]:
+def calc_dependencies(path: str, dir_names: Dict[str, Tuple[str, ...]]) -> Tuple[str, ...]:
   '''
   Infer the dependencies for the file at `path`.
   '''
@@ -447,11 +423,9 @@ def calc_dependencies(path: str, dir_names: Dict[str, Tuple[str, ...]]) -> Tuple
   try:
     dep_fn = dependency_fns[ext]
   except KeyError:
-    return ((), ())
+    return ()
   with open(path) as f:
-    all_deps = dep_fn(path, f, dir_names)
-    deps, wild_deps = fan_by_pred(sorted(set(all_deps)), has_formatter)
-    return tuple(deps), tuple(wild_deps)
+    return tuple(dep_fn(path, f, dir_names))
 
 
 def list_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
@@ -480,7 +454,7 @@ except ImportError:
     raise error(src_path, '`writeup` is not installed; run `pip install writeup-tool`.')
 
 
-dependency_fns = {
+dependency_fns: Dict[str, Callable[..., Iterable[str]]] = {
   '.list' : list_dependencies,
   '.mush' : mush_dependencies,
   '.pat' : pat_dependencies,
