@@ -10,14 +10,10 @@ b-through-{i}.txt.py (dependents: b-through-0.txt b-through-1.txt):
 c-many.txt:
   c-many.txt.py
   a-to-many-0.txt*
-  a-to-many-1.txt*
   b-through-0.txt:
     b-through-{i}.txt.py*
     a-to-many-0.txt*
+  a-to-many-1.txt*
   b-through-1.txt:
     b-through-{i}.txt.py*
     a-to-many-1.txt*
-  a-to-many-0.txt*
-  b-through-0.txt:
-    b-through-{i}.txt.py*
-    a-to-many-0.txt*

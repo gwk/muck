@@ -7,7 +7,6 @@ from typing import *
 
 from .pithy.io import *
 from .pithy.fs import is_file, path_dir, path_join
-from .paths import bindings_for_format, paths_from_format
 
 
 def src_error(path: str, line1: int, col1: int, msg: str, text: str=None) -> SystemExit:

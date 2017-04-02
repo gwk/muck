@@ -27,7 +27,7 @@ from .pithy.path_encode import path_for_url
 from .pithy.transform import Transformer
 
 from .constants import tmp_ext
-from .paths import bindings_for_format, bindings_from_argv, dflt_prod_path_for_source, dst_path, manifest_path, paths_from_format
+from .paths import bindings_from_argv, dflt_prod_path_for_source, dst_path, manifest_path
 
 
 # module exports.
@@ -37,7 +37,6 @@ __all__ = [
   'dst_file',
   'fetch',
   'load',
-  'load_many',
   'load_url',
   'open_dep',
   'transform',
@@ -169,13 +168,6 @@ def load(target_path: str, ext=None, **kwargs: Any) -> Any:
     del kwargs[k] # only pass this arg to open_deps; del is safe because kwargs has local lifetime.
   file = open_dep(subs_path, **open_args)
   return load_fn(file, **kwargs)
-
-
-def load_many(format_path: str, ext=None, **kwargs: Any) -> Iterable[Any]:
-  seqs = dict(bindings_for_format(format_path, kwargs))
-  for k in seqs: del kwargs[k] # for clarity, do not pass format sequence items to `load`.
-  for path, args in paths_from_format(format_path, seqs):
-    yield load(path, ext=ext, **kwargs), args
 
 
 class HTTPError(Exception):
