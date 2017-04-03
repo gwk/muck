@@ -20,6 +20,7 @@ from hashlib import sha256
 from typing import *
 from typing import BinaryIO, IO, Match, TextIO
 
+from .pithy.ansi import TXT_L_ERR, TXT_Y_ERR, RST_ERR
 from .pithy.format import FormatError, format_to_re, parse_formatters
 from .pithy.fs import *
 from .pithy.io import *
@@ -761,10 +762,10 @@ def filter_source_names(names: Iterable[str], prod_name: str) -> Iterable[str]:
 
 
 def note(path: str, *items: Any) -> None:
-  errL(f'muck note: {path}: ', *items)
+  errL(TXT_L_ERR, f'muck note: {path}: ', *items, RST_ERR)
 
 def warn(path: str, *items: Any) -> None:
-  errL(f'muck WARNING: {path}: ', *items)
+  errL(TXT_Y_ERR, f'muck WARNING: {path}: ', *items, RST_ERR)
 
 def error(path: str, *items: Any) -> SystemExit:
   return SystemExit(''.join((f'muck error: {path}: ',) + items))
