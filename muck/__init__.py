@@ -201,7 +201,7 @@ def _fetch(url: str, timeout: int, headers: Dict[str, str], expected_status_code
   return r
 
 
-def fetch(url: str, cache_path: str=None, params: Dict[str, str]={}, headers: Dict[str, str]={}, expected_status_code=200, timeout=4, delay=0, delay_range=0, spoof=False) -> str:
+def fetch(url: str, cache_path: str=None, params: Dict[str, str]={}, headers: Dict[str, str]={}, expected_status_code=200, timeout=30, delay=0, delay_range=0, spoof=False) -> str:
   "Fetch the data at `url` and save it to a path in the '_fetch' directory derived from the URL."
   if params:
     if '?' in url: raise ValueError("params specified but url already contains '?'")
@@ -227,7 +227,7 @@ def fetch(url: str, cache_path: str=None, params: Dict[str, str]={}, headers: Di
   return path
 
 
-def load_url(url: str, ext: str=None, cache_path: str=None, params: Dict[str, str]={}, headers: Dict[str, str]={}, expected_status_code=200, timeout=4, delay=0, delay_range=0, spoof=False, **kwargs: Any) -> Any:
+def load_url(url: str, ext: str=None, cache_path: str=None, params: Dict[str, str]={}, headers: Dict[str, str]={}, expected_status_code=200, timeout=30, delay=0, delay_range=0, spoof=False, **kwargs: Any) -> Any:
   'Fetch the data at `url` and then load using `muck.load`.'
   # note: implementing uncached requests efficiently requires new versions of the source functions;
   # these will take a text argument instead of a path argument.
