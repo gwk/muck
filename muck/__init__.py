@@ -83,18 +83,20 @@ def open_dep(target_path: str, binary=False, buffering=-1, encoding=None, errors
   `target_path` must be a string literal.
   '''
   global _deps_recv, _deps_send
-  if _deps_recv is None:
-    try:
-      recv = int(os.environ['DEPS_RECV'])
-      send = int(os.environ['DEPS_SEND'])
-    except KeyError: pass # not running as child of muck build process.
-    else:
-      _deps_recv = cast(TextIO, open(int(recv), 'r'))
-      _deps_send = cast(TextIO, open(int(send), 'w'))
-  if _deps_recv:
-    print(target_path, file=_deps_send, flush=True)
-    ack = _deps_recv.readline()
-    if ack != target_path + '\n': raise Exception(f'muck.open_dep: dependency {target_path} was not acknowledged: {ack!r}')
+  if not target_path.startswith('/') and not target_path.startswith('../'):
+    if _deps_recv is None:
+      try:
+        recv = int(os.environ['DEPS_RECV'])
+        send = int(os.environ['DEPS_SEND'])
+      except KeyError: pass # not running as child of muck build process.
+      else:
+        _deps_recv = cast(TextIO, open(int(recv), 'r'))
+        _deps_send = cast(TextIO, open(int(send), 'w'))
+    if _deps_recv:
+      print(target_path, file=_deps_send, flush=True)
+      ack = _deps_recv.readline()
+      if ack != target_path + '\n':
+        raise Exception(f'muck.open_dep: dependency {target_path} was not acknowledged: {ack!r}')
   return open(target_path, mode=('rb' if binary else 'r'), buffering=buffering, encoding=encoding, errors=errors, newline=newline)
 
 
