@@ -242,7 +242,7 @@ def load_url(url: str, ext: str=None, cache_path: str=None, params: Dict[str, st
       ext = path_ext(cache_path)
     else:
       parts = urlparse(url)
-      ext = path_ext(parts.path)
+      ext = path_ext(parts.path) # TODO: support compound extensions, e.g. 'tar.gz'.
   path = fetch(url, cache_path=cache_path, params=params, headers=headers, expected_status_code=expected_status_code,
     timeout=timeout, delay=delay, delay_range=delay_range, spoof=spoof)
   return load(path, ext=ext, **kwargs)
