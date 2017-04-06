@@ -16,6 +16,7 @@ import time
 
 from argparse import ArgumentParser
 from collections import defaultdict, namedtuple
+from datetime import datetime
 from hashlib import sha256
 from typing import *
 from typing import BinaryIO, IO, Match, TextIO
@@ -312,7 +313,7 @@ def check_product_not_modified(ctx: Ctx, target: str, actual_path: str, size: in
   # and we would rather compute the hash than report a false problem.
   if size != old.size or (mtime != old.mtime and
     (size > max_hash_size or hash_for_path(actual_path, size, max_hash_size) != old.hash)):
-    ctx.dbg(target, f'size: {old.size} -> {size}; mtime: {old.mtime} -> {mtime}')
+    ctx.dbg(target, f'size: {old.size} -> {size}; mtime: {disp_mtime(old.mtime)} -> {mtime}')
     # TODO: change language depending on whether product is derived from a patch?
     raise error(target, 'existing product has changed; did you mean to update a patch?\n'
       f'  Otherwise, save your changes if necessary and then `muck clean {target}`.')
@@ -691,7 +692,7 @@ def calc_size_mtime_old(ctx: Ctx, target: str, actual_path: str) -> tuple:
     size, mtime = file_size_and_mtime(actual_path)
   except FileNotFoundError:
     size, mtime = 0, 0
-  ctx.dbg(target, f'size: {size}; mtime: {mtime}')
+  ctx.dbg(target, f'size: {size}; mtime: {disp_mtime(mtime)}')
   return size, mtime, ctx.db.get_record(target=target)
 
 
@@ -769,3 +770,7 @@ def warn(path: str, *items: Any) -> None:
 
 def error(path: str, *items: Any) -> SystemExit:
   return SystemExit(''.join((f'muck error: {path}: ',) + items))
+
+
+def disp_mtime(mtime: float) -> str:
+  return str(datetime.fromtimestamp(mtime))
