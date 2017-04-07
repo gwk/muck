@@ -1,8 +1,0 @@
-{
-  'compile': ['touch .project-root'],
-  'cmd': './client.py',
-  'links': {
-    'test/0/client.py',
-    'test/0/client',
-  },
-}

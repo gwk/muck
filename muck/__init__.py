@@ -33,6 +33,7 @@ from .paths import bindings_from_argv, dflt_prod_path_for_source, dst_path, mani
 # module exports.
 __all__ = [
   'HTTPError',
+  'argv',
   'add_loader',
   'dst_file',
   'fetch',
