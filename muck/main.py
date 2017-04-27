@@ -294,6 +294,7 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[str], force=Fal
       note(target, f"target is {'now' if is_product else 'no longer'} a product.")
       is_changed = True
     if not has_old_file:
+      assert is_product
       note(target, 'old product was deleted.')
 
   if is_product:
