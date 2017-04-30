@@ -381,7 +381,7 @@ def update_non_product(ctx: Ctx, target: str, is_changed: bool, size, mtime, old
     if is_changed: # this is more interesting; report.
       note(target, 'source changed.')
 
-  return update_deps_and_record(ctx, target, target,
+  return update_deps_and_record(ctx, target, actual_path=target,
     is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=None, dyn_deps=(), old=old)
 
 
