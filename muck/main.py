@@ -314,9 +314,9 @@ def check_product_not_modified(ctx: Ctx, target: str, actual_path: str, size: in
   # existing product should not have been modified since record was stored.
   # if the size changed then it was definitely modified.
   # otherwise, if the mtime is unchanged, assume that the file is ok, for speed.
-  # if the mtime changed, check the hash;
+  # if the mtime changed, and the file is sufficiently small, then check the hash;
   # the user might have made an accidental edit and then reverted it,
-  # and we would rather compute the hash than report a false problem.
+  # and we would rather compute small hashes than report a false problem.
   if size != old.size or (mtime != old.mtime and
     (size > max_hash_size or hash_for_path(actual_path, size, max_hash_size) != old.hash)):
     ctx.dbg(target, f'size: {old.size} -> {size}; mtime: {disp_mtime(old.mtime)} -> {mtime}')
@@ -371,7 +371,9 @@ def update_product_with_tmp(ctx: Ctx, src: str, dyn_deps: Tuple[str, ...], tmp_p
   is_changed = (old is None or size != old.size or size > max_hash_size or file_hash != old.hash)
   if is_changed:
     ctx.db.delete_record(target=target) # delete metadata if it exists, just before overwrite, in case muck fails before update.
-  move_file(tmp_path, product_path, overwrite=True) # move regardless; if not changed, just cleans up the identical tmp file.
+    move_file(tmp_path, product_path, overwrite=True)
+  else: # do not overwrite old because we want to preserve the old mtime.
+    remove_file(tmp_path)
   note(target, f"product {'changed' if is_changed else 'did not change'}; {format_byte_count(size)}.")
   return update_deps_and_record(ctx, target=target, actual_path=product_path,
     is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=src, dyn_deps=dyn_deps, old=old)
@@ -386,9 +388,15 @@ def update_non_product(ctx: Ctx, target: str, is_changed: bool, old: Optional[Ta
     remove_file_if_exists(product)
     make_link(target, product, make_dirs=True)
   else: # all we know so far is that it exists and status as a source has not changed.
-    is_changed = (old is None or size != old.size or file_hash != old.hash)
+    is_changed = (old is None or size != old.size or size > max_hash_size or file_hash != old.hash)
     if is_changed: # this is more interesting; report.
       note(target, 'source changed.')
+    else:
+      assert old is not None
+      if mtime != old.mtime:
+        mtime = old.mtime
+        note(target, 'source mtime changed but contents did not; reverting to: ', disp_mtime(mtime))
+        set_file_time_mod(target, mtime)
 
   return update_deps_and_record(ctx, target, actual_path=target,
     is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=None, dyn_deps=(), old=old)
