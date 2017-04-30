@@ -1,5 +1,5 @@
 {
-  'desc': 'initial',
+  'desc': 'initial.',
   'cmd': '$MUCK -no-times',
   'code': 0,
   'files': {
