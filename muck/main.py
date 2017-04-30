@@ -295,7 +295,7 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[str], force=Fal
 
   if is_product:
     size: Optional[int] = None
-    mtime: Optional[float] = None
+    mtime = 0.0
     try: size, mtime = file_size_and_mtime(actual_path)
     except FileNotFoundError: pass
     if old is not None:
@@ -303,7 +303,6 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[str], force=Fal
         note(target, 'old product was deleted.')
         is_changed = True
       else:
-        assert mtime is not None
         check_product_not_modified(ctx, target, actual_path, size=size, mtime=mtime, old=old)
     return update_product(ctx, target, actual_path, is_changed=is_changed, size=size, mtime=mtime, old=old)
   else:
@@ -325,7 +324,7 @@ def check_product_not_modified(ctx: Ctx, target: str, actual_path: str, size: in
       f'  Otherwise, save your changes if necessary and then `muck clean {target}`.')
 
 
-def update_product(ctx: Ctx, target: str, actual_path: str, is_changed: bool, size: Optional[int], mtime: Optional[float], old: Optional[TargetRecord]) -> bool:
+def update_product(ctx: Ctx, target: str, actual_path: str, is_changed: bool, size: Optional[int], mtime: float, old: Optional[TargetRecord]) -> bool:
   ctx.dbg(target, 'update_product')
   src = source_for_target(ctx, target)
   validate_target_or_error(ctx, src)
@@ -352,7 +351,6 @@ def update_product(ctx: Ctx, target: str, actual_path: str, is_changed: bool, si
         is_changed=True, size=0, mtime=0, file_hash=b'', src=src, dyn_deps=dyn_deps, old=old)
   else: # not is_changed.
     assert size is not None
-    assert mtime is not None
     assert old is not None
     return update_deps_and_record(ctx, target=target, actual_path=actual_path,
       is_changed=is_changed, size=size, mtime=mtime, file_hash=old.hash, src=src, dyn_deps=old.dyn_deps, old=old)
@@ -783,4 +781,4 @@ def error(path: str, *items: Any) -> SystemExit:
 
 
 def disp_mtime(mtime: Optional[float]) -> str:
-  return 'None' if mtime is None else str(datetime.fromtimestamp(mtime))
+  return str(datetime.fromtimestamp(mtime)) if mtime else '0'
