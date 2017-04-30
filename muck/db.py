@@ -14,20 +14,12 @@ from .pithy.io import errL, errSL
 
 class TargetRecord(NamedTuple):
   path: str # target path (not product paths prefixed with build dir).
-  size: int # 0 for empty/missing records, but can also be 0 for legitimate records.
-  mtime: float # 0 for empty/missing records.
-  hash: Optional[bytes]
+  size: int
+  mtime: float
+  hash: bytes
   src: Optional[str] # None for non-product sources.
   deps: Tuple[str, ...] # sorted tuple of target path strings.
   dyn_deps: Tuple[str, ...]
-
-
-def empty_record(target: str) -> TargetRecord:
-  return TargetRecord(path=target, size=0, mtime=0, hash=None, src=None, deps=(), dyn_deps=())
-
-
-def is_empty_record(record: TargetRecord) -> bool:
-  return record.hash is None
 
 
 class DBError(Exception): pass
@@ -83,7 +75,7 @@ class DB:
     return bool(count)
 
 
-  def get_record(self, target: str) -> TargetRecord:
+  def get_record(self, target: str) -> Optional[TargetRecord]:
     c = self.run('SELECT * FROM targets WHERE path=:path', path=target)
     rows = c.fetchall()
     if len(rows) > 1:
@@ -93,7 +85,7 @@ class DB:
       return TargetRecord(target, r[idx_size], r[idx_mtime], r[idx_hash], r[idx_src],
         from_marshalled(r[idx_deps]), from_marshalled(r[idx_dyn_deps]))
     else:
-      return empty_record(target)
+      return None
 
 
   def update_record(self, record: TargetRecord) -> None:
