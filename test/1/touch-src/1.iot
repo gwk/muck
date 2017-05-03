@@ -1,6 +1,6 @@
 {
   'compile': [
-    'sleep 1',
+    'sleep 1', # necessary due to poor HFS+ timestamp resolution.
     'touch a.txt.py',
   ],
   'cmd': '$MUCK -no-times c.txt',
