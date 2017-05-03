@@ -2,7 +2,7 @@
 
 '''
 Muck stores build info in an sqlite3 database.
-It is a single table and could be swapped out for a different key-value store.
+However the database operations are simple and could be replaced with a simple key-value store.
 '''
 
 from marshal import dumps as to_marshalled, loads as from_marshalled
@@ -16,6 +16,7 @@ class TargetRecord(NamedTuple):
   path: str # target path (not product paths prefixed with build dir).
   size: int
   mtime: float
+  ptime: int
   hash: bytes
   src: Optional[str] # None for non-product sources.
   deps: Tuple[str, ...] # sorted tuple of target path strings.
@@ -25,7 +26,7 @@ class TargetRecord(NamedTuple):
 class DBError(Exception): pass
 
 
-idx_id, idx_path, idx_size, idx_mtime, idx_hash, idx_src, idx_deps, idx_dyn_deps = range(8)
+idx_id, idx_path, idx_size, idx_mtime, idx_ptime, idx_hash, idx_src, idx_deps, idx_dyn_deps = range(9)
 
 
 class DB:
@@ -47,13 +48,25 @@ class DB:
       path TEXT,
       size INT,
       mtime REAL,
+      ptime INT,
       hash BLOB,
       src TEXT,
       deps BLOB,
       dyn_deps BLOB
     )''')
 
-    self.run('CREATE UNIQUE INDEX IF NOT EXISTS target_paths ON targets(path)')
+    self.run('CREATE UNIQUE INDEX IF NOT EXISTS targets_paths ON targets(path)')
+
+    self.run('''
+    CREATE TABLE IF NOT EXISTS globals (
+      id INTEGER PRIMARY KEY,
+      key BLOB,
+      val BLOB
+    )''')
+
+    self.run('CREATE UNIQUE INDEX IF NOT EXISTS globals_keys ON globals(key)')
+    self.run('INSERT OR IGNORE INTO globals (key, val) VALUES ("ptime", 0)')
+
 
 
   def run(self, query: str, **args: Any) -> Cursor:
@@ -82,7 +95,7 @@ class DB:
       raise DBError(f'multiple rows matching target path: {target!r}') #!cov-ignore.
     if rows:
       r = rows[0]
-      return TargetRecord(target, r[idx_size], r[idx_mtime], r[idx_hash], r[idx_src],
+      return TargetRecord(target, r[idx_size], r[idx_mtime], r[idx_ptime], r[idx_hash], r[idx_src],
         from_marshalled(r[idx_deps]), from_marshalled(r[idx_dyn_deps]))
     else:
       return None
@@ -91,9 +104,9 @@ class DB:
   def update_record(self, record: TargetRecord) -> None:
     self.run(
       'UPDATE targets SET '
-      'size=:size, mtime=:mtime, hash=:hash, src=:src, deps=:deps, dyn_deps=:dyn_deps '
+      'size=:size, mtime=:mtime, ptime=:ptime, hash=:hash, src=:src, deps=:deps, dyn_deps=:dyn_deps '
       'WHERE path=:path',
-      size=record.size, mtime=record.mtime, hash=record.hash, src=record.src,
+      size=record.size, mtime=record.mtime, ptime=record.ptime, hash=record.hash, src=record.src,
       deps=to_marshalled(record.deps), dyn_deps=to_marshalled(record.dyn_deps),
       path=record.path)
 
@@ -101,9 +114,9 @@ class DB:
   def insert_record(self, record: TargetRecord) -> None:
     try:
       self.run(
-        'INSERT INTO targets (path, size, mtime, hash, src, deps, dyn_deps) '
-        'VALUES (:path, :size, :mtime, :hash, :src, :deps, :dyn_deps)',
-        path=record.path, size=record.size, mtime=record.mtime, hash=record.hash, src=record.src,
+        'INSERT INTO targets (path, size, mtime, ptime, hash, src, deps, dyn_deps) '
+        'VALUES (:path, :size, :mtime, :ptime, :hash, :src, :deps, :dyn_deps)',
+        path=record.path, size=record.size, mtime=record.mtime, ptime=record.ptime, hash=record.hash, src=record.src,
         deps=to_marshalled(record.deps), dyn_deps=to_marshalled(record.dyn_deps))
     except IntegrityError as e: #!cov-ignore.
       raise DBError(f'insert_record: target path is not unique: {record.path}') from e
@@ -111,5 +124,15 @@ class DB:
 
   def delete_record(self, target: str) -> None:
     self.run('DELETE FROM targets WHERE path=:path', path=target)
+
+
+  def inc_ptime(self) -> int:
+    self.run('UPDATE globals SET val = val + 1 WHERE key = "ptime"')
+    c = self.run('SELECT val FROM globals WHERE key="ptime"')
+    rows = c.fetchall()
+    assert len(rows) == 1
+    val = rows[0][0]
+    assert isinstance(val, int)
+    return val
 
 

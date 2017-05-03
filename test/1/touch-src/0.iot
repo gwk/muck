@@ -1,0 +1,9 @@
+{
+  'cmd': '$MUCK -no-times c.txt',
+  'code': 0,
+  'links': {
+    'test/1/touch-src/a.txt.py',
+    'test/1/touch-src/b.txt.py',
+    'test/1/touch-src/c.txt.py',
+  }
+}

@@ -1,7 +1,0 @@
-{
-  'desc': 'touch b.txt.py; rebuild reverts mtime.',
-  'compile': ['touch b.txt.py'],
-  'cmd': '$MUCK -no-times',
-  'code': 0,
-  'err_mode': 'match',
-}

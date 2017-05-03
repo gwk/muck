@@ -1,0 +1,8 @@
+{
+  'compile': [
+    'sleep 1',
+    'touch a.txt.py',
+  ],
+  'cmd': '$MUCK -no-times c.txt',
+  'code': 0,
+}

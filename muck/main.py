@@ -86,7 +86,7 @@ def main() -> None:
     db_name,
   })
 
-  ctx = Ctx(db=DB(path=db_path), statuses={}, dir_names={}, dependents=defaultdict(set),
+  ctx = Ctx(db=DB(path=db_path), trans_times={}, dir_names={}, dependents=defaultdict(set),
     build_dir=build_dir, build_dir_slash=build_dir_slash,
     reserved_names=reserved_names, report_times=(not args.no_times), dbg=dbg)
 
@@ -109,7 +109,7 @@ def main() -> None:
 
 class Ctx(NamedTuple):
   db: DB
-  statuses: Dict[str, Optional[bool]]
+  trans_times: Dict[str, Optional[int]]
   dir_names: Dict[str, List[str]]
   dependents: DefaultDict[str, Set[str]]
   build_dir: str
@@ -183,7 +183,7 @@ def muck_deps_list(ctx: Ctx, targets: List[str]) -> None:
   for target in sorted(targets):
     update_dependency(ctx, target, dependent=None)
 
-  outLL(*sorted(ctx.statuses))
+  outLL(*sorted(ctx.trans_times))
 
 
 def muck_prod_list(ctx: Ctx, targets: List[str]) -> None:
@@ -193,7 +193,7 @@ def muck_prod_list(ctx: Ctx, targets: List[str]) -> None:
   for target in sorted(targets):
     update_dependency(ctx, target, dependent=None)
 
-  outLL(*sorted(product_path_for_target(ctx, t) for t in ctx.statuses))
+  outLL(*sorted(product_path_for_target(ctx, t) for t in ctx.trans_times))
 
 
 def muck_create_patch(ctx: Ctx, args: List[str]) -> None:
@@ -259,24 +259,24 @@ command_fns: Dict[str, Callable[[Ctx, List[str]], None]] = {
 # Default update functionality.
 
 
-def update_dependency(ctx: Ctx, target: str, dependent: Optional[str], force=False) -> bool:
+def update_dependency(ctx: Ctx, target: str, dependent: Optional[str], force=False) -> int:
   '''
-  returns is_changed.
+  returns ptime.
   '''
   validate_target(ctx, target)
 
   if dependent is not None:
     ctx.dependents[target].add(dependent)
 
-  try: status: Optional[bool] = ctx.statuses[target]
+  try: trans_time = ctx.trans_times[target]
   except KeyError: pass
-  else: # if in ctx.statuses, this path has already been visited during this build process run.
-    if status is None: # recursion sentinal.
-      involved_paths = sorted(path for path, status in ctx.statuses.items() if status is None)
+  else: # if in ctx.trans_times, this path has already been visited during this build process run.
+    if trans_time is None: # recursion sentinal.
+      involved_paths = sorted(path for path, t in ctx.trans_times.items() if t is None)
       raise error(target, 'target has circular dependency; involved paths:', *('\n  ' + p for p in involved_paths))
-    return status
+    return trans_time
 
-  ctx.statuses[target] = None # recursion sentinal is replaced before return by update_deps_and_record.
+  ctx.trans_times[target] = None # recursion sentinal is replaced before return by update_deps_and_record.
 
   ctx.dbg(target, f'examining... (dependent={dependent})')
   is_product = not path_exists(target)
@@ -312,7 +312,7 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[str], force=Fal
 def check_product_not_modified(ctx: Ctx, target: str, actual_path: str, size: int, mtime: float, old: TargetRecord) -> None:
   # existing product should not have been modified since record was stored.
   # if the size changed then it was definitely modified.
-  # otherwise, if the mtime is unchanged, assume that the file is ok, for speed.
+  # otherwise, if the mtime is unchanged, assume that the contents are unchanged, for speed.
   # if the mtime changed, and the file is sufficiently small, then check the hash;
   # the user might have made an accidental edit and then reverted it,
   # and we would rather compute small hashes than report a false problem.
@@ -324,7 +324,7 @@ def check_product_not_modified(ctx: Ctx, target: str, actual_path: str, size: in
       f'  Otherwise, save your changes if necessary and then `muck clean {target}`.')
 
 
-def update_product(ctx: Ctx, target: str, actual_path: str, is_changed: bool, size: Optional[int], mtime: float, old: Optional[TargetRecord]) -> bool:
+def update_product(ctx: Ctx, target: str, actual_path: str, is_changed: bool, size: Optional[int], mtime: float, old: Optional[TargetRecord]) -> int:
   ctx.dbg(target, 'update_product')
   src = source_for_target(ctx, target)
   validate_target_or_error(ctx, src)
@@ -332,31 +332,40 @@ def update_product(ctx: Ctx, target: str, actual_path: str, is_changed: bool, si
   if old is not None and old.src != src:
     is_changed = True
     note(target, f'source path of target product changed\n  was: {old.src}\n  now: {src}')
-  is_changed = update_dependency(ctx, src, dependent=target) or is_changed
 
-  if not is_changed and old is not None:
+  ptime = 0 if old is None else old.ptime
+  src_time = update_dependency(ctx, src, dependent=target)
+  if src_time > ptime:
+    is_changed = True
+
+  trans_time = max(ptime, src_time)
+  if not is_changed:
+    assert old is not None
     for dyn_dep in old.dyn_deps:
-      is_changed = update_dependency(ctx, dyn_dep, dependent=target) or is_changed
+      dep_time = update_dependency(ctx, dyn_dep, dependent=target)
+      trans_time = max(trans_time, dep_time)
+  if trans_time > ptime:
+    is_changed = True
 
   if is_changed: # must rebuild product.
-    dyn_deps, tmp_paths = build_product(ctx, target, src, actual_path)
+    dyn_time, dyn_deps, tmp_paths = build_product(ctx, target, src, actual_path)
+    trans_time = max(trans_time, dyn_time)
     ctx.dbg(target, f'tmp_paths: {tmp_paths}')
-    if tmp_paths:
-      is_changed = False # now determine if any product has actually changed.
-      for tmp_path in tmp_paths:
-        is_changed = update_product_with_tmp(ctx, src=src, dyn_deps=dyn_deps, tmp_path=tmp_path) or is_changed
-      return is_changed
-    else: # no tmp paths; this is a weird corner case that we always treat as changed.
-      return update_deps_and_record(ctx, target=target, actual_path=actual_path,
-        is_changed=True, size=0, mtime=0, file_hash=b'', src=src, dyn_deps=dyn_deps, old=old)
+    assert tmp_paths
+    for tmp_path in tmp_paths:
+      a_target, a_ptime = update_product_with_tmp(ctx, src=src, dyn_deps=dyn_deps, tmp_path=tmp_path, trans_time=trans_time)
+      if a_target == target:
+        ptime = a_ptime
+    assert ptime > 0
+    return ptime
   else: # not is_changed.
     assert size is not None
     assert old is not None
     return update_deps_and_record(ctx, target=target, actual_path=actual_path,
-      is_changed=is_changed, size=size, mtime=mtime, file_hash=old.hash, src=src, dyn_deps=old.dyn_deps, old=old)
+      is_changed=is_changed, size=size, mtime=mtime, ptime=old.ptime, file_hash=old.hash, src=src, dyn_deps=old.dyn_deps, old=old)
 
 
-def update_product_with_tmp(ctx: Ctx, src: str, dyn_deps: Tuple[str, ...], tmp_path: str) -> bool:
+def update_product_with_tmp(ctx: Ctx, src: str, dyn_deps: Tuple[str, ...], tmp_path: str, trans_time: int) -> Tuple[str, int]:
   product_path, ext = split_stem_ext(tmp_path)
   if ext not in (out_ext, tmp_ext):
     raise error(tmp_path, f'product output path has unexpected extension: {ext!r}')
@@ -368,16 +377,21 @@ def update_product_with_tmp(ctx: Ctx, src: str, dyn_deps: Tuple[str, ...], tmp_p
   file_hash = hash_for_path(tmp_path, size, max_hash_size)
   is_changed = (old is None or size != old.size or size > max_hash_size or file_hash != old.hash)
   if is_changed:
+    ptime = trans_time
+    change_verb = 'is new' if old is None else 'changed'
     ctx.db.delete_record(target=target) # delete metadata if it exists, just before overwrite, in case muck fails before update.
     move_file(tmp_path, product_path, overwrite=True)
-  else: # do not overwrite old because we want to preserve the old mtime.
-    remove_file(tmp_path)
-  note(target, f"product {'changed' if is_changed else 'did not change'}; {format_byte_count(size)}.")
-  return update_deps_and_record(ctx, target=target, actual_path=product_path,
-    is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=src, dyn_deps=dyn_deps, old=old)
+  else:
+    assert old is not None
+    ptime = old.ptime
+    change_verb = 'did not change'
+    remove_file(tmp_path) # do not overwrite old because we want to preserve the old mtime.
+  note(target, f"product {change_verb}; {format_byte_count(size)}.")
+  return target, update_deps_and_record(ctx, target=target, actual_path=product_path,
+    is_changed=is_changed, size=size, mtime=mtime, ptime=ptime, file_hash=file_hash, src=src, dyn_deps=dyn_deps, old=old)
 
 
-def update_non_product(ctx: Ctx, target: str, is_changed: bool, old: Optional[TargetRecord]) -> bool:
+def update_non_product(ctx: Ctx, target: str, is_changed: bool, old: Optional[TargetRecord]) -> int:
   ctx.dbg(target, 'update_non_product')
   size, mtime = file_size_and_mtime(target)
   file_hash = hash_for_path(target, size, max_hash_size) # must be calculated in all cases.
@@ -386,22 +400,24 @@ def update_non_product(ctx: Ctx, target: str, is_changed: bool, old: Optional[Ta
     remove_file_if_exists(product)
     make_link(target, product, make_dirs=True)
   else: # all we know so far is that it exists and status as a source has not changed.
-    is_changed = (old is None or size != old.size or size > max_hash_size or file_hash != old.hash)
+    is_changed = (old is None or size != old.size or file_hash != old.hash or (size > max_hash_size and mtime != old.mtime))
     if is_changed: # this is more interesting; report.
       note(target, 'source changed.')
-    else:
-      assert old is not None
-      if mtime != old.mtime:
-        mtime = old.mtime
-        note(target, 'source mtime changed but contents did not; reverting to: ', disp_mtime(mtime))
-        set_file_time_mod(target, mtime)
+  if is_changed:
+    ptime = ctx.db.inc_ptime()
+  else:
+    assert old is not None
+    ptime = old.ptime
+  if not is_changed:
+    assert old is not None
+    if mtime != old.mtime:
+      note(target, f'source modification time changed but contents did not.')
+  return update_deps_and_record(ctx, target, actual_path=target, is_changed=is_changed,
+    size=size, mtime=mtime, ptime=ptime, file_hash=file_hash, src=None, dyn_deps=(), old=old)
 
-  return update_deps_and_record(ctx, target, actual_path=target,
-    is_changed=is_changed, size=size, mtime=mtime, file_hash=file_hash, src=None, dyn_deps=(), old=old)
 
-
-def update_deps_and_record(ctx, target: str, actual_path: str, is_changed: bool,
- size: int, mtime: float, file_hash: bytes, src: Optional[str], dyn_deps: Tuple[str, ...], old: Optional[TargetRecord]) -> bool:
+def update_deps_and_record(ctx, target: str, actual_path: str, is_changed: bool, size: int, mtime: float, ptime: int,
+ file_hash: bytes, src: Optional[str], dyn_deps: Tuple[str, ...], old: Optional[TargetRecord]) -> int:
   ctx.dbg(target, 'update_deps_and_record')
   if is_changed:
     deps = calc_dependencies(actual_path, ctx.dir_names)
@@ -412,24 +428,25 @@ def update_deps_and_record(ctx, target: str, actual_path: str, is_changed: bool,
   else:
     assert old is not None
     deps = old.deps
+  trans_time: int = ptime
   for dep in deps:
-    is_changed = update_dependency(ctx, dep, dependent=target) or is_changed
+    trans_time = max(trans_time, update_dependency(ctx, dep, dependent=target))
 
-  assert ctx.statuses.get(target) is None
+  assert ctx.trans_times.get(target) is None
   #^ use get (which defaults to None) because when a script generates multiple outputs,
   # this function gets called without a preceding call to update_dependency.
-  # TODO: is there a case where two different scripts could generate the same named file,
-  # causing this assertion to fail?
-  ctx.statuses[target] = is_changed # replace sentinal with final value.
-  if is_changed:
-    record = TargetRecord(path=target, size=size, mtime=mtime, hash=file_hash, src=src, deps=deps, dyn_deps=dyn_deps)
-    ctx.dbg(target, f'updated record:\n  {record}')
-    if old is None:
-      ctx.db.insert_record(record)
-    else:
-      ctx.db.update_record(record)
+  # note: it is possible that two different scripts could generate the same named file, causing this assertion to fail.
+  # TODO: change this from an assertion to an informative error.
+  ctx.trans_times[target] = trans_time # replace sentinal with final value.
+  # always update record, because even if is_changed=False, mtime may have changed.
+  record = TargetRecord(path=target, size=size, mtime=mtime, ptime=ptime, hash=file_hash, src=src, deps=deps, dyn_deps=dyn_deps)
+  ctx.dbg(target, f'updated record:\n  {record}')
+  if old is None:
+    ctx.db.insert_record(record)
+  else:
+    ctx.db.update_record(record)
 
-  return is_changed
+  return trans_time
 
 
 # Dependency calculation.
@@ -485,7 +502,7 @@ dependency_fns: Dict[str, Callable[..., Iterable[str]]] = {
 # Build.
 
 
-def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple[Tuple[str, ...], List[str]]:
+def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple[int, Tuple[str, ...], List[str]]:
   '''
   Run a source file, producing zero or more products.
   Return a list of produced product paths.
@@ -503,7 +520,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
 
   if not build_tool:
     note(target, 'no op.')
-    return (), [] # no product.
+    return 0, (), [] # no product.
 
   prod_dir = path_dir(prod_path)
   make_dirs(prod_dir)
@@ -523,6 +540,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
     env.update(env_fn())
 
   note(target, f"building: `{' '.join(shlex.quote(w) for w in cmd)}`")
+  dyn_time = 0
   dyn_deps: List[str] = []
   with cast(BinaryIO, open(prod_path_out, 'wb')) as out_file, DuplexPipe() as pipe:
     deps_recv, deps_send = pipe.left_files()
@@ -539,7 +557,8 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
       ctx.dbg(target, 'dep: ', dep)
       dyn_deps.append(dep)
       try:
-        update_dependency(ctx, dep, dependent=target) # at this point, ignore is_changed return value.
+        dep_time = update_dependency(ctx, dep, dependent=target) # ignore return value.
+        dyn_time = max(dyn_time, dep_time)
       except (Exception, SystemExit):
         proc.kill() # this avoids a confusing exception message from the script when muck fails.
         raise
@@ -577,7 +596,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
     remove_file(manif_path)
   time_msg = f'{time_elapsed:0.2f} seconds ' if ctx.report_times else ''
   note(target, f'finished: {time_msg}(via {via}).')
-  return tuple(dyn_deps), tmp_paths
+  return dyn_time, tuple(dyn_deps), tmp_paths
 
 
 _pythonV_V = 'python' + '.'.join(str(v) for v in sys.version_info[:2])

@@ -1,5 +1,5 @@
 {
-  'desc': 'rebuild: b.txt, basic.html.',
+  'desc': 'rebuild previously cleaned b.txt.',
   'cmd': '$MUCK -no-times',
   'code': 0
 }
