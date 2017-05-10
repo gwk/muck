@@ -101,20 +101,10 @@ class DB:
       return None
 
 
-  def update_record(self, record: TargetRecord) -> None:
-    self.run(
-      'UPDATE targets SET '
-      'size=:size, mtime=:mtime, ptime=:ptime, hash=:hash, src=:src, deps=:deps, dyn_deps=:dyn_deps '
-      'WHERE path=:path',
-      size=record.size, mtime=record.mtime, ptime=record.ptime, hash=record.hash, src=record.src,
-      deps=to_marshalled(record.deps), dyn_deps=to_marshalled(record.dyn_deps),
-      path=record.path)
-
-
-  def insert_record(self, record: TargetRecord) -> None:
+  def insert_or_replace_record(self, record: TargetRecord) -> None:
     try:
       self.run(
-        'INSERT INTO targets (path, size, mtime, ptime, hash, src, deps, dyn_deps) '
+        'INSERT OR REPLACE INTO targets (path, size, mtime, ptime, hash, src, deps, dyn_deps) '
         'VALUES (:path, :size, :mtime, :ptime, :hash, :src, :deps, :dyn_deps)',
         path=record.path, size=record.size, mtime=record.mtime, ptime=record.ptime, hash=record.hash, src=record.src,
         deps=to_marshalled(record.deps), dyn_deps=to_marshalled(record.dyn_deps))

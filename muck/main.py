@@ -441,11 +441,7 @@ def update_deps_and_record(ctx, target: str, actual_path: str, is_changed: bool,
   # always update record, because even if is_changed=False, mtime may have changed.
   record = TargetRecord(path=target, size=size, mtime=mtime, ptime=ptime, hash=file_hash, src=src, deps=deps, dyn_deps=dyn_deps)
   ctx.dbg(target, f'updated record:\n  {record}')
-  if old is None:
-    ctx.db.insert_record(record)
-  else:
-    ctx.db.update_record(record)
-
+  ctx.db.insert_or_replace_record(record)
   return trans_time
 
 
