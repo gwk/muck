@@ -1,0 +1,2 @@
+# original.
+print('A')
