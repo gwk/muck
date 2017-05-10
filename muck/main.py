@@ -728,10 +728,6 @@ def hash_for_path(path: str, size: int, max_hash_size: int) -> bytes:
   return h.digest()
 
 
-def hash_string(hash: bytes) -> str:
-  return base64.urlsafe_b64encode(hash).decode()
-
-
 def file_size_and_mtime(path: str) -> Tuple[int, float]:
   stats = os.stat(path)
   return (stats.st_size, stats.st_mtime)
