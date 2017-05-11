@@ -311,15 +311,15 @@ def check_product_not_modified(ctx: Ctx, target: str, actual_path: str, size: in
   # existing product should not have been modified since record was stored.
   # if the size changed then it was definitely modified.
   # otherwise, if the mtime is unchanged, assume that the contents are unchanged, for speed.
-  # if the mtime changed, and the file is sufficiently small, then check the hash;
-  # the user might have made an accidental edit and then reverted it,
-  # and we would rather compute small hashes than report a false problem.
-  if size != old.size or (mtime != old.mtime and
-    (size > max_hash_size or hash_for_path(actual_path, size, max_hash_size) != old.hash)):
-    ctx.dbg(target, f'size: {old.size} -> {size}; mtime: {disp_mtime(old.mtime)} -> {mtime}')
-    # TODO: change language depending on whether product is derived from a patch?
-    raise error(target, 'existing product has changed; did you mean to update a patch?\n'
-      f'  Otherwise, save your changes if necessary and then `muck clean {target}`.')
+  if size == old.size and mtime == old.mtime: return
+  # if mtime is changed but contents are not, the user might have made an accidental edit and then reverted it.
+  if size == old.size and hash_for_path(actual_path) == old.hash:
+    note(target, 'product mtime changed but contents did not.')
+    # TODO: revert mtime?
+    return
+  # TODO: change language depending on whether product is derived from a patch?
+  raise error(target, 'existing product has changed; did you mean to update a patch?\n'
+    f'  Otherwise, save your changes if necessary and then `muck clean {target}`.')
 
 
 def update_product(ctx: Ctx, target: str, actual_path: str, needs_update: bool, size: Optional[int], mtime: float,
@@ -375,8 +375,8 @@ def update_product_with_tmp(ctx: Ctx, src: str, dyn_deps: Tuple[str, ...], tmp_p
   target = product_path[len(ctx.build_dir_slash):]
   old = ctx.db.get_record(target=target)
   size, mtime = file_size_and_mtime(tmp_path)
-  file_hash = hash_for_path(tmp_path, size, max_hash_size)
-  is_changed = (old is None or size != old.size or size > max_hash_size or file_hash != old.hash)
+  file_hash = hash_for_path(tmp_path)
+  is_changed = (old is None or size != old.size or file_hash != old.hash)
   if is_changed:
     change_time = update_time
     change_verb = 'is new' if old is None else 'changed'
@@ -396,7 +396,7 @@ def update_non_product(ctx: Ctx, target: str, needs_update: bool, old: Optional[
   'returns transitive change_time.'
   ctx.dbg(target, 'update_non_product')
   size, mtime = file_size_and_mtime(target)
-  file_hash = hash_for_path(target, size, max_hash_size) # must be calculated in all cases.
+  file_hash = hash_for_path(target) # must be calculated in all cases.
   product_link = product_path_for_target(ctx, target) # non_products get linked into build dir.
   if needs_update:
     remove_file_if_exists(product_link)
@@ -410,7 +410,7 @@ def update_non_product(ctx: Ctx, target: str, needs_update: bool, old: Optional[
   if needs_update:
     is_changed = True
   else: # all we know so far is that it exists and status as a non-product has not changed.
-    is_changed = (old is None or size != old.size or file_hash != old.hash or (size > max_hash_size and mtime != old.mtime))
+    is_changed = (old is None or size != old.size or file_hash != old.hash)
     if is_changed: # this is more interesting; report.
       note(target, 'source changed.')
 
@@ -698,33 +698,19 @@ def match_wilds(wildcard_path: str, string: str) -> Optional[Match[str]]:
 # Utilities.
 
 
-def hash_for_path(path: str, size: int, max_hash_size: int) -> bytes:
+def hash_for_path(path: str) -> bytes:
   '''
-  Return a hash string for the contents of the file at `path`, up to `max_hash_size`.
-  For files larger than `max_hash_size`, hash the first and last `max_hash_size//2` bytes;
-  thus this hash value does not guarantee that changes will be detected,
-  but does a decent job of detecting changes by checking the start and end of the file.
+  Return a hash string for the contents of the file at `path`.
   '''
   hash_chunk_size = 1 << 16
   #^ a quick timing experiment suggested that chunk sizes larger than this are not faster.
-  assert max_hash_size % hash_chunk_size == 0
-  max_chunks = max_hash_size // hash_chunk_size
   try: f = open(path, 'rb')
   except IsADirectoryError: raise error(path, 'expected a file but found a directory')
   h = sha256()
-  if size <= max_hash_size:
-    for i in range(max_chunks):
-      chunk = f.read(hash_chunk_size)
-      if not chunk: break
-      h.update(chunk)
-  else: # too large; read half from start, half from the end.
-    half_chunks = max_chunks // 2
-    for i in range(half_chunks):
-      h.update(f.read(hash_chunk_size))
-    f.seek(max_hash_size//2, 2) # note: whence=2 seeks backwards from end.
-    #^ TODO: if whence=2 is unsupported, just absorb that exception and read the second half from current pos.
-    for i in range(half_chunks):
-      h.update(f.read(hash_chunk_size))
+  while True:
+    chunk = f.read(hash_chunk_size)
+    if not chunk: break
+    h.update(chunk)
   return h.digest()
 
 

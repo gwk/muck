@@ -19,5 +19,3 @@ reserved_exts = frozenset({
 })
 
 reserved_or_ignored_exts = reserved_exts | ignored_exts
-
-max_hash_size = 1 << 24
