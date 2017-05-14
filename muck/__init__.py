@@ -12,13 +12,13 @@ import random
 import time
 import requests
 
-from csv import reader as csv_reader
 from http import HTTPStatus
 from sys import argv
 from typing import *
 from typing import IO, TextIO
 from urllib.parse import urlencode, urlparse
 
+from .pithy.csv_utils import load_csv
 from .pithy.format import has_formatter
 from .pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, path_stem
 from .pithy.io import errL
@@ -128,7 +128,7 @@ def load_txt(f: TextIO, clip_ends=False) -> Iterable[str]:
 
 _default_loaders: Tuple[Tuple[str, Callable[..., Any], Dict[str, Any]], ...] = (
   ('.css',   load_txt, {}),
-  ('.csv',   csv_reader, dict(newline='')),
+  ('.csv',   load_csv, dict(newline='')), # newline specified as per footnote in csv module.
   ('.json',  load_json, dict(encoding=None)),
   ('.jsonl', load_jsonl, dict(encoding=None)),
   ('.jsons', load_jsons, dict(encoding=None)),
