@@ -153,8 +153,7 @@ def load(target_path: str, ext=None, **kwargs: Any) -> Any:
   elif not isinstance(ext, str): raise TypeError(ext)
   try: load_fn, std_open_args = _loaders[ext]
   except KeyError:
-    errL(f'ERROR: No loader found for target: {subs_path!r}')
-    errL(f'NOTE: extension: {ext!r}')
+    errL(f'ERROR: No loader found for path: {path!r}; extension: {ext!r}')
     raise
   open_args = std_open_args.copy()
   # transfer all matching kwargs to open_args.
