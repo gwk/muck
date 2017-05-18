@@ -79,9 +79,6 @@ _deps_send: Optional[TextIO] = None
 def open_dep(target_path: str, binary=False, buffering=-1, encoding=None, errors=None, newline=None) -> IO:
   '''
   Open a dependency for reading.
-
-  Muck's static analysis looks specifically for this function to infer dependencies;
-  `target_path` must be a string literal.
   '''
   global _deps_recv, _deps_send
   if not target_path.startswith('/') and not target_path.startswith('../'):
@@ -148,9 +145,6 @@ def load(target_path: str, ext=None, **kwargs: Any) -> Any:
   Thus, keyword arguments passed to `load` get divvied up between `open_dep` and the custom load function.
 
   If no loader is found, raise an error.
-
-  Muck's static analysis looks specifically for this function to infer dependencies;
-  `target_path` must be a string literal.
   '''
   bindings = bindings_from_argv(sys.argv)
   subs_path = target_path.format(**bindings)
@@ -266,9 +260,6 @@ def transform(target_path: str, ext: str=None, **kwargs: Any) -> Transformer:
 
   Additional keyword arguments are passed to the specific load function matching `ext`;
   see muck.load for details.
-
-  Muck's static analysis looks specifically for this function to infer dependencies;
-  `target_path` must be a string literal.
   '''
   seq = load(target_path, ext=ext, **kwargs)
   product = dflt_prod_path_for_source(argv[0]) # TODO: needs to process wildcards.
