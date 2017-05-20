@@ -23,7 +23,7 @@ from urllib.parse import urlencode, urlparse
 from .pithy.csv_utils import load_csv
 from .pithy.format import has_formatter
 from .pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, path_stem
-from .pithy.io import errL
+from .pithy.io import stderr, errL, errSL
 from .pithy.json_utils import load_json, load_jsonl, load_jsons
 from .pithy.path_encode import path_for_url
 from .pithy.transform import Transformer
@@ -48,7 +48,7 @@ __all__ = [
 _dst_vars_opened: Set[Tuple[Tuple[str, str], ...]] = set()
 _manifest_file = None
 
-def dst_file(binary=False, **kwargs: str) -> IO:
+def dst_file(encoding='UTF-8', **kwargs: str) -> IO:
   '''
   Open an output file for writing, expanding target path formatters with `kwargs`.
 
@@ -57,35 +57,32 @@ def dst_file(binary=False, **kwargs: str) -> IO:
   '''
   global _manifest_file
   src = argv[0]
-  mode = 'wb' if binary else 'w'
   if not has_formatter(src): # single destination; no need for manifest.
     if kwargs:
       raise Exception(f'source path contains no formatters but bindings provided to `dst_file`: {src}')
-    return open(dflt_prod_path_for_source(src) + tmp_ext, mode)
+    return _std_open(dflt_prod_path_for_source(src) + tmp_ext, mode=('wb' if encoding is None else 'w'))
   args = tuple(sorted(kwargs.items())) # need kwargs as a hash key.
   if args in _dst_vars_opened:
     raise Exception(f'file already opened for `dst_file` arguments: {args}')
   _dst_vars_opened.add(args)
   path = dst_path(argv, kwargs) + tmp_ext
   if _manifest_file is None:
-    _manifest_file = open(manifest_path(argv), 'w')
+    _manifest_file = _std_open(manifest_path(argv), 'w')
   print(path, file=_manifest_file)
-  return open(path, mode=mode)
+  if encoding is None: # binary.
+    return _std_open(path, mode='wb')
+  else:
+    return _std_open(path, mode='w', encoding=encoding)
 
 
-OpenFn = Callable[..., IO]
-
-_open_parameters = frozenset({'mode', 'buffering', 'encoding', 'errors', 'newline'})
+_open_parameters = frozenset({'buffering', 'encoding', 'errors', 'newline'})
 
 _deps_recv: Optional[TextIO] = None
 _deps_send: Optional[TextIO] = None
 
-def open(target_path: str, mode='r', buffering=-1, encoding=None, errors=None, newline=None) -> IO:
-  '''
-  Open a dependency for reading.
-  '''
+def _open(path: str, buffering=-1, encoding='UTF-8', errors=None, newline=None) -> IO:
   global _deps_recv, _deps_send
-  if not target_path.startswith('/') and not target_path.startswith('../'):
+  if not path.startswith('/') and not path.startswith('../'):
     if _deps_recv is None:
       try:
         recv = int(os.environ['DEPS_RECV'])
@@ -95,11 +92,28 @@ def open(target_path: str, mode='r', buffering=-1, encoding=None, errors=None, n
         _deps_recv = cast(TextIO, _std_open(int(recv), 'r'))
         _deps_send = cast(TextIO, _std_open(int(send), 'w'))
     if _deps_recv:
-      print(target_path, file=_deps_send, flush=True)
+      print(path, file=_deps_send, flush=True)
       ack = _deps_recv.readline()
-      if ack != target_path + '\n':
-        raise Exception(f'muck.open: dependency {target_path} was not acknowledged: {ack!r}')
-  return _std_open(target_path, mode=mode, buffering=buffering, encoding=encoding, errors=errors, newline=newline)
+      if ack != path + '\n':
+        raise Exception(f'muck.open: dependency {path} was not acknowledged: {ack!r}')
+  if encoding is None: # binary.
+    return _std_open(path, mode='rb', buffering=buffering, errors=errors, newline=newline)
+  else: # text.
+    return _std_open(path, buffering=buffering, encoding=encoding, errors=errors, newline=newline)
+
+
+def open(path: str, **kwargs) -> IO:
+  '''
+  Open a dependency for reading.
+  Compared to standard `open`, this function does not support integer file descriptors for the path argument,
+  nor the `closefd` and `opener` parameters,
+  because their usage is fundamentally at odds with dependency tracking.
+  `mode` is also unsupported, because the API is read-only; binary mode is implied by `encoding=None`.
+  TODO: support the other pathlike objects.
+  '''
+  if '{' in path:
+    path = path.format(**bindings_from_argv(sys.argv))
+  return _open(path, **kwargs)
 
 
 LoadFn = Callable[..., Any]
@@ -107,21 +121,15 @@ LoadFn = Callable[..., Any]
 class Loader(NamedTuple):
   ext: str
   fn: LoadFn
-  open_keys: Tuple[str, ...]
   open_args: Tuple[Tuple[str, Any], ...]
 
 
 _loaders: Dict[str, Loader] = {}
 
-def add_loader(ext: str, _fn: LoadFn, _dflt=False, open_keys:Iterable[str]=(), **open_args:Any) -> None:
+def add_loader(ext: str, _fn: LoadFn, buffering=-1, encoding='UTF-8', errors=None, newline=None, _dflt=False) -> None:
   '''
   Register a loader function, which will be called by `muck.load` for matching `ext`.
-  `open_keys` specifies the names of keyword arguments that, when passed to `load`, will be forwarded on to `open`.
-  `open_args` (as kwargs) will always be passed on to `open` but cannot be overridden.
-
-  In other words, when `load` is called with a path whose extension matches a given loader,
-  keys that are present in `open_keys` are passed on to `open`;
-  all other keyword arguments are passed on to `_fn`.
+  `buffering`, `encoding`, `errors`, and `newline` are all passed on to `open` when it is called by `load`.
   '''
   if not ext.startswith('.'):
     raise ValueError(f"file extension does not start with '.': {ext!r}")
@@ -129,65 +137,50 @@ def add_loader(ext: str, _fn: LoadFn, _dflt=False, open_keys:Iterable[str]=(), *
     try: prev_loader = _loaders[ext]
     except KeyError: pass
     else: raise Exception(f'add_loader: extension previously registered: {ext!r}; loader: {prev_loader!r}')
-  for k in open_keys:
-    if k not in _open_parameters: raise KeyError(f'bad parameter name for `open` in `open_keys`: {k}')
-  for k in open_args:
-    if k not in _open_parameters: raise KeyError(f'bad parameter name for `open` in `open_args`: {k}')
-    if k in open_keys: raise KeyError(f'`open_keys` key repeated in `open_args`: {k}')
-  _loaders[ext] = Loader(ext=ext, fn=_fn, open_keys=tuple(open_keys), open_args=tuple(open_args.items()))
+  _loaders[ext] = Loader(ext=ext, fn=_fn, open_args=(
+    ('buffering', buffering), ('encoding', encoding), ('errors', errors), ('newline', newline)))
 
 
 def load_txt(f: TextIO, clip_ends=False) -> Iterable[str]:
-  if clip_ends: return (line.rstrip('\n') for line in f)
+  if clip_ends: return (line.rstrip('\n\r') for line in f)
   return f
 
 
-def load_zip(f: BinaryIO, load=True, load_single=False, load_ext:str=None, **kwargs:Any) -> Any:
-  from zipfile import ZipFile
-  z = ZipFile(f)
-  if not load and not load_single and not load_ext:
-    if kwargs:
-      raise ValueError('load_zip: no load options results in a ZipFile, and implies that no other options should be set')
-    return z
-  paths = z.namelist()
-  if load_single:
-    if len(paths) != 1: raise Exception(f'load_zip: expected single file in archive; found: {paths}')
-    for el in _zip_load_gen(z, paths, load_ext, kwargs): return el
-  else:
-    return _zip_load_gen(z, paths, load_ext, kwargs)
+def load_xls(file: BinaryIO) -> Any:
+  from xlrd import open_workbook # type: ignore
+  # Unfortunately load_xls will not take an open file handle.
+  # Since we might be passing in an in-memory file like ArchiveFile,
+  # the best we can do for now is always read file contents into memory.
+  # Alternative would be to make ArchiveFile conform to mmap protocol,
+  # or patch xlrd to support passing in an open binary file descriptor.
+  return open_workbook(filename=None, logfile=stderr, file_contents=file.read())
 
 
-def _zip_load_gen(z: Any, paths: List[str], ext:Optional[str], kwargs:Dict[str, Any]) -> Any:
-  'Factored out to accommodate load_single option.'
-
-  def open_within_zip(path: str, mode='r', buffering=-1, encoding=None, errors=None, newline=None) -> IO:
-    '''
-    Imitates load_dep within a zip file.
-    Note: `buffering` is ignored, as it appears to have no effect for TextIOWrapper in read mode.
-    '''
-    f: IO = z.open(path)
-    if 'b' in mode:
-      if encoding is not None or errors is not None or newline is not None:
-        raise ValueError('load_zip: binary mode implies that `encoding`, `errors`, and `newline` should not be set')
-      return f
-    else:
-      return TextIOWrapper(f, encoding=encoding, errors=errors, newline=newline)
-
-  for path in paths:
-    if path.endswith('/'): continue # ignore directories.
-    yield load(path, open=open_within_zip, ext=ext, **kwargs)
+def load_zip(f: BinaryIO, single_name=None, single_ext=None, **kwargs:Any) -> Any:
+  from .pithy.archive import Archive
+  archive = Archive(f)
+  if single_name is None:
+    if single_ext is not None or kwargs:
+      raise ValueError('load_zip: `single_name` not specified; no other options should be set')
+    return archive
+  # load single file.
+  for file in archive: # type: ignore
+    if file.name != single_name: continue
+    return load(file, ext=single_ext, **kwargs)
+  raise LookupError(f'load_zip: could not find specified single_name in archive: {single_name!r}; archive.file_names: {archive.file_names}')
 
 
-add_loader('.txt',    load_txt,   _dflt=True, open_keys=_open_parameters)
-add_loader('.css',    load_txt,   _dflt=True, open_keys=_open_parameters)
-add_loader('.csv',    load_csv,   _dflt=True, open_keys={'encoding'}, newline='') # newline specified as per footnote in csv module.
-add_loader('.json',   load_json,  _dflt=True, encoding=None)
-add_loader('.jsonl',  load_jsonl, _dflt=True, encoding=None)
-add_loader('.jsons',  load_jsons, _dflt=True, encoding=None)
-add_loader('.zip',    load_zip,   _dflt=True, mode='rb')
+add_loader('.txt',    load_txt,   _dflt=True)
+add_loader('.css',    load_txt,   _dflt=True)
+add_loader('.csv',    load_csv,   _dflt=True, newline='') # newline specified as per footnote in csv module.
+add_loader('.json',   load_json,  _dflt=True)
+add_loader('.jsonl',  load_jsonl, _dflt=True)
+add_loader('.jsons',  load_jsons, _dflt=True)
+add_loader('.xls',    load_xls,   _dflt=True, encoding=None)
+add_loader('.zip',    load_zip,   _dflt=True, encoding=None)
 
 
-def load(target_path: str, open:OpenFn=open, ext:str=None, **kwargs: Any) -> Any:
+def load(file_or_path: Any, ext:str=None, **kwargs) -> Any:
   '''
   Select an appropriate loader based on the file extension, or `ext` if specified.
 
@@ -197,30 +190,38 @@ def load(target_path: str, open:OpenFn=open, ext:str=None, **kwargs: Any) -> Any
   except updated by any values in `kwargs` whose keys match the loader `open_keys`.
   The remaining `kwargs` are passed to the loader function.
   '''
-  if kwargs.get('mode', 'r') not in ('r', 'rb', 'br'): raise ValueError(f'invalid read mode: {kwargs["mode"]}')
-  bindings = bindings_from_argv(sys.argv)
-  path = target_path.format(**bindings)
-  fn, open_args, load_args = _get_loader_fn_and_args(path, ext, kwargs)
-  file = open(path, **open_args)
-  return fn(file, **load_args)
+  is_file = hasattr(file_or_path, 'read')
+  if is_file:
+    if ext is None:
+      try: path = file_or_path.name
+      except AttributeError as e:
+        raise ValueError(f'load: file object does not have `name` attribute and no `ext` specified: {file_or_path}') from e
+      ext = path_ext(path)
+  else:
+    path = file_or_path
+    if '{' in path: # might have format; expand.
+      path = path.format(**bindings_from_argv(sys.argv))
+    if ext is None:
+      ext = path_ext(path)
 
-
-def _get_loader_fn_and_args(path: str, ext:Optional[str], kwargs:Any) -> Tuple[LoadFn, Dict[str, Any], Dict[str, Any]]:
-  if ext is None:
-    ext = path_ext(path)
-  try: loader = _loaders[ext]
-  except KeyError:
-    errL(f'ERROR: No loader found for path: {path!r}; extension: {ext!r}')
-    raise
+  loader = _loaders[ext]
   open_args = dict(loader.open_args)
-  load_args = dict(kwargs) # copy argument to be safe.
-  # transfer all kwargs matching open_keys to open_args.
-  for k in loader.open_keys:
+  for k in tuple(open_args):
     try: v = kwargs[k]
-    except KeyError: continue
-    open_args[k] = v
-    del load_args[k]
-  return loader.fn, open_args, load_args
+    except KeyError: pass
+    else:
+      open_args[k] = v
+      del kwargs[k] # this arg goes to open, not load. safe because kwargs is local.
+
+  if is_file:
+    file = file_or_path
+    if open_args['encoding'] is not None and not hasattr(file, 'encoding'): # want text but have binary file.
+      del open_args['buffering'] # TextIOWrapper does not support this argument.
+      file = TextIOWrapper(file, **open_args)
+  else:
+    file = open(file_or_path, **open_args)
+
+  return loader.fn(file, **kwargs)
 
 
 class HTTPError(Exception):
@@ -268,7 +269,7 @@ def fetch(url: str, cache_path: str=None, params: Dict[str, str]={}, headers: Di
       headers = h
     r = _fetch(url, timeout, headers, expected_status_code)
     make_dirs(path_dir(path))
-    with open(path, 'wb') as f:
+    with _std_open(path, 'wb') as f:
       f.write(r.content)
     sleep_min = delay - delay_range * 0.5
     sleep_max = delay + delay_range * 0.5
