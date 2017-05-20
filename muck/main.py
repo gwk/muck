@@ -314,7 +314,7 @@ def check_product_not_modified(ctx: Ctx, target: str, actual_path: str, size: in
   if size == old.size and mtime == old.mtime: return
   # if mtime is changed but contents are not, the user might have made an accidental edit and then reverted it.
   if size == old.size and hash_for_path(actual_path) == old.hash:
-    note(target, 'product mtime changed but contents did not.')
+    note(target, f'product mtime changed but contents did not: {disp_mtime(old.mtime)} -> {disp_mtime(mtime)}.')
     # TODO: revert mtime?
     return
   # TODO: change language depending on whether product is derived from a patch?
