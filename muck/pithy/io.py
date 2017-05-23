@@ -1,1 +1,0 @@
-../../pithy/pithy/io.py

@@ -1,1 +1,0 @@
-../../pithy/pithy/pipe.py
