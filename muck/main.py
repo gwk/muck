@@ -396,8 +396,8 @@ def update_non_product(ctx: Ctx, target: str, needs_update: bool, old: Optional[
   'returns transitive change_time.'
   ctx.dbg(target, 'update_non_product')
   size, mtime = file_size_and_mtime(target)
-  file_hash = hash_for_path(target) # must be calculated in all cases.
   product_link = product_path_for_target(ctx, target) # non_products get linked into build dir.
+
   if needs_update:
     remove_file_if_exists(product_link)
     make_link(target, product_link, make_dirs=True)
@@ -409,21 +409,28 @@ def update_non_product(ctx: Ctx, target: str, needs_update: bool, old: Optional[
 
   if needs_update:
     is_changed = True
+    file_hash = hash_for_path(target)
   else: # all we know so far is that it exists and status as a non-product has not changed.
-    is_changed = (old is None or size != old.size or file_hash != old.hash)
-    if is_changed: # this is more interesting; report.
-      note(target, 'source changed.')
+    appears_changed = (old is None or size != old.size or mtime != old.mtime)
+    if appears_changed: # check if contents actually changed.
+      file_hash = hash_for_path(target)
+      is_changed = (old.hash != file_hash)
+    else: # assume not changed based on size/mtime; otherwise we constantly recalculate hashes for large sources.
+      is_changed = False
+      file_hash = old.hash
 
   if is_changed:
+    if not needs_update: note(target, 'source changed.') # only want to report this on subsequent changes.
     change_time = ctx.db.inc_ptime()
   else:
     assert old is not None
     change_time = old.change_time
+    file_hash = old.hash
     if mtime != old.mtime:
       note(target, f'source modification time changed but contents did not.')
   return update_deps_and_record(ctx, target, actual_path=target, is_changed=is_changed,
     size=size, mtime=mtime, change_time=change_time, update_time=change_time, file_hash=file_hash, src=None, dyn_deps=(), old=old)
-# TODO: non_product update_time is meaningless? mark as -1?
+  # TODO: non_product update_time is meaningless? mark as -1?
 
 
 def update_deps_and_record(ctx, target: str, actual_path: str, is_changed: bool, size: int, mtime: float,
