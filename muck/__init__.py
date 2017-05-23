@@ -22,7 +22,7 @@ from urllib.parse import urlencode, urlparse
 
 from .pithy.csv_utils import load_csv
 from .pithy.format import has_formatter
-from .pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, path_stem
+from .pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, path_stem, split_stem_ext
 from .pithy.io import stderr, errL, errSL
 from .pithy.json_utils import load_json, load_jsonl, load_jsons
 from .pithy.path_encode import path_for_url
@@ -141,6 +141,18 @@ def add_loader(ext: str, _fn: LoadFn, buffering=-1, encoding='UTF-8', errors=Non
     ('buffering', buffering), ('encoding', encoding), ('errors', errors), ('newline', newline)))
 
 
+def load_gz(f: BinaryIO, sub_ext=None, **kwargs:Any) -> Any:
+  stem = path_stem(f.name)
+  if sub_ext is None:
+    sub_ext = path_ext(stem)
+  if sub_ext == '.tar': # load_archive handles compressed stream faster internally.
+    return load_archive(f, **kwargs)
+  from gzip import GzipFile
+  g = GzipFile(mode='rb', fileobj=f)
+  g.name = stem # strip off '.gz' for secondary dispatch by `load`.
+  return load(g, ext=sub_ext, **kwargs)
+
+
 def load_txt(f: TextIO, clip_ends=False) -> Iterable[str]:
   if clip_ends: return (line.rstrip('\n\r') for line in f)
   return f
@@ -156,28 +168,34 @@ def load_xls(file: BinaryIO) -> Any:
   return open_workbook(filename=None, logfile=stderr, file_contents=file.read())
 
 
-def load_zip(f: BinaryIO, single_name=None, single_ext=None, **kwargs:Any) -> Any:
+def load_archive(f: BinaryIO, single_name=None, single_ext=None, **kwargs:Any) -> Any:
   from .pithy.archive import Archive
   archive = Archive(f)
-  if single_name is None:
-    if single_ext is not None or kwargs:
-      raise ValueError('load_zip: `single_name` not specified; no other options should be set')
+  if single_name is None and single_ext is None:
+    if kwargs:
+      raise ValueError('load_archive: `single_name` not specified; no other options should be set')
     return archive
   # load single file.
+  match_exact = (single_name is not None)
   for file in archive: # type: ignore
-    if file.name != single_name: continue
+    if match_exact:
+      if file.name != single_name: continue
+    else:
+      if not file.name.endswith(single_ext): continue
     return load(file, ext=single_ext, **kwargs)
-  raise LookupError(f'load_zip: could not find specified single_name in archive: {single_name!r}; archive.file_names: {archive.file_names}')
+  raise LookupError(f'load_archive: could not find specified single_{"name" if match_exact else "ext"} in archive: {single_name!r}; archive.file_names: {archive.file_names}')
 
 
-add_loader('.txt',    load_txt,   _dflt=True)
-add_loader('.css',    load_txt,   _dflt=True)
-add_loader('.csv',    load_csv,   _dflt=True, newline='') # newline specified as per footnote in csv module.
-add_loader('.json',   load_json,  _dflt=True)
-add_loader('.jsonl',  load_jsonl, _dflt=True)
-add_loader('.jsons',  load_jsons, _dflt=True)
-add_loader('.xls',    load_xls,   _dflt=True, encoding=None)
-add_loader('.zip',    load_zip,   _dflt=True, encoding=None)
+add_loader('.txt',    load_txt,     _dflt=True)
+add_loader('.css',    load_txt,     _dflt=True)
+add_loader('.csv',    load_csv,     _dflt=True, newline='') # newline specified as per footnote in csv module.
+add_loader('.gz',     load_gz,      _dflt=True, encoding=None)
+add_loader('.json',   load_json,    _dflt=True)
+add_loader('.jsonl',  load_jsonl,   _dflt=True)
+add_loader('.jsons',  load_jsons,   _dflt=True)
+add_loader('.tar',    load_archive, _dflt=True, encoding=None)
+add_loader('.xls',    load_xls,     _dflt=True, encoding=None)
+add_loader('.zip',    load_archive, _dflt=True, encoding=None)
 
 
 def load(file_or_path: Any, ext:str=None, **kwargs) -> Any:
