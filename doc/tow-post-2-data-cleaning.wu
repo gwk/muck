@@ -1,4 +1,5 @@
 writeup v0
+Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
 
 
 # Data Cleaning with Muck
@@ -89,33 +90,33 @@ All of this suggests a major limitation of the file-based perspective inherent t
 We want the check for a flaw, the application of a fix, and any reporting of the occurrence to be expressed together in a cohesive, clearly written unit. After some experimentation and quite a bit of supporting work, Muck now supports just such a workflow, via a function called `transform`. The technical description of how it works is more painful than using it, so we'll start with an example:
 
 | with muck.transform('input.txt') as t:
-| 
+|
 |   @t.keep
 |   def non_empty_lines(line):
 |     'lines containing only whitespace are ommitted, without logging.'
 |     return bool(re.strip())
-| 
+|
 |   @t.drop
 |   def vulgar(line):
 |     'profane lines are ommitted and logged.'
 |     return re.match(r'darn|gosh|shucks', line)
-| 
+|
 |   @t.edit
 |   def (line):
 |     'all occurrences of the word "tweet" are replaced with "trumpet",'
 |     'preserving the leading capital; altered lines are logged.'
 |     return re.sub(r'([Tt])weet', r'\1rumpet', line)
-| 
+|
 |   @t.convert
 |   def br_tags(line):
 |     'capitalize each line; no logging.'
 |     reutrn line.capitalize()
-| 
+|
 |   @t.flag
 |   def big_words(line):
 |     'log lines with long words, but do not alter them.'
 |     return any(len(word) > 16 for word in line.split())
-| 
+|
 |   @t.put
 |   def out(line):
 |     'write the final result line.'
