@@ -22,7 +22,7 @@ from typing import *
 from typing import BinaryIO, IO, Match, TextIO
 
 from .pithy.ansi import TXT_L_ERR, TXT_Y_ERR, RST_ERR
-from .pithy.format import FormatError, format_to_re, parse_formatters
+from .pithy.format import format_to_re
 from .pithy.fs import *
 from .pithy.io import *
 from .pithy.iterable import fan_by_pred
@@ -31,10 +31,12 @@ from .pithy.pipe import DuplexPipe
 from .pithy.string_utils import format_byte_count
 from .pithy.task import launch, runC
 
+from .ctx import Ctx, InvalidTarget, validate_target
 from .db import TargetRecord, DB, DBError
 from .constants import *
 from .paths import manifest_path
 from .py_deps import py_dependencies
+from .server import serve_build
 
 
 def main() -> None:
@@ -44,6 +46,8 @@ def main() -> None:
   arg_parser.add_argument('-dbg', action='store_true', help='log lots of details to stderr.')
   arg_parser.add_argument('-force', action='store_true', help='rebuild specified targets even if they are up to date.')
   arg_parser.add_argument('-build-dir', default='_build', help="specify build directory; defaults to '_build'.")
+  arg_parser.add_argument('-serve', nargs='?', const='index.html',
+    help='serve contents of build directory via local HTTP, and open the specified target in the browser.')
 
   group = arg_parser.add_argument_group('special commands')
   def add_cmd(cmd: str, help: str) -> None:
@@ -86,37 +90,36 @@ def main() -> None:
     db_name,
   })
 
-  ctx = Ctx(db=DB(path=db_path), change_times={}, dir_names={}, dependents=defaultdict(set),
-    build_dir=build_dir, build_dir_slash=build_dir_slash,
+  ctx = Ctx(db=DB(path=db_path), build_dir=build_dir, build_dir_slash=build_dir_slash,
     reserved_names=reserved_names, report_times=(not args.no_times), dbg=dbg)
 
-  for t in args.targets: validate_target_or_error(ctx, t)
+  # `-serve` option captures the following target if it is present; add that to the target list.
+  targets = args.targets + ([args.serve] if args.serve else [])
+  if not targets: targets = ['index.html']
+
+  for t in targets: validate_target_or_error(ctx, t)
 
   if cmd:
-    command_fns[cmd](ctx, args.targets)
+    command_fns[cmd](ctx, targets)
     return
-  else: # no command; default behavior is to update each specified target.
-    for target in (args.targets or ['index.html']):
-      if path_exists(target):
-        stem, ext = split_stem_ext(target)
-        if ext in dependency_fns:
-          note(target, f'specified target is a source and not a product; building {stem!r}...')
-          target = stem
-        else:
-          note(target, 'specified target is a source and not a product.')
-      update_dependency(ctx, target, dependent=None, force=args.force)
 
+  # no command; default behavior is to update each specified target.
 
-class Ctx(NamedTuple):
-  db: DB
-  change_times: Dict[str, Optional[int]]
-  dir_names: Dict[str, List[str]]
-  dependents: DefaultDict[str, Set[str]]
-  build_dir: str
-  build_dir_slash: str
-  reserved_names: FrozenSet
-  report_times: bool
-  dbg: Callable[..., None]
+  def update_target(target):
+    update_dependency(ctx, target, dependent=None, force=args.force)
+
+  for target in targets:
+    if path_exists(target):
+      stem, ext = split_stem_ext(target)
+      if ext in dependency_fns:
+        note(target, f'specified target is a source and not a product; building {stem!r}...')
+        target = stem
+      else:
+        note(target, 'specified target is a source and not a product.')
+    update_target(target)
+
+  if args.serve:
+    serve_build(ctx, main_target=args.serve, update_target=update_target)
 
 
 # Commands.
@@ -134,7 +137,7 @@ def muck_clean(ctx: Ctx, args: List[str]) -> None:
     if not ctx.db.contains_record(target=target):
       errL(f'muck clean note: {target}: skipping unknown target.')
       continue
-    prod_path = product_path_for_target(ctx, target)
+    prod_path = ctx.product_path_for_target(target)
     remove_file_if_exists(prod_path)
     ctx.db.delete_record(target=target)
 
@@ -193,7 +196,7 @@ def muck_prod_list(ctx: Ctx, targets: List[str]) -> None:
   for target in sorted(targets):
     update_dependency(ctx, target, dependent=None)
 
-  outLL(*sorted(product_path_for_target(ctx, t) for t in ctx.change_times))
+  outLL(*sorted(ctx.product_path_for_target(t) for t in ctx.change_times))
 
 
 def muck_create_patch(ctx: Ctx, args: List[str]) -> None:
@@ -280,7 +283,7 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[str], force=Fal
   is_product = not path_exists(target)
   if is_product and is_link(target):
     raise error(target, f'target is a dangling symlink to: {read_link(target)}')
-  actual_path = product_path_for_target(ctx, target) if is_product else target
+  actual_path = ctx.product_path_for_target(target) if is_product else target
 
   old = ctx.db.get_record(target=target)
   needs_update = force or (old is None)
@@ -370,7 +373,7 @@ def update_product_with_tmp(ctx: Ctx, src: str, dyn_deps: Tuple[str, ...], tmp_p
   product_path, ext = split_stem_ext(tmp_path)
   if ext not in (out_ext, tmp_ext):
     raise error(tmp_path, f'product output path has unexpected extension: {ext!r}')
-  if not is_product_path(ctx, product_path):
+  if not ctx.is_product_path(product_path):
      raise error(product_path, 'product path is not in build dir.')
   target = product_path[len(ctx.build_dir_slash):]
   old = ctx.db.get_record(target=target)
@@ -396,7 +399,7 @@ def update_non_product(ctx: Ctx, target: str, needs_update: bool, old: Optional[
   'returns transitive change_time.'
   ctx.dbg(target, 'update_non_product')
   size, mtime = file_size_and_mtime(target)
-  product_link = product_path_for_target(ctx, target) # non_products get linked into build dir.
+  product_link = ctx.product_path_for_target(target) # non_products get linked into build dir.
 
   if needs_update:
     remove_file_if_exists(product_link)
@@ -603,7 +606,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
       tmp_paths = [prod_path_out]
   else: # found manifest.
     via = 'manifest'
-    tmp_paths = list(product_path_for_target(ctx, line.rstrip('\n')) for line in f)
+    tmp_paths = list(ctx.product_path_for_target(line.rstrip('\n')) for line in f)
     cleanup_out()
     if prod_path_tmp not in tmp_paths:
       errL('prod_path_tmp: ', prod_path_tmp)
@@ -637,56 +640,16 @@ build_tool_env_fns = {
 # Targets and paths.
 
 
-class InvalidTarget(Exception):
-  def __init__(self, target: str, msg: str) -> None:
-    super().__init__(target, msg)
-    self.target = target
-    self.msg = msg
-
-
-target_invalids_re = re.compile(r'[\s]|\.\.|\./|//')
-
-def validate_target(ctx: Ctx, target: str) -> None:
-  if not target:
-    raise InvalidTarget(target, 'empty string.')
-  inv_m  =target_invalids_re.search(target)
-  if inv_m:
-    raise InvalidTarget(target, f'cannot contain {inv_m.group(0)!r}.')
-  if target[0] == '.' or target[-1] == '.':
-    raise InvalidTarget(target, "cannot begin or end with '.'.")
-  if path_name_stem(target) in ctx.reserved_names:
-    reserved_desc = ', '.join(sorted(ctx.reserved_names))
-    raise InvalidTarget(target, f'name is reserved; please rename the target.\n(reserved names: {reserved_desc}.)')
-  if path_ext(target) in reserved_exts:
-    raise InvalidTarget(target, 'target name has reserved extension; please rename the target.')
-  try:
-    for name, _, _, _t in parse_formatters(target):
-      if not name:
-        raise InvalidTarget(target, 'contains unnamed formatter')
-  except FormatError as e:
-    raise InvalidTarget(target, 'invalid format') from e
-
-
 def validate_target_or_error(ctx: Ctx, target: str) -> None:
   try: validate_target(ctx, target)
   except InvalidTarget as e:
     exit(f'muck error: invalid target: {e.target!r}; {e.msg}')
 
 
-def is_product_path(ctx: Ctx, path: str) -> bool:
-  return path.startswith(ctx.build_dir_slash)
-
-
-def product_path_for_target(ctx: Ctx, target_path: str) -> str:
-  if target_path == ctx.build_dir or is_product_path(ctx, target_path):
-    raise ValueError(f'provided target path is prefixed with build dir: {target_path}')
-  return path_join(ctx.build_dir, target_path)
-
-
 def target_path_for_source(ctx: Ctx, source_path: str) -> str:
   'Return the target path for `source_path` (which may itself be a product).'
   path = path_stem(source_path) # strip off source ext.
-  if is_product_path(ctx, path): # source might be a product.
+  if ctx.is_product_path(path): # source might be a product.
     return path[len(ctx.build_dir_slash):]
   else:
     return path
