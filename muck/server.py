@@ -37,6 +37,9 @@ def serve_build(ctx: Ctx, main_target: str, update_target: Callable[[str], None]
       if target == main_target:
         if should_reload_main: ctx.reset()
         should_reload_main = True
+      elif target == 'favicon.ico': # TODO: make this an optional target somehow?
+        errL('ignoring favicon.icon.')
+        return self.send_error(404, message='muck.server currently ignores favicon.ico.')
 
       errL(f'local request: {self.path}; target: {target}')
       update_target(target)
