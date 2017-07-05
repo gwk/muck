@@ -14,6 +14,8 @@ class Ctx(NamedTuple):
   build_dir: str
   build_dir_slash: str
   reserved_names: FrozenSet
+  force: bool
+  serve: bool
   report_times: bool
   dbg: Callable[..., None]
   change_times: Dict[str, Optional[int]] = {}

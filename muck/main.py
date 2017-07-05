@@ -61,28 +61,11 @@ def main() -> None:
   add_cmd('update-patch', help='update a patch: usage: [target.pat]')
 
   args = arg_parser.parse_args()
-  cmds = args.cmds or []
+  cmds = args.cmds or [None]
   build_dir = args.build_dir.rstrip('/')
   build_dir_slash = build_dir + '/'
   db_name = '_muck'
   db_path = build_dir_slash + db_name
-
-  if args.dbg:
-    def dbg(path: str, *items: str) -> None:
-      errL(f'muck dbg: {path}: ', *items)
-  else:
-    def dbg(path: str, *items: str) -> None: pass
-
-  if len(cmds) > 1:
-    desc = ', '.join(repr('-' + c) for c in cmds)
-    exit(f'muck error: multiple commands specified: {desc}.')
-
-  make_dirs(build_dir) # required to create new DB.
-
-  cmd = cmds[0] if cmds else None
-  if cmd == 'clean' and not args.targets:
-    muck_clean_all(build_dir)
-    exit()
 
   reserved_names = frozenset({
     'muck',
@@ -90,23 +73,47 @@ def main() -> None:
     db_name,
   })
 
+  if args.dbg:
+    def dbg(path: str, *items: str) -> None:
+      errL('muck dbg: ', path, ': ', *items)
+  else:
+    def dbg(path: str, *items: str) -> None: pass
+
+  if len(cmds) > 1:
+    desc = ', '.join(repr('-' + c) for c in cmds)
+    exit(f'muck error: multiple commands specified: {desc}.')
+
+  cmd = cmds[0]
+
+  make_dirs(build_dir) # required to create new DB.
+
+  if cmd == 'clean' and not args.targets:
+    # special case: we do not want to initialize the DB.
+    muck_clean_all(build_dir)
+    exit()
+
   ctx = Ctx(db=DB(path=db_path), build_dir=build_dir, build_dir_slash=build_dir_slash,
-    reserved_names=reserved_names, report_times=(not args.no_times), dbg=dbg)
+    reserved_names=reserved_names, force=args.force, serve=args.serve, report_times=(not args.no_times), dbg=dbg)
 
   # `-serve` option captures the following target if it is present; add that to the target list.
   targets = args.targets + ([args.serve] if args.serve else [])
-  if not targets: targets = ['index.html']
+
+  cmd_fn, wants_dflt_target = command_fns[cmd]
+  if wants_dflt_target and not targets: targets = ['index.html']
 
   for t in targets: validate_target_or_error(ctx, t)
 
-  if cmd:
-    command_fns[cmd](ctx, targets)
-    return
+  cmd_fn(ctx, targets)
 
-  # no command; default behavior is to update each specified target.
 
-  def update_target(target):
-    update_dependency(ctx, target, dependent=None, force=args.force)
+# Commands.
+
+
+def muck_build(ctx: Ctx, targets: List[str]) -> None:
+  'muck default command: update each specified target.'
+
+  def update_target(target): # closure to pass to serve_build.
+    update_dependency(ctx, target, dependent=None, force=ctx.force)
 
   for target in targets:
     if path_exists(target):
@@ -117,12 +124,8 @@ def main() -> None:
       else:
         note(target, 'specified target is a source and not a product.')
     update_target(target)
-
-  if args.serve:
-    serve_build(ctx, main_target=args.serve, update_target=update_target)
-
-
-# Commands.
+  if ctx.serve:
+    serve_build(ctx, main_target=ctx.serve, update_target=update_target)
 
 
 def muck_clean_all(build_dir: str) -> None:
@@ -144,8 +147,6 @@ def muck_clean(ctx: Ctx, args: List[str]) -> None:
 
 def muck_deps(ctx: Ctx, targets: List[str]) -> None:
   '`muck -deps [targets...]` command.'
-  if not targets: targets = ['index.html']
-
   for target in sorted(targets):
     update_dependency(ctx, target, dependent=None)
 
@@ -181,21 +182,15 @@ def muck_deps(ctx: Ctx, targets: List[str]) -> None:
 
 def muck_deps_list(ctx: Ctx, targets: List[str]) -> None:
   '`muck -deps-list [targets...]` command.'
-  if not targets: targets = ['index.html']
-
-  for target in sorted(targets):
+  for target in targets:
     update_dependency(ctx, target, dependent=None)
-
   outLL(*sorted(ctx.change_times))
 
 
 def muck_prod_list(ctx: Ctx, targets: List[str]) -> None:
-  '`muck -deps-list [targets...]` command.'
-  if not targets: targets = ['index.html']
-
-  for target in sorted(targets):
+  '`muck -prod-list [targets...]` command.'
+  for target in targets:
     update_dependency(ctx, target, dependent=None)
-
   outLL(*sorted(ctx.product_path_for_target(t) for t in ctx.change_times))
 
 
@@ -249,13 +244,15 @@ The patch file will be updated with the diff of the previously specified origina
   #^ TODO: update target instead.
 
 
-command_fns: Dict[str, Callable[[Ctx, List[str]], None]] = {
-  'clean'         : muck_clean,
-  'deps'          : muck_deps,
-  'deps-list'     : muck_deps_list,
-  'patch'         : muck_create_patch,
-  'prod-list'     : muck_prod_list,
-  'update-patch'  : muck_update_patch,
+# map command names to (fn, wants_dflt_target).
+command_fns: Dict[str, Tuple[Callable[[Ctx, List[str]], None], bool]] = {
+  None            : (muck_build, True),
+  'clean'         : (muck_clean, False),
+  'deps'          : (muck_deps, True),
+  'deps-list'     : (muck_deps_list, True),
+  'patch'         : (muck_create_patch, False),
+  'prod-list'     : (muck_prod_list, True),
+  'update-patch'  : (muck_update_patch, False),
 }
 
 
