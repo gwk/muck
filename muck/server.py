@@ -42,6 +42,11 @@ def serve_build(ctx: Ctx, main_target: str, update_target: Callable[[str], None]
       update_target(target)
       return super().send_head()
 
+    def send_response(self, code, message=None):
+      super().send_response(code=code, message=message)
+      self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+
+
     def target_for_url_path(self):
       '''
       Special case maps directories to index.html; based on the beginning of super's implementation of `send_head`.
