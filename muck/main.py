@@ -328,7 +328,7 @@ def update_product(ctx: Ctx, target: str, actual_path: str, needs_update: bool, 
   ctx.dbg(target, 'update_product')
   src = source_for_target(ctx, target)
   validate_target_or_error(ctx, src)
-  ctx.dbg(target, f'src: {src}')
+  ctx.dbg(target, f'src: ', src)
   if old is not None and old.src != src:
     needs_update = True
     note(target, f'source path of target product changed\n  was: {old.src}\n  now: {src}')
@@ -460,7 +460,7 @@ def update_deps_and_record(ctx, target: str, actual_path: str, is_changed: bool,
   # always update record, because even if is_changed=False, mtime may have changed.
   record = TargetRecord(path=target, size=size, mtime=mtime, change_time=change_time, update_time=update_time,
     hash=file_hash, src=src, deps=deps, dyn_deps=dyn_deps)
-  ctx.dbg(target, f'updated record:\n  {record}')
+  ctx.dbg(target, f'updated record:\n  ', record)
   ctx.db.insert_or_replace_record(record)
   return change_time
 
