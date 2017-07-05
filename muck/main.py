@@ -386,6 +386,7 @@ def update_product_with_tmp(ctx: Ctx, src: str, dyn_deps: Tuple[str, ...], tmp_p
     assert old is not None
     change_time = old.change_time
     change_verb = 'did not change'
+    mtime = old.mtime # we are abandoning the new file.
     remove_file(tmp_path) # do not overwrite old because we want to preserve the old mtime.
   note(target, f"product {change_verb}; {format_byte_count(size)}.")
   return target, update_deps_and_record(ctx, target=target, actual_path=product_path, is_changed=is_changed, size=size, mtime=mtime,
