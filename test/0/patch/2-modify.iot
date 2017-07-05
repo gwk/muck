@@ -1,8 +1,8 @@
 {
   'desc': 'modify file.',
   'compile': [
-    # sleep necessary due to poor HFS+ timestamp resolution.
-    "sh -c 'sleep 1 && echo modified text. > _build/patched.txt'",
+    # for file systems with poor timestamp resolution, e.g. HFS+, a `sleep 1` is necessary for consistent testing.
+    "sh -c 'echo modified text. > _build/patched.txt'",
     ],
   'cmd': '$MUCK patched.txt',
 }
