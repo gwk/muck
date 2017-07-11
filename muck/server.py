@@ -23,7 +23,7 @@ def serve_build(ctx: Ctx, main_target: str, update_target: Callable[[str], None]
       super's implementation returns an absolute path based on cwd; we want one relative to build_dir.
       Note: we could reimplement necessary URL parsing logic here and not call super().translate_path, but this is easier.
       '''
-      target = rel_path(super().translate_path(path))
+      target = rel_path(super().translate_path(path)) # type: ignore # this is technically a private method.
       return ctx.product_path_for_target(target)
 
     def send_head(self):
@@ -43,7 +43,7 @@ def serve_build(ctx: Ctx, main_target: str, update_target: Callable[[str], None]
 
       errL(f'local request: {self.path}; target: {target}')
       update_target(target)
-      return super().send_head()
+      return super().send_head() # type: ignore # this is technically a private method.
 
     def send_response(self, code, message=None):
       super().send_response(code=code, message=message)
@@ -57,7 +57,7 @@ def serve_build(ctx: Ctx, main_target: str, update_target: Callable[[str], None]
       Not sure how this will generalize, but seems like an obscure case.
       Note: muck does not support 'index.htm', only 'index.html', nor does it support the fallback directory listing.
       '''
-      target = rel_path(super().translate_path(self.path))
+      target = rel_path(super().translate_path(self.path)) # type: ignore # this is technically a private method.
       return path_join(target, 'index.html') if is_dir(target) else target
 
 

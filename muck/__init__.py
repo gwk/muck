@@ -114,8 +114,8 @@ def _open(path: str, buffering=-1, encoding='UTF-8', errors=None, newline=None) 
         send = int(os.environ['DEPS_SEND'])
       except KeyError: pass # not running as child of muck build process.
       else:
-        _deps_recv = cast(TextIO, _std_open(int(recv), 'r'))
-        _deps_send = cast(TextIO, _std_open(int(send), 'w'))
+        _deps_recv = _std_open(int(recv), 'r')
+        _deps_send = _std_open(int(send), 'w')
     if _deps_recv:
       print(path, file=_deps_send, flush=True)
       ack = _deps_recv.readline()

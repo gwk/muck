@@ -52,7 +52,7 @@ def main() -> None:
   group = arg_parser.add_argument_group('special commands')
 
   # map command names to (fn, wants_dflt_target).
-  command_fns: Dict[str, Tuple[Callable[[Ctx, List[str]], None], bool]] = {
+  command_fns: Dict[Optional[str], Tuple[Callable[[Ctx, List[str]], None], bool]] = {
     None : (muck_build, True), # default command.
   }
 
@@ -119,7 +119,7 @@ def main() -> None:
 def muck_build(ctx: Ctx, targets: List[str]) -> None:
   'muck default command: update each specified target.'
 
-  def update_target(target): # closure to pass to serve_build.
+  def update_target(target: str) -> None: # closure to pass to serve_build.
     update_dependency(ctx, target, dependent=None, force=ctx.args.force)
 
   for target in targets:
@@ -406,11 +406,10 @@ def update_non_product(ctx: Ctx, target: str, needs_update: bool, old: Optional[
   if needs_update:
     is_changed = True
     file_hash = hash_for_path(target)
-  else: # all we know so far is that it exists and status as a non-product has not changed.
-    appears_changed = (old is None or size != old.size or mtime != old.mtime)
-    if appears_changed: # check if contents actually changed.
+  else: # all we know so far is that the file exists and status as a non-product has not changed.
+    if (old is None or size != old.size or mtime != old.mtime): # appears changed; check if contents actually changed.
       file_hash = hash_for_path(target)
-      is_changed = (old.hash != file_hash)
+      is_changed = (old is None or old.hash != file_hash)
     else: # assume not changed based on size/mtime; otherwise we constantly recalculate hashes for large sources.
       is_changed = False
       file_hash = old.hash
@@ -554,7 +553,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   note(target, f"building: `{' '.join(shlex.quote(w) for w in cmd)}`")
   dyn_time = 0
   dyn_deps: List[str] = []
-  with cast(BinaryIO, open(prod_path_out, 'wb')) as out_file, DuplexPipe() as pipe:
+  with open(prod_path_out, 'wb') as out_file, DuplexPipe() as pipe:
     deps_recv, deps_send = pipe.left_files()
     env.update(zip(('DEPS_RECV', 'DEPS_SEND'), [str(fd) for fd in pipe.right_fds]))
     assert env['DEPS_RECV'] is not None
