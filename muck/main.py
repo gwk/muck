@@ -99,8 +99,8 @@ def main() -> None:
     muck_clean_all(build_dir)
     exit()
 
-  ctx = Ctx(db=DB(path=db_path), build_dir=build_dir, build_dir_slash=build_dir_slash,
-    reserved_names=reserved_names, force=args.force, serve=args.serve, report_times=(not args.no_times), dbg=dbg)
+  ctx = Ctx(args=args, db=DB(path=db_path), build_dir=build_dir, build_dir_slash=build_dir_slash,
+    reserved_names=reserved_names, report_times=(not args.no_times), dbg=dbg)
 
   # `-serve` option captures the following target if it is present; add that to the target list.
   targets = args.targets + ([args.serve] if args.serve else [])
@@ -120,7 +120,7 @@ def muck_build(ctx: Ctx, targets: List[str]) -> None:
   'muck default command: update each specified target.'
 
   def update_target(target): # closure to pass to serve_build.
-    update_dependency(ctx, target, dependent=None, force=ctx.force)
+    update_dependency(ctx, target, dependent=None, force=ctx.args.force)
 
   for target in targets:
     if path_exists(target):
@@ -131,8 +131,8 @@ def muck_build(ctx: Ctx, targets: List[str]) -> None:
       else:
         note(target, 'specified target is a source and not a product.')
     update_target(target)
-  if ctx.serve:
-    serve_build(ctx, main_target=ctx.serve, update_target=update_target)
+  if ctx.args.serve:
+    serve_build(ctx, main_target=ctx.args.serve, update_target=update_target)
 
 
 def muck_clean_all(build_dir: str) -> None:

@@ -1,5 +1,6 @@
 # Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
 
+import argparse
 import re
 from typing import *
 from .pithy.format import FormatError, parse_formatters
@@ -10,12 +11,11 @@ from .db import DB
 
 
 class Ctx(NamedTuple):
+  args: argparse.Namespace
   db: DB
   build_dir: str
   build_dir_slash: str
   reserved_names: FrozenSet
-  force: bool
-  serve: bool
   report_times: bool
   dbg: Callable[..., None]
   change_times: Dict[str, Optional[int]] = {}
