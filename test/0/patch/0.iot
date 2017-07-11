@@ -1,6 +1,6 @@
 {
   'desc': 'create patch.',
-  'cmd': '$MUCK -patch orig.txt patched.txt',
+  'cmd': '$MUCK -create-patch orig.txt patched.txt',
   'code': 0,
   'links': {
     'test/0/patch/orig.txt',

@@ -1,7 +1,7 @@
 {
-  'cmd': '$MUCK -patch',
+  'cmd': '$MUCK -create-patch',
   'err-val': '''\
-muck -patch error: requires two arguments: [original] [modified].
+muck -create-patch error: requires two arguments: [original] [modified].
 This command creates an empty patch called [modified].pat, and copies [original] to _build/[modified].
 '''
 }

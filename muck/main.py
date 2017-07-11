@@ -50,15 +50,22 @@ def main() -> None:
     help='serve contents of build directory via local HTTP, and open the specified target in the browser.')
 
   group = arg_parser.add_argument_group('special commands')
-  def add_cmd(cmd: str, help: str) -> None:
-    group.add_argument('-' + cmd, dest='cmds', action='append_const', const=cmd, help=help)
 
-  add_cmd('clean', help='clean the specified targets or the entire build folder.')
-  add_cmd('deps',  help='print targets and their dependencies as a visual hierarchy.')
-  add_cmd('deps-list',  help='print targets and their dependencies as a list.')
-  add_cmd('prod-list',  help='print products as a list.')
-  add_cmd('patch', help='create a patch; usage: [original] [modified.pat]')
-  add_cmd('update-patch', help='update a patch: usage: [target.pat]')
+  # map command names to (fn, wants_dflt_target).
+  command_fns: Dict[str, Tuple[Callable[[Ctx, List[str]], None], bool]] = {
+    None : (muck_build, True), # default command.
+  }
+
+  def add_cmd(cmd: str, fn: Callable[[Ctx, List[str]], None], wants_dflt: bool, help: str) -> None:
+    group.add_argument('-' + cmd, dest='cmds', action='append_const', const=cmd, help=help)
+    command_fns[cmd] = (fn, wants_dflt)
+
+  add_cmd('clean',        muck_clean,         True, help='clean the specified targets or the entire build folder.')
+  add_cmd('deps',         muck_deps,          True, help='print targets and their dependencies as a visual hierarchy.')
+  add_cmd('deps-list',    muck_deps_list,     True, help='print targets and their dependencies as a list.')
+  add_cmd('prod-list',    muck_prod_list,     True, help='print products as a list.')
+  add_cmd('create-patch', muck_create_patch,  False, help='create a patch; usage: [original] [modified.pat]')
+  add_cmd('update-patch', muck_update_patch,  False, help='update a patch: usage: [target.pat]')
 
   args = arg_parser.parse_args()
   cmds = args.cmds or [None]
@@ -195,25 +202,25 @@ def muck_prod_list(ctx: Ctx, targets: List[str]) -> None:
 
 
 def muck_create_patch(ctx: Ctx, args: List[str]) -> None:
-  '`muck -patch` command.'
+  '`muck -create-patch` command.'
   if len(args) != 2:
     exit('''\
-muck -patch error: requires two arguments: [original] [modified].
+muck -create-patch error: requires two arguments: [original] [modified].
 This command creates an empty patch called [modified].pat, and copies [original] to _build/[modified].''')
   original, modified = args
   patch = modified + '.pat'
   if original.endswith('.pat'):
-    exit(f"muck -patch error: 'original' should not be a patch file: {original}")
+    exit(f"muck -create-patch error: 'original' should not be a patch file: {original}")
   if modified.endswith('.pat'):
-    exit(f"muck -patch error: 'modified' should not be a patch file: {modified}")
+    exit(f"muck -create-patch error: 'modified' should not be a patch file: {modified}")
   if path_exists(modified) or ctx.db.contains_record(patch):
-    exit(f"muck -patch error: 'modified' is an existing target: {modified}")
+    exit(f"muck -create-patch error: 'modified' is an existing target: {modified}")
   if path_exists(patch) or ctx.db.contains_record(patch):
-    exit(f"muck -patch error: patch is an existing target: {patch}")
+    exit(f"muck -create-patch error: patch is an existing target: {patch}")
   update_dependency(ctx, original, dependent=None)
   cmd = ['pat', 'create', original, modified, '../' + patch]
   cmd_str = ' '.join(shlex.quote(w) for w in cmd)
-  errL(f'muck -patch note: creating patch: `{cmd_str}`')
+  errL(f'muck -create-patch note: creating patch: `{cmd_str}`')
   exit(runC(cmd, cwd=ctx.build_dir))
 
 
@@ -242,18 +249,6 @@ The patch file will be updated with the diff of the previously specified origina
   #^ need to remove or update the target record to avoid the 'did you mean to patch?' safeguard.
   #^ for now, just delete it to be safe; this makes the target look stale.
   #^ TODO: update target instead.
-
-
-# map command names to (fn, wants_dflt_target).
-command_fns: Dict[str, Tuple[Callable[[Ctx, List[str]], None], bool]] = {
-  None            : (muck_build, True),
-  'clean'         : (muck_clean, False),
-  'deps'          : (muck_deps, True),
-  'deps-list'     : (muck_deps_list, True),
-  'patch'         : (muck_create_patch, False),
-  'prod-list'     : (muck_prod_list, True),
-  'update-patch'  : (muck_update_patch, False),
-}
 
 
 # Default update functionality.
