@@ -1,6 +1,6 @@
 {
   'desc': 'rebuild.',
-  'compile': ['$MUCK -clean patched.txt'],
+  'compile': ['$MUCK clean patched.txt'],
   'cmd': '$MUCK -no-times patched.txt',
   'code': 0,
   'files': {

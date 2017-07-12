@@ -1,6 +1,6 @@
 {
-  'cmd': '$MUCK -update-patch a.txt',
+  'cmd': '$MUCK update-patch a.txt',
   'err-val': '''\
-muck -update-patch error: argument does not specify a .pat file: 'a.txt'
+muck update-patch error: argument does not specify a .pat file: 'a.txt'
 '''
 }

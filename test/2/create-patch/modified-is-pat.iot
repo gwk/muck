@@ -1,0 +1,6 @@
+{
+  'cmd': '$MUCK create-patch original.txt modified.pat',
+  'err-val': '''\
+muck create-patch error: 'modified' should not be a patch file: modified.pat
+'''
+}

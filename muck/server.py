@@ -12,7 +12,7 @@ def serve_build(ctx: Ctx, main_target: str, update_target: Callable[[str], None]
   address = ('localhost', 8000)
   host, port = address
   addr_str = f'http://{host}:{port}/{main_target}'
-  should_reload_main = False # starts from built state.
+  should_rebuild = False # starts from built state.
 
   class Handler(SimpleHTTPRequestHandler):
 
@@ -32,11 +32,11 @@ def serve_build(ctx: Ctx, main_target: str, update_target: Callable[[str], None]
       We override it to detect dependencies and build them before sending the header.
       Note that the header contains file size and mtime, so we must finish building the product first.
       '''
-      nonlocal should_reload_main
+      nonlocal should_rebuild
       target = self.target_for_url_path()
       if target == main_target:
-        if should_reload_main: ctx.reset()
-        should_reload_main = True
+        if should_rebuild: ctx.reset()
+        should_rebuild = True
       elif target == 'favicon.ico': # TODO: make this an optional target somehow?
         errL('ignoring favicon.icon.')
         return self.send_error(404, message='muck.server currently ignores favicon.ico.')

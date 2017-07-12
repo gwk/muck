@@ -1,8 +1,8 @@
 {
   'compile': [
-    '$MUCK clean-all.txt',
-    '$MUCK -clean',
+    '$MUCK $STEM-src.txt',
+    '$MUCK clean-all',
   ],
   'cmd': 'ls _build', # result is empty file.
-  'links': {'$STEM.txt.py'}
+  'links': {'test'}
 }

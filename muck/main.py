@@ -1,7 +1,8 @@
 # Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
 
 '''
-Muck is a build tool that infers dependencies between files.
+Muck build tool.
+This file was separated from __main__.py to make stack traces more consistent during testing.
 '''
 
 import sys
@@ -14,7 +15,7 @@ import shlex
 import re
 import time
 
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from collections import defaultdict, namedtuple
 from datetime import datetime
 from hashlib import sha256
@@ -40,45 +41,69 @@ from .server import serve_build
 
 
 def main() -> None:
-  arg_parser = ArgumentParser(description=__doc__)
-  arg_parser.add_argument('targets', nargs='*', default=[], help="target file names; defaults to 'index.html'.")
-  arg_parser.add_argument('-no-times', action='store_true', help='do not report process times.')
-  arg_parser.add_argument('-dbg', action='store_true', help='log lots of details to stderr.')
-  arg_parser.add_argument('-force', action='store_true', help='rebuild specified targets even if they are up to date.')
-  arg_parser.add_argument('-build-dir', default='_build', help="specify build directory; defaults to '_build'.")
-  arg_parser.add_argument('-serve', nargs='?', const='index.html',
+
+  db_name = '_muck'
+  reserved_names = { 'muck', db_name }
+
+  # argument parser setup.
+  # argparse's subparser feature does not allow for a default command.
+  # thus we build an argument parser for each command, as well as the main one,
+  # and dispatch manually based on the first argument.
+
+  parsers: Dict[str, ArgumentParser] = {}
+
+  def add_parser(cmd: str, fn: Callable[..., None], builds: bool, targets_dflt:str=None, takes_ctx:bool=True, **kwargs) -> ArgumentParser:
+    reserved_names.add(cmd)
+    parser = ArgumentParser(prog='muck ' + cmd, **kwargs)
+    parser.set_defaults(fn=fn, builds=builds, targets_dflt=targets_dflt, takes_ctx=takes_ctx)
+    parser.add_argument('-build-dir', default='_build', help="specify build directory; defaults to '_build'.")
+    parser.add_argument('-dbg', action='store_true', help='log lots of details to stderr.')
+    if builds:
+      parser.add_argument('-no-times', action='store_true', help='do not report process times.')
+      parser.add_argument('-force', action='store_true', help='rebuild specified targets even if they are up to date.')
+    if targets_dflt is not None:
+      default = ['index.html'] if targets_dflt else None
+      parser.add_argument('targets', nargs='*', default=default, help="target file names; defaults to 'index.html'.")
+    parsers[cmd] = parser
+    return parser
+
+  build_parser = add_parser('build', muck_build, builds=True, targets_dflt=True, description='build targets')
+  build_parser.add_argument('-serve', nargs='?', const='index.html',
     help='serve contents of build directory via local HTTP, and open the specified target in the browser.')
 
-  group = arg_parser.add_argument_group('special commands')
+  add_parser('clean-all',     muck_clean_all,     builds=False, takes_ctx=False, description='clean the entire build directory, including the build database.')
+  add_parser('clean',         muck_clean,         builds=False, targets_dflt=False, description='clean the specified targets.')
+  add_parser('deps',          muck_deps,          builds=True,  targets_dflt=True,  description='print targets and their dependencies as a visual hierarchy.')
+  add_parser('deps-list',     muck_deps_list,     builds=True,  targets_dflt=True,  description='print targets and their dependencies as a list.')
+  add_parser('prod-list',     muck_prod_list,     builds=True,  targets_dflt=True,  description='print products as a list.')
 
-  # map command names to (fn, wants_dflt_target).
-  command_fns: Dict[Optional[str], Tuple[Callable[[Ctx, List[str]], None], bool]] = {
-    None : (muck_build, True), # default command.
-  }
+  create_patch = add_parser('create-patch',  muck_create_patch,  builds=True, description="create a patch; creates a new '.pat' source.",
+    epilog='This command creates an empty patch called [modified].pat, and copies [original] to _build/[modified].')
+  create_patch.add_argument('original', help='the target to be patched.')
+  create_patch.add_argument('modified', help='the target to be produced by patching the original.')
 
-  def add_cmd(cmd: str, fn: Callable[[Ctx, List[str]], None], wants_dflt: bool, help: str) -> None:
-    group.add_argument('-' + cmd, dest='cmds', action='append_const', const=cmd, help=help)
-    command_fns[cmd] = (fn, wants_dflt)
+  update_patch = add_parser('update-patch',  muck_update_patch,  builds=True, description="update a '.pat' patch.",
+    epilog='The patch file will be updated with the diff between the original referenced by the patch, and _build/[modified].')
+  update_patch.add_argument('patch', help='the patch to update.')
 
-  add_cmd('clean',        muck_clean,         True, help='clean the specified targets or the entire build folder.')
-  add_cmd('deps',         muck_deps,          True, help='print targets and their dependencies as a visual hierarchy.')
-  add_cmd('deps-list',    muck_deps_list,     True, help='print targets and their dependencies as a list.')
-  add_cmd('prod-list',    muck_prod_list,     True, help='print products as a list.')
-  add_cmd('create-patch', muck_create_patch,  False, help='create a patch; usage: [original] [modified.pat]')
-  add_cmd('update-patch', muck_update_patch,  False, help='update a patch: usage: [target.pat]')
+  # set build_parser epilog after all other parsers have been constructed.
+  cmds_str = ', '.join(parsers)
+  build_parser.epilog = f'`build` is the default subcommand; other available commands are:\n{cmds_str}.`'
 
-  args = arg_parser.parse_args()
-  cmds = args.cmds or [None]
-  build_dir = args.build_dir.rstrip('/')
-  build_dir_slash = build_dir + '/'
-  db_name = '_muck'
-  db_path = build_dir_slash + db_name
+  # command dispatch.
 
-  reserved_names = frozenset({
-    'muck',
-    build_dir,
-    db_name,
-  })
+  if len(argv) >= 2 and argv[1] in parsers:
+    cmd = argv[1]
+    cmd_args = argv[2:]
+  else:
+    cmd = 'build'
+    cmd_args = argv[1:]
+  parser = parsers[cmd]
+
+  args = parser.parse_args(cmd_args)
+  args.build_dir = args.build_dir.rstrip('/')
+  reserved_names.add(args.build_dir)
+  db_path = path_join(args.build_dir, db_name)
 
   if args.dbg:
     def dbg(path: str, *items: str) -> None:
@@ -86,43 +111,28 @@ def main() -> None:
   else:
     def dbg(path: str, *items: str) -> None: pass
 
-  if len(cmds) > 1:
-    desc = ', '.join(repr('-' + c) for c in cmds)
-    exit(f'muck error: multiple commands specified: {desc}.')
+  make_dirs(args.build_dir) # required to create new DB.
 
-  cmd = cmds[0]
+  if not args.takes_ctx:
+    args.fn(args)
+    return
 
-  make_dirs(build_dir) # required to create new DB.
+  ctx = Ctx(args=args, db=DB(path=db_path), build_dir=args.build_dir, build_dir_slash=args.build_dir + '/',
+    reserved_names=reserved_names, dbg=dbg)
 
-  if cmd == 'clean' and not args.targets:
-    # special case: we do not want to initialize the DB.
-    muck_clean_all(build_dir)
-    exit()
-
-  ctx = Ctx(args=args, db=DB(path=db_path), build_dir=build_dir, build_dir_slash=build_dir_slash,
-    reserved_names=reserved_names, report_times=(not args.no_times), dbg=dbg)
-
-  # `-serve` option captures the following target if it is present; add that to the target list.
-  targets = args.targets + ([args.serve] if args.serve else [])
-
-  cmd_fn, wants_dflt_target = command_fns[cmd]
-  if wants_dflt_target and not targets: targets = ['index.html']
-
-  for t in targets: validate_target_or_error(ctx, t)
-
-  cmd_fn(ctx, targets)
+  args.fn(ctx)
 
 
 # Commands.
 
 
-def muck_build(ctx: Ctx, targets: List[str]) -> None:
-  'muck default command: update each specified target.'
+def muck_build(ctx: Ctx) -> None:
+  '`muck build` (default) command: update each specified target.'
 
   def update_target(target: str) -> None: # closure to pass to serve_build.
     update_dependency(ctx, target, dependent=None, force=ctx.args.force)
 
-  for target in targets:
+  for target in ctx.args.targets:
     if path_exists(target):
       stem, ext = split_stem_ext(target)
       if ext in dependency_fns:
@@ -132,18 +142,21 @@ def muck_build(ctx: Ctx, targets: List[str]) -> None:
         note(target, 'specified target is a source and not a product.')
     update_target(target)
   if ctx.args.serve:
+    update_target(ctx.args.serve)
     serve_build(ctx, main_target=ctx.args.serve, update_target=update_target)
 
 
-def muck_clean_all(build_dir: str) -> None:
-  '`muck -clean` command (no arguments).'
-  remove_dir_contents(build_dir)
+def muck_clean_all(args: Namespace) -> None:
+  '`muck clean-all` command.'
+  remove_dir_contents(args.build_dir)
 
 
-def muck_clean(ctx: Ctx, args: List[str]) -> None:
-  '`muck -clean [targets...]` command.'
-  assert args
-  for target in args:
+def muck_clean(ctx: Ctx) -> None:
+  '`muck clean` command.'
+  targets = ctx.args.targets
+  if not targets:
+    exit('muck clean: no targets specified; did you mean `muck clean-all`?')
+  for target in targets:
     if not ctx.db.contains_record(target=target):
       errL(f'muck clean note: {target}: skipping unknown target.')
       continue
@@ -152,12 +165,12 @@ def muck_clean(ctx: Ctx, args: List[str]) -> None:
     ctx.db.delete_record(target=target)
 
 
-def muck_deps(ctx: Ctx, targets: List[str]) -> None:
-  '`muck -deps [targets...]` command.'
-  for target in sorted(targets):
+def muck_deps(ctx: Ctx) -> None:
+  '`muck deps` command.'
+  for target in ctx.args.targets:
     update_dependency(ctx, target, dependent=None)
 
-  roots = set(targets)
+  roots = set(ctx.args.targets)
   roots.update(t for t, s in ctx.dependents.items() if len(s) > 1)
 
   def visit(depth: int, target: str) -> None:
@@ -187,52 +200,49 @@ def muck_deps(ctx: Ctx, targets: List[str]) -> None:
     visit(0, root)
 
 
-def muck_deps_list(ctx: Ctx, targets: List[str]) -> None:
-  '`muck -deps-list [targets...]` command.'
-  for target in targets:
+def muck_deps_list(ctx: Ctx) -> None:
+  '`muck deps-list` command.'
+  for target in ctx.args.targets:
     update_dependency(ctx, target, dependent=None)
   outLL(*sorted(ctx.change_times))
 
 
-def muck_prod_list(ctx: Ctx, targets: List[str]) -> None:
-  '`muck -prod-list [targets...]` command.'
-  for target in targets:
+def muck_prod_list(ctx: Ctx) -> None:
+  '`muck prod-list` command.'
+  for target in ctx.args.targets:
     update_dependency(ctx, target, dependent=None)
   outLL(*sorted(ctx.product_path_for_target(t) for t in ctx.change_times))
 
 
-def muck_create_patch(ctx: Ctx, args: List[str]) -> None:
-  '`muck -create-patch` command.'
-  if len(args) != 2:
-    exit('''\
-muck -create-patch error: requires two arguments: [original] [modified].
-This command creates an empty patch called [modified].pat, and copies [original] to _build/[modified].''')
-  original, modified = args
+def muck_create_patch(ctx: Ctx) -> None:
+  '`muck create-patch` command.'
+  original = ctx.args.original
+  modified = ctx.args.modified
+  validate_target_or_error(ctx, original)
+  validate_target_or_error(ctx, modified)
   patch = modified + '.pat'
   if original.endswith('.pat'):
-    exit(f"muck -create-patch error: 'original' should not be a patch file: {original}")
+    exit(f"muck create-patch error: 'original' should not be a patch file: {original}")
   if modified.endswith('.pat'):
-    exit(f"muck -create-patch error: 'modified' should not be a patch file: {modified}")
+    exit(f"muck create-patch error: 'modified' should not be a patch file: {modified}")
   if path_exists(modified) or ctx.db.contains_record(patch):
-    exit(f"muck -create-patch error: 'modified' is an existing target: {modified}")
+    exit(f"muck create-patch error: 'modified' is an existing target: {modified}")
   if path_exists(patch) or ctx.db.contains_record(patch):
-    exit(f"muck -create-patch error: patch is an existing target: {patch}")
+    exit(f"muck create-patch error: patch is an existing target: {patch}")
   update_dependency(ctx, original, dependent=None)
   cmd = ['pat', 'create', original, modified, '../' + patch]
   cmd_str = ' '.join(shlex.quote(w) for w in cmd)
-  errL(f'muck -create-patch note: creating patch: `{cmd_str}`')
+  errL(f'muck create-patch note: creating patch: `{cmd_str}`')
   exit(runC(cmd, cwd=ctx.build_dir))
 
 
-def muck_update_patch(ctx: Ctx, args: List[str]) -> None:
-  '`muck -update-patch` command.'
-  if len(args) != 1:
-    exit('''\
-muck -update-patch error: requires one argument, the patch target to update.
-The patch file will be updated with the diff of the previously specified original and _build/[target].''')
-  patch_path = args[0]
+def muck_update_patch(ctx: Ctx) -> None:
+  '`muck update-patch` command.'
+  patch_path = ctx.args.patch
+  validate_target_or_error(ctx, patch_path)
   if path_ext(patch_path) != '.pat':
-    exit(f'muck -update-patch error: argument does not specify a .pat file: {patch_path!r}')
+    exit(f'muck update-patch error: argument does not specify a .pat file: {patch_path!r}')
+
   deps = pat_dependencies(patch_path, open(patch_path), {})
   assert len(deps) == 1
   orig_path = deps[0]
@@ -241,7 +251,7 @@ The patch file will be updated with the diff of the previously specified origina
   patch_path_tmp = patch_path + tmp_ext
   cmd = ['pat', 'diff', orig_path, target, '../' + patch_path_tmp]
   cmd_str = ' '.join(shlex.quote(w) for w in cmd)
-  errL(f'muck -update-patch note: diffing: `{cmd_str}`')
+  errL(f'muck update-patch note: diffing: `{cmd_str}`')
   code = runC(cmd, cwd=ctx.build_dir)
   if code: exit(code)
   move_file(patch_path_tmp, patch_path, overwrite=True)
@@ -256,7 +266,7 @@ The patch file will be updated with the diff of the previously specified origina
 
 def update_dependency(ctx: Ctx, target: str, dependent: Optional[str], force=False) -> int:
   'returns transitive change_time.'
-  validate_target(ctx, target)
+  validate_target_or_error(ctx, target)
 
   if dependent is not None:
     ctx.dependents[target].add(dependent)
@@ -605,7 +615,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
       errSL(*tmp_paths)
       raise error(target, f'product does not appear in manifest ({len(tmp_paths)} records): {manif_path}')
     remove_file(manif_path)
-  time_msg = f'{time_elapsed:0.2f} seconds ' if ctx.report_times else ''
+  time_msg = '' if ctx.args.no_times else f'{time_elapsed:0.2f} seconds '
   note(target, f'finished: {time_msg}(via {via}).')
   return dyn_time, tuple(dyn_deps), tmp_paths
 

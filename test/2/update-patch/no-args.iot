@@ -1,7 +1,10 @@
 {
-  'cmd': '$MUCK -update-patch',
+  'cmd': '$MUCK update-patch',
+  'code': 2,
   'err-val': '''\
-muck -update-patch error: requires one argument, the patch target to update.
-The patch file will be updated with the diff of the previously specified original and _build/[target].
+usage: muck update-patch [-h] [-build-dir BUILD_DIR] [-dbg] [-no-times]
+                         [-force]
+                         patch
+muck update-patch: error: the following arguments are required: patch
 '''
 }

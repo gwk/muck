@@ -16,7 +16,6 @@ class Ctx(NamedTuple):
   build_dir: str
   build_dir_slash: str
   reserved_names: FrozenSet
-  report_times: bool
   dbg: Callable[..., None]
   change_times: Dict[str, Optional[int]] = {}
   dir_names: Dict[str, List[str]] = {}
@@ -49,7 +48,9 @@ def validate_target(ctx: Ctx, target: str) -> None:
   inv_m  =target_invalids_re.search(target)
   if inv_m:
     raise InvalidTarget(target, f'cannot contain {inv_m[0]!r}.')
-  if target[0] == '.' or target[-1] == '.':
+  if target.startswith('-'):
+    raise InvalidTarget(target, "cannot begin with '-'.")
+  if target.startswith('.') or target.endswith('.'):
     raise InvalidTarget(target, "cannot begin or end with '.'.")
   if target == ctx.build_dir or ctx.is_product_path(target):
     raise InvalidTarget(target, f'target path is prefixed with build dir.')

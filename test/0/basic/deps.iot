@@ -1,3 +1,3 @@
 {
-  'cmd': '$MUCK -deps index.html'
+  'cmd': '$MUCK deps index.html'
 }
