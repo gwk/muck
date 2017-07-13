@@ -1,0 +1,11 @@
+{
+  'compile': [
+    'touch local.txt',
+    '$MUCK move-to-fetched-url local.txt http://gwk.github.io/muck/does-not-exist.txt',
+  ],
+  'cmd': '$MUCK -no-times move-to-fetched-url-src.txt',
+  'code': 0,
+  'links': {
+    'test/1/move-to-fetched-url-src.txt.py',
+  }
+}

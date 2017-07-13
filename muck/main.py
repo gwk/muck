@@ -28,6 +28,7 @@ from .pithy.fs import *
 from .pithy.io import *
 from .pithy.iterable import fan_by_pred
 from .pithy.json_utils import load_json, write_json
+from .pithy.path_encode import path_for_url
 from .pithy.pipe import DuplexPipe
 from .pithy.string_utils import format_byte_count
 from .pithy.task import launch, runC
@@ -43,7 +44,7 @@ from .server import serve_build
 def main() -> None:
 
   db_name = '_muck'
-  reserved_names = { 'muck', db_name }
+  reserved_names = { 'muck', '_fetch', db_name }
 
   # argument parser setup.
   # argparse's subparser feature does not allow for a default command.
@@ -71,7 +72,7 @@ def main() -> None:
   build_parser.add_argument('-serve', nargs='?', const='index.html',
     help='serve contents of build directory via local HTTP, and open the specified target in the browser.')
 
-  add_parser('clean-all',     muck_clean_all,     builds=False, takes_ctx=False, description='clean the entire build directory, including the build database.')
+  add_parser('clean-all',     muck_clean_all,     builds=False, takes_ctx=False,    description='clean the entire build directory, including the build database.')
   add_parser('clean',         muck_clean,         builds=False, targets_dflt=False, description='clean the specified targets.')
   add_parser('deps',          muck_deps,          builds=True,  targets_dflt=True,  description='print targets and their dependencies as a visual hierarchy.')
   add_parser('deps-list',     muck_deps_list,     builds=True,  targets_dflt=True,  description='print targets and their dependencies as a list.')
@@ -85,6 +86,11 @@ def main() -> None:
   update_patch = add_parser('update-patch',  muck_update_patch,  builds=True, description="update a '.pat' patch.",
     epilog='The patch file will be updated with the diff between the original referenced by the patch, and _build/[modified].')
   update_patch.add_argument('patch', help='the patch to update.')
+
+  move_to_fetched_url_parser = add_parser('move-to-fetched-url', muck_move_to_fetched_url, builds=False, takes_ctx=False,
+    description="move a manually downloaded file to the '_fetch' folder.")
+  move_to_fetched_url_parser.add_argument('path', help='the local file to be moved')
+  move_to_fetched_url_parser.add_argument('url', help='the url from which the file was downloaded')
 
   # set build_parser epilog after all other parsers have been constructed.
   cmds_str = ', '.join(parsers)
@@ -261,7 +267,20 @@ def muck_update_patch(ctx: Ctx) -> None:
   #^ TODO: update target instead.
 
 
-# Default update functionality.
+def muck_move_to_fetched_url(args: Namespace) -> None:
+  '`muck move-to-fetched-url` command.'
+  path = args.path
+  fetch_path = path_join('_fetch', path_for_url(args.url))
+  make_dirs(path_dir(fetch_path))
+  if path_exists(fetch_path):
+    exit(f'muck move-to-fetched-url error: file already exists at destination fetch path: {fetch_path}')
+    # TODO: offer to remove.
+  try: move_file(path, fetch_path)
+  except OSError as e: exit(e)
+
+
+
+# main update algorithm.
 
 
 def update_dependency(ctx: Ctx, target: str, dependent: Optional[str], force=False) -> int:
