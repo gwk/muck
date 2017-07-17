@@ -44,7 +44,7 @@ from .server import serve_build
 def main() -> None:
 
   db_name = '_muck'
-  reserved_names = { 'muck', '_fetch', db_name }
+  reserved_names = { 'muck', '_fetch', '_fetch/tmp', db_name }
 
   # argument parser setup.
   # argparse's subparser feature does not allow for a default command.

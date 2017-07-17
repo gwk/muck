@@ -9,8 +9,8 @@ assert sys.version_info.major == 3 # python 2 is not supported.
 
 import os
 import random
+import shlex
 import time
-import requests
 
 from builtins import open as _std_open
 from http import HTTPStatus
@@ -22,9 +22,10 @@ from urllib.parse import urlencode, urlparse
 
 from .pithy.format import has_formatter
 from .pithy.loader import add_loader, load as _load
-from .pithy.fs import make_dirs, path_dir, path_exists, path_ext, path_join, path_stem, split_stem_ext
+from .pithy.fs import make_dirs, move_file, path_dir, path_exists, path_ext, path_join, path_stem, split_stem_ext
 from .pithy.io import stderr, errL, errSL
 from .pithy.path_encode import path_for_url
+from .pithy.task import runCO
 from .pithy.transform import Transformer
 
 from .constants import tmp_ext
@@ -128,35 +129,13 @@ def _open(path: str, buffering=-1, encoding='UTF-8', errors=None, newline=None) 
 
 
 class HTTPError(Exception):
-  def __init__(self, msg: str, request: Any) -> None:
+  def __init__(self, msg: str, curl_code: int=0, status_code: int=-1) -> None:
     super().__init__(msg)
-    self.request = request
-    self.status_code = 0 if request is None else request.status_code
+    self.curl_code = curl_code
+    self.status_code = status_code
 
 
-def _fetch(url: str, timeout: int, headers: Dict[str, str], expected_status_code: int) -> Any:
-  '''
-  wrap the call to `get` with try/except that flattens any exception trace into an HTTPError.
-  without this, a backtrace due to a network failure is massive, involves multiple exceptions,
-  and is mostly irrelevant to the caller.
-  '''
-  r = None
-  try:
-    msg = None
-    r = requests.get(url, timeout=timeout, headers=headers)
-  except Exception as e:
-    args_str = ', '.join(str(a) for a in e.args)
-    msg = f'fetch failed with exception: {type(e).__name__}: {args_str}' # TODO: use `raise from e` here.
-  else:
-    if r.status_code != expected_status_code:
-      s = HTTPStatus(r.status_code)
-      msg = f'fetch failed with HTTP code: {s.value}: {s.phrase}; {s.description}.'
-  if msg is not None:
-    raise HTTPError(msg=msg, request=r)
-  return r
-
-
-def fetch(url: str, cache_path: str=None, params: Dict[str, str]={}, headers: Dict[str, str]={}, expected_status_code=200, timeout=30, delay=0, delay_range=0, spoof=False) -> str:
+def fetch(url: str, cache_path: str=None, params: Dict[str, str]={}, headers: Dict[str, str]={}, expected_status_code=200, timeout=30, delay=0, delay_range=0, spoof_ua=False) -> str:
   "Fetch the data at `url` and save it to a path in the '_fetch' directory derived from the URL."
   if params:
     if '?' in url: raise ValueError("params specified but url already contains '?'")
@@ -164,16 +143,31 @@ def fetch(url: str, cache_path: str=None, params: Dict[str, str]={}, headers: Di
   if not cache_path:
     cache_path = path_for_url(url)
   path = path_join('../_fetch', cache_path)
+  path_tmp = path_join('../_fetch/tmp', cache_path)
   if not path_exists(path):
-    errL(f'fetch: {url}')
-    if spoof:
+    cmd = ['curl', url, '--write-out', '%{http_code}', '--output', path_tmp]
+    if spoof_ua:
       h = spoofing_headers()
-      h.update(headers)
+      h.update(headers) # any explicit headers override the spoofing values.
       headers = h
-    r = _fetch(url, timeout, headers, expected_status_code)
+    for k, v in headers.items():
+      cmd.extend(('--header', f'{k}: {v}'))
+    make_dirs(path_dir(path_tmp))
+    errSL('fetch:', *[shlex.quote(word) for word in cmd])
+    curl_code, output = runCO(cmd)
+    if curl_code != 0:
+      raise HTTPError(f'curl failed with code: {curl_code}', curl_code=curl_code)
+      # TODO: copy the error code explanations from `man curl`? Or parse them on the fly?
+    try:
+      status_code = int(output)
+      status = HTTPStatus(status_code)
+    except ValueError as e:
+      raise HTTPError(f'curl returned strange HTTP code: {repr(output)}') from e
+    if status_code != expected_status_code:
+      raise HTTPError(msg=f'fetch failed with HTTP code: {status.value}: {status.phrase}; {status.description}.',
+        status_code=status_code)
     make_dirs(path_dir(path))
-    with _std_open(path, 'wb') as f:
-      f.write(r.content)
+    move_file(path_tmp, path)
     sleep_min = delay - delay_range * 0.5
     sleep_max = delay + delay_range * 0.5
     sleep_time = random.uniform(sleep_min, sleep_max)
@@ -182,13 +176,8 @@ def fetch(url: str, cache_path: str=None, params: Dict[str, str]={}, headers: Di
   return path
 
 
-def load_url(url: str, ext: str=None, cache_path: str=None, params: Dict[str, str]={}, headers: Dict[str, str]={}, expected_status_code=200, timeout=30, delay=0, delay_range=0, spoof=False, **kwargs: Any) -> Any:
+def load_url(url: str, ext: str=None, cache_path: str=None, params: Dict[str, str]={}, headers: Dict[str, str]={}, expected_status_code=200, timeout=30, delay=0, delay_range=0, spoof_ua=False, **kwargs: Any) -> Any:
   'Fetch the data at `url` and then load using `muck.load`.'
-  # note: implementing uncached requests efficiently requires new versions of the source functions;
-  # these will take a text argument instead of a path argument.
-  # alternatively, the source functions could be reimplemented to take text strings,
-  # or perhaps streams.
-  # in the uncached case, muck would do the open and read.
   if ext is None:
     # extract the extension from the url path;
     # load will try to extract it from the encoded path,
@@ -199,12 +188,13 @@ def load_url(url: str, ext: str=None, cache_path: str=None, params: Dict[str, st
       parts = urlparse(url)
       ext = path_ext(parts.path) # TODO: support compound extensions, e.g. 'tar.gz'.
   path = fetch(url, cache_path=cache_path, params=params, headers=headers, expected_status_code=expected_status_code,
-    timeout=timeout, delay=delay, delay_range=delay_range, spoof=spoof)
+    timeout=timeout, delay=delay, delay_range=delay_range, spoof_ua=spoof_ua)
   return load(path, ext=ext, **kwargs)
 
 
 def spoofing_headers() -> Dict[str, str]:
-  # Headers that Safari currently sends. TODO: allow imitating other browsers?
+  # Headers that Safari sent at one point. Not sure how up-to-date these ought to be.
+  # TODO: allow imitating other browsers?
   return {
     'DNT': '1',
     'Upgrade-Insecure-Requests': '1',
