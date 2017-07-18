@@ -16,7 +16,6 @@ import re
 import time
 
 from argparse import ArgumentParser, Namespace
-from collections import defaultdict, namedtuple
 from datetime import datetime
 from hashlib import sha256
 from typing import *
