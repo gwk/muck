@@ -3,28 +3,27 @@
   "echoCommand": false,
   "type": "process",
   "presentation": {},
-  "suppressTaskName": true,
   "tasks": [
     {
       "taskName": "typecheck-current",
       "command": "mypy-plumage",
       "args": ["${relativeFile}"],
       "group": {"kind": "build", "isDefault": true},
-      "problemMatcher": "$mypy"
+      "problemMatcher": "$plumage-mypy"
     },
     {
       "taskName": "typecheck",
       "command": "mypy-plumage",
       "args": ["muck"],
       "group": "build",
-      "problemMatcher": "$mypy"
+      "problemMatcher": "$plumage-mypy"
     },
     {
       "taskName": "test and typecheck",
       "command": "make",
       "args": [],
       "group": {"kind": "test", "isDefault": true},
-      "problemMatcher": "$mypy"
+      "problemMatcher": "$plumage-mypy"
     }
   ]
 }
