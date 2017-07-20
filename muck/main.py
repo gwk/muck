@@ -52,7 +52,7 @@ def main() -> None:
 
   parsers: Dict[str, ArgumentParser] = {}
 
-  def add_parser(cmd: str, fn: Callable[..., None], builds: bool, targets_dflt:str=None, takes_ctx:bool=True, **kwargs) -> ArgumentParser:
+  def add_parser(cmd: str, fn: Callable[..., None], builds: bool, targets_dflt:Optional[bool]=None, takes_ctx:bool=True, **kwargs) -> ArgumentParser:
     reserved_names.add(cmd)
     parser = ArgumentParser(prog='muck ' + cmd, **kwargs)
     parser.set_defaults(fn=fn, builds=builds, targets_dflt=targets_dflt, takes_ctx=takes_ctx)
@@ -66,10 +66,6 @@ def main() -> None:
       parser.add_argument('targets', nargs='*', default=default, help="target file names; defaults to 'index.html'.")
     parsers[cmd] = parser
     return parser
-
-  build_parser = add_parser('build', muck_build, builds=True, targets_dflt=True, description='build targets')
-  build_parser.add_argument('-serve', nargs='?', const='index.html',
-    help='serve contents of build directory via local HTTP, and open the specified target in the browser.')
 
   add_parser('clean-all',     muck_clean_all,     builds=False, takes_ctx=False,    description='clean the entire build directory, including the build database.')
   add_parser('clean',         muck_clean,         builds=False, targets_dflt=False, description='clean the specified targets.')
@@ -91,9 +87,13 @@ def main() -> None:
   move_to_fetched_url_parser.add_argument('path', help='the local file to be moved')
   move_to_fetched_url_parser.add_argument('url', help='the url from which the file was downloaded')
 
-  # set build_parser epilog after all other parsers have been constructed.
+  # add build_parser last so that we can describe other commands in its epilog.
   cmds_str = ', '.join(parsers)
-  build_parser.epilog = f'`build` is the default subcommand; other available commands are:\n{cmds_str}.`'
+  build_parser = add_parser('build', muck_build, builds=True, targets_dflt=True, description='build targets',
+    epilog=f'`build` is the default subcommand; other available commands are:\n{cmds_str}.`')
+  build_parser.add_argument('-serve', nargs='?', const='index.html',
+    help='serve contents of build directory via local HTTP, and open the specified target in the browser.')
+
 
   # command dispatch.
 
@@ -123,7 +123,7 @@ def main() -> None:
     return
 
   ctx = Ctx(args=args, db=DB(path=db_path), build_dir=args.build_dir, build_dir_slash=args.build_dir + '/',
-    reserved_names=reserved_names, dbg=dbg)
+    reserved_names=frozenset(reserved_names), dbg=dbg)
 
   args.fn(ctx)
 
