@@ -6,24 +6,24 @@
   "tasks": [
     {
       "taskName": "typecheck-current",
-      "command": "mypy-plumage",
+      "command": "craft-py-check",
       "args": ["${relativeFile}"],
       "group": {"kind": "build", "isDefault": true},
-      "problemMatcher": "$plumage-mypy"
+      "problemMatcher": "$craft"
     },
     {
       "taskName": "typecheck",
-      "command": "mypy-plumage",
+      "command": "craft-py-check",
       "args": ["muck"],
       "group": "build",
-      "problemMatcher": "$plumage-mypy"
+      "problemMatcher": "$craft"
     },
     {
       "taskName": "test and typecheck",
       "command": "make",
       "args": [],
       "group": {"kind": "test", "isDefault": true},
-      "problemMatcher": "$plumage-mypy"
+      "problemMatcher": "$craft"
     }
   ]
 }

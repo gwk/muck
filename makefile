@@ -36,4 +36,4 @@ test:
 	iotest -fail-fast
 
 typecheck:
-	mypy-plumage muck
+	craft-py-check muck
