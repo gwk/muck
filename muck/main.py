@@ -638,14 +638,12 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   return dyn_time, tuple(dyn_deps), tmp_paths
 
 
-_pythonV_V = 'python' + '.'.join(str(v) for v in sys.version_info[:2])
 build_tools: Dict[str, List[str]] = {
   '.list' : [], # no-op.
   '.mush' : ['mush'],
   '.pat' : ['pat', 'apply'],
-  '.py' : [_pythonV_V],
-    # use the same version of python that muck is running under.
-  '.wu' : ['writeup'],
+  '.py' : ['python3'],
+    '.wu' : ['writeup'],
 }
 
 

@@ -1,12 +1,12 @@
-muck note: c-many.txt: building: `python3.6 c-many.txt.py`
-muck note: a-to-many-0.txt: building: `python3.6 'a-to-many-{i}.txt.py' 0`
+muck note: c-many.txt: building: `python3 c-many.txt.py`
+muck note: a-to-many-0.txt: building: `python3 'a-to-many-{i}.txt.py' 0`
 muck note: a-to-many-0.txt: finished: (via manifest).
 muck note: a-to-many-0.txt: product is new; 12 B.
 muck note: a-to-many-1.txt: product is new; 12 B.
-muck note: b-through-0.txt: building: `python3.6 'b-through-{i}.txt.py' 0`
+muck note: b-through-0.txt: building: `python3 'b-through-{i}.txt.py' 0`
 muck note: b-through-0.txt: finished: (via stdout).
 muck note: b-through-0.txt: product is new; 12 B.
-muck note: b-through-1.txt: building: `python3.6 'b-through-{i}.txt.py' 1`
+muck note: b-through-1.txt: building: `python3 'b-through-{i}.txt.py' 1`
 muck note: b-through-1.txt: finished: (via stdout).
 muck note: b-through-1.txt: product is new; 12 B.
 muck note: c-many.txt: finished: (via stdout).

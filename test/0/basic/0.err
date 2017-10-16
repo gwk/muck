@@ -1,16 +1,16 @@
-muck note: b.txt: building: `python3.6 b.txt.py`
-muck note: d.txt: building: `python3.6 d.txt.py`
+muck note: b.txt: building: `python3 b.txt.py`
+muck note: d.txt: building: `python3 d.txt.py`
 muck note: d.txt: finished: (via stdout).
 muck note: d.txt: product is new; 6 B.
 muck note: b.txt: finished: (via stdout).
 muck note: b.txt: product is new; 19 B.
-muck note: c.txt.py: building: `python3.6 c.txt.py.py`
+muck note: c.txt.py: building: `python3 c.txt.py.py`
 muck note: c.txt.py: finished: (via stdout).
 muck note: c.txt.py: product is new; 111 B.
-muck note: c.txt: building: `python3.6 c.txt.py`
+muck note: c.txt: building: `python3 c.txt.py`
 muck note: c.txt: finished: (via stdout).
 muck note: c.txt: product is new; 19 B.
-muck note: module-import.txt: building: `python3.6 module-import.txt.py`
+muck note: module-import.txt: building: `python3 module-import.txt.py`
 muck note: module-import.txt: finished: (via stdout).
 muck note: module-import.txt: product is new; 42 B.
 muck note: index.html: building: `writeup index.html.wu`
