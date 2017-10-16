@@ -39,7 +39,7 @@ class DB:
     try:
       self.run('SELECT COUNT(*) FROM sqlite_master') # dummy query to check file integrity.
     except DatabaseError as e:
-      if e.args[0] == 'file is encrypted or is not a database':
+      if e.args[0] in {'file is not a database', 'file is encrypted or is not a database'}:
         exit('muck error: database is outdated or corrupt; run `muck clean-all`.')
       raise #!cov-ignore.
 
