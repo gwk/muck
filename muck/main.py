@@ -509,12 +509,21 @@ def list_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tupl
   return [l for l in lines if l and not l.startswith('#')]
 
 
-def mush_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> Iterable[str]:
-  'Calculate dependencies for .mush files.'
+def sh_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> Iterable[str]:
+  'Calculate dependencies for .sh files.'
   for line in src_file:
     for token in shlex.split(line):
       if path_ext(token):
         yield token
+
+
+def sqlite3_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> Iterable[str]:
+  'Calculate dependencies for .sql files (assumed to be sqlite3 commands).'
+  for i, line in enumerate(src_file, 1):
+    tokens = shlex.split(line)
+    for j, token in enumerate(tokens):
+      if token == '.open' and j+1 < len(tokens):
+        yield tokens[j+1]
 
 
 try: from pat import pat_dependencies # type: ignore
@@ -530,10 +539,12 @@ except ImportError:
 
 
 dependency_fns: Dict[str, Callable[..., Iterable[str]]] = {
+  '.bash' : sh_dependencies,
   '.list' : list_dependencies,
-  '.mush' : mush_dependencies,
   '.pat' : pat_dependencies,
   '.py' : py_dependencies,
+  '.sh' : sh_dependencies,
+  '.sql' : sqlite3_dependencies,
   '.wu' : writeup_dependencies,
 }
 
@@ -546,30 +557,37 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   Run a source file, producing zero or more products.
   Return a list of produced product paths.
   '''
+  src_prod_path = ctx.product_path_for_target(src_path)
   src_ext = path_ext(src_path)
-  try:
-    build_tool = build_tools[src_ext]
-  except KeyError:
-    # TODO: fall back to generic .deps file.
-    raise error(target, f'unsupported source file extension: {src_ext!r}')
+  prod_dir = path_dir(prod_path)
   prod_path_out = prod_path + out_ext
   prod_path_tmp = prod_path + tmp_ext
+
+  build_tool: List[str]
+  if is_file_executable_by_owner(src_prod_path):
+    src_to_stdin = False
+    build_tool = []
+  else:
+    try:
+      src_to_stdin, build_tool = build_tools[src_ext]
+    except KeyError:
+      # TODO: fall back to generic .deps file.
+      raise error(target, f'unsupported source file extension: {src_ext!r}')
+    if not build_tool:
+      note(target, 'no op.')
+      return 0, (), [] # no product.
+
+  make_dirs(prod_dir)
   remove_file_if_exists(prod_path_out)
   remove_file_if_exists(prod_path_tmp)
-
-  if not build_tool:
-    note(target, 'no op.')
-    return 0, (), [] # no product.
-
-  prod_dir = path_dir(prod_path)
-  make_dirs(prod_dir)
 
   # Extract args from the combination of wilds in the source and the matching target.
   m = match_wilds(target_path_for_source(ctx, src_path), target)
   if m is None:
     raise error(target, f'internal error: match failed; src_path: {src_path!r}')
-  argv = [src_path] + list(m.groups())
-  cmd = build_tool + argv
+  args =  list(m.groups())
+  src_arg = ([] if src_to_stdin else [src_path])
+  cmd = build_tool + src_arg + args
 
   env = os.environ.copy()
   try:
@@ -577,17 +595,18 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   except KeyError: pass
   else:
     env.update(env_fn())
-
-  note(target, f"building: `{' '.join(shlex.quote(w) for w in cmd)}`")
+  msg_stdin = f' < {src_path}' if src_to_stdin else ''
+  note(target, f"building: `{' '.join(shlex.quote(w) for w in cmd)}{msg_stdin}`")
   dyn_time = 0
   dyn_deps: List[str] = []
   with open(prod_path_out, 'wb') as out_file, DuplexPipe() as pipe:
     deps_recv, deps_send = pipe.left_files()
     env.update(zip(('DEPS_RECV', 'DEPS_SEND'), [str(fd) for fd in pipe.right_fds]))
-    assert env['DEPS_RECV'] is not None
-    assert env['DEPS_SEND'] is not None
+    env['MUCK_OUT'] = path_rel_to_ancestor_or_abs(prod_path_tmp, ancestor=ctx.build_dir)
+    task_stdin = open(src_prod_path, 'rb') if src_to_stdin else None
     time_start = time.time()
-    proc, _ = launch(cmd, cwd=ctx.build_dir, env=env, out=out_file, files=pipe.right_fds)
+    proc, _ = launch(cmd, cwd=ctx.build_dir, env=env, stdin=task_stdin, out=out_file, files=pipe.right_fds)
+    if task_stdin: task_stdin.close()
     pipe.close_right()
     while True:
       dep_line = deps_recv.readline()
@@ -608,11 +627,11 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   if code != 0:
     raise error(target, f'build failed with code: {code}')
 
-  def cleanup_out() -> None:
+  def cleanup_out(actual_dst_msg) -> None:
     if file_size(prod_path_out) == 0:
       remove_file(prod_path_out)
     else:
-      warn(target, f'wrote data directly to `{prod_path_tmp}`;\n  ignoring output captured in `{prod_path_out}`')
+      warn(target, f'wrote data to {actual_dst_msg};\n  ignoring output captured in `{prod_path_out}`')
 
   manif_path = ctx.build_dir_slash + manifest_path(src_path, args)
   try: f = open(manif_path)
@@ -620,14 +639,14 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
     if path_exists(prod_path_tmp):
       via = 'tmp'
       tmp_paths = [prod_path_tmp]
-      cleanup_out()
+      cleanup_out(actual_dst_msg=f'$MUCK_OUT ({prod_path_tmp})')
     else: # no tmp; use captured stdout.
       via = 'stdout'
       tmp_paths = [prod_path_out]
   else: # found manifest.
     via = 'manifest'
-    tmp_paths = list(ctx.product_path_for_target(line.rstrip('\n')) for line in f)
-    cleanup_out()
+    tmp_paths = [ctx.product_path_for_target(line.rstrip('\n')) for line in f]
+    cleanup_out(actual_dst_msg='manifest files')
     if prod_path_tmp not in tmp_paths:
       errL('prod_path_tmp: ', prod_path_tmp)
       errSL(*tmp_paths)
@@ -638,12 +657,14 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   return dyn_time, tuple(dyn_deps), tmp_paths
 
 
-build_tools: Dict[str, List[str]] = {
-  '.list' : [], # no-op.
-  '.mush' : ['mush'],
-  '.pat' : ['pat', 'apply'],
-  '.py' : ['python3'],
-    '.wu' : ['writeup'],
+build_tools: Dict[str, Tuple[bool, List[str]]] = {
+  # The boolean inicates that the tool expects the source as stdin.
+  '.list' : (False, []), # no-op.
+  '.pat'  : (False, ['pat', 'apply']),
+  '.py'   : (False, ['python3']),
+  '.sh'   : (False, ['sh']),
+  '.sql'  : (True, ['sqlite3', '-batch']),
+  '.wu'   : (False, ['writeup']),
 }
 
 
