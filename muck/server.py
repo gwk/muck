@@ -14,6 +14,7 @@ def serve_build(ctx: Ctx, main_target: str, update_target: Callable[[str], None]
   addr_str = f'http://{host}:{port}/{main_target}'
   should_rebuild = False # starts from built state.
 
+
   class Handler(SimpleHTTPRequestHandler):
 
     def translate_path(self, path):
@@ -26,28 +27,43 @@ def serve_build(ctx: Ctx, main_target: str, update_target: Callable[[str], None]
       target = rel_path(super().translate_path(path)) # type: ignore # this is technically a private method.
       return ctx.product_path_for_target(target)
 
+
     def send_head(self):
       '''
       SimpleHTTPRequestHandler.send_head does the work for both HEAD and GET requests.
       We override it to detect dependencies and build them before sending the header.
       Note that the header contains file size and mtime, so we must finish building the product first.
+      TODO: decide if we need to send the header immediately for long-running build steps.
       '''
       nonlocal should_rebuild
+
       target = self.target_for_url_path()
       if target == main_target:
         if should_rebuild: ctx.reset()
         should_rebuild = True
-      elif target == 'favicon.ico': # TODO: make this an optional target somehow?
-        errL('ignoring favicon.icon.')
-        return self.send_error(404, message='muck.server currently ignores favicon.ico.')
 
-      errL(f'local request: {self.path}; target: {target}')
+      ctx.dbg(f'local request: {self.path}; target: {target}')
       update_target(target)
       return super().send_head() # type: ignore # this is technically a private method.
+
 
     def send_response(self, code, message=None):
       super().send_response(code=code, message=message)
       self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+
+
+    def do_GET(self):
+      '''Serve a GET request.'''
+      if self.path == '/favicon.ico':
+        self.send_header('Content-type', 'image/x-icon')
+        self.send_header('Content-Length', 0)
+        self.end_headers()
+        return
+
+      f = self.send_head()
+      if not f: return
+      try: self.copyfile(f, self.wfile)
+      finally: f.close()
 
 
     def target_for_url_path(self):
@@ -72,4 +88,3 @@ def serve_build(ctx: Ctx, main_target: str, update_target: Callable[[str], None]
   except KeyboardInterrupt:
     errL('\nKeyboard interrupt received; shutting down.')
     exit()
-
