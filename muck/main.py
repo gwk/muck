@@ -614,7 +614,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
     else:
       warn(target, f'wrote data directly to `{prod_path_tmp}`;\n  ignoring output captured in `{prod_path_out}`')
 
-  manif_path = ctx.build_dir_slash + manifest_path(argv)
+  manif_path = ctx.build_dir_slash + manifest_path(src_path, args)
   try: f = open(manif_path)
   except FileNotFoundError: # no manifest.
     if path_exists(prod_path_tmp):
