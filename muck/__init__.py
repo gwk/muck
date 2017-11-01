@@ -112,8 +112,8 @@ def _open(path: str, buffering=-1, encoding='UTF-8', errors=None, newline=None) 
   if not path.startswith('/') and not path.startswith('../'):
     if _deps_recv is None:
       try:
-        recv = int(os.environ['DEPS_RECV'])
-        send = int(os.environ['DEPS_SEND'])
+        recv = int(os.environ['MUCK_DEPS_RECV'])
+        send = int(os.environ['MUCK_DEPS_SEND'])
       except KeyError: pass # not running as child of muck build process.
       else:
         _deps_recv = _std_open(int(recv), 'r')

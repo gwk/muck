@@ -601,7 +601,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   dyn_deps: List[str] = []
   with open(prod_path_out, 'wb') as out_file, DuplexPipe() as pipe:
     deps_recv, deps_send = pipe.left_files()
-    env.update(zip(('DEPS_RECV', 'DEPS_SEND'), [str(fd) for fd in pipe.right_fds]))
+    env.update(zip(('MUCK_DEPS_RECV', 'MUCK_DEPS_SEND'), [str(fd) for fd in pipe.right_fds]))
     env['MUCK_OUT'] = path_rel_to_ancestor_or_abs(prod_path_tmp, ancestor=ctx.build_dir)
     task_stdin = open(src_prod_path, 'rb') if src_to_stdin else None
     time_start = time.time()
