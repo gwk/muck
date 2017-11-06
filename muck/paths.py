@@ -13,7 +13,7 @@ from .constants import manifest_ext
 from typing import *
 
 
-def dflt_prod_path_for_source(source_path: str) -> str:
+def dflt_prod_path_for_source(source_path: str) -> str: # TODO: rename? this is confusing compared to ctx.product_path
   '''
   Return the default product path for `source_path` (which may itself be a product),
   as implied by the source stem.
