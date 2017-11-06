@@ -509,6 +509,10 @@ def list_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tupl
   return [l for l in lines if l and not l.startswith('#')]
 
 
+def md_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
+  return []
+
+
 def sh_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> Iterable[str]:
   'Calculate dependencies for .sh files.'
   for line in src_file:
@@ -660,6 +664,8 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
 build_tools: Dict[str, Tuple[bool, List[str]]] = {
   # The boolean inicates that the tool expects the source as stdin.
   '.list' : (False, []), # no-op.
+  '.csv'  : (False, ['csv-to-html']),
+  '.md'   : (False, ['cmark-gfm']),
   '.pat'  : (False, ['pat', 'apply']),
   '.py'   : (False, ['python3']),
   '.sh'   : (False, ['sh']),

@@ -16,6 +16,7 @@ setup(
   packages=[name, name + '.pithy'],
   entry_points = {'console_scripts': [
     'muck=muck.main:main',
+    'csv-to-html=muck.csv_to_html:main',
   ]},
   install_requires=[
     'requests',
