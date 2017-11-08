@@ -22,7 +22,7 @@ from urllib.parse import urlencode, urlparse
 
 from .pithy.format import has_formatter
 from .pithy.loader import add_loader, load as _load
-from .pithy.fs import make_dirs, move_file, path_dir, path_exists, path_ext, path_join, path_stem, split_stem_ext
+from .pithy.fs import make_dirs, move_file, path_dir, path_exists, path_ext, path_join, path_stem, split_stem_ext, Path, PathOrFd
 from .pithy.io import stderr, errL, errSL
 from .pithy.path_encode import path_for_url
 from .pithy.task import runCO
@@ -76,7 +76,7 @@ def dst_file(encoding='UTF-8', **kwargs: str) -> IO:
     return _std_open(path, mode='w', encoding=encoding)
 
 
-def load(file_or_path: Any, ext:str=None, **kwargs) -> Any:
+def load(file_or_path: Union[PathOrFd, IO], ext:str=None, **kwargs) -> Any:
   '''
   Select an appropriate loader based on the file extension, or `ext` if specified.
   This function is a wrapper around pithy.loader.load; see that function's documentation for details.
@@ -84,49 +84,18 @@ def load(file_or_path: Any, ext:str=None, **kwargs) -> Any:
   and uses muck.open instead of the standard io.open
   to communicate dependencies to the parent build process.
   '''
-  if isinstance(file_or_path, str):
-    if '{' in file_or_path: # might have format; expand.
+  if isinstance(file_or_path, str) and '{' in file_or_path: # might have format; expand.
       file_or_path = file_or_path.format(**bindings_from_args(src=argv[0], args=tuple(argv[1:])))
-  return _load(file_or_path, open=_open, ext=ext, **kwargs)
+  return _load(file_or_path, ext=ext, **kwargs)
 
 
-def open(path: str, **kwargs) -> IO:
+def open(path: PathOrFd, **kwargs) -> IO:
   '''
-  Open a dependency for reading.
-  Compared to standard `open`, this function does not support integer file descriptors for the path argument,
-  nor the `closefd` and `opener` parameters,
-  because their usage is fundamentally at odds with dependency tracking.
-  `mode` is also unsupported, because the API is read-only; binary mode is implied by `encoding=None`.
-  TODO: support the other pathlike objects.
+  Wrapper around the standard system open that formats arguments into the file name appropriately.
   '''
-  if '{' in path: # might have format; expand.
+  if isinstance(path, str) and '{' in path: # might have format; expand.
     path = path.format(**bindings_from_args(src=argv[0], args=tuple(argv[1:])))
-  return _open(path, **kwargs)
-
-
-_deps_recv: Optional[TextIO] = None
-_deps_send: Optional[TextIO] = None
-
-def _open(path: str, buffering=-1, encoding='UTF-8', errors=None, newline=None) -> IO:
-  global _deps_recv, _deps_send
-  if not path.startswith('/') and not path.startswith('../'):
-    if _deps_recv is None:
-      try:
-        recv = int(os.environ['MUCK_DEPS_RECV'])
-        send = int(os.environ['MUCK_DEPS_SEND'])
-      except KeyError: pass # not running as child of muck build process.
-      else:
-        _deps_recv = _std_open(int(recv), 'r')
-        _deps_send = _std_open(int(send), 'w')
-    if _deps_recv:
-      print(path, file=_deps_send, flush=True)
-      ack = _deps_recv.readline()
-      if ack != path + '\n':
-        raise Exception(f'muck.open: dependency {path} was not acknowledged: {ack!r}')
-  if encoding is None: # binary.
-    return _std_open(path, mode='rb', buffering=buffering, errors=errors, newline=newline)
-  else: # text.
-    return _std_open(path, buffering=buffering, encoding=encoding, errors=errors, newline=newline)
+  return _std_open(path, **kwargs)
 
 
 class HTTPError(Exception):

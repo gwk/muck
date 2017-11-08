@@ -1,21 +1,21 @@
 
-a.txt (dependents: index.html.wu module-import.txt):
+a.txt[0m (⇠ [34mindex.html.wu[0m, [31mmodule-import.txt[0m)
 
-d.txt (dependents: b.txt c.txt):
-  d.txt.py:
-    basic_lib.py
+d.txt[0m (⇠ [31mb.txt[0m, [31mc.txt[0m)
+┗╸[32md.txt.py[0m
+  ╰╴[34mbasic_lib.py[0m
 
-index.html:
-  index.html.wu:
-    a.txt*
-    b.txt:
-      b.txt.py
-      d.txt*
-    c.txt:
-      c.txt.py:
-        c.txt.py.py
-      d.txt*
-    linked-src.html
-    module-import.txt:
-      module-import.txt.py
-      a.txt*
+index.html[0m
+┗╸[32mindex.html.wu[0m
+  ╰╴[34ma.txt[0m ⇡
+  ╰╴[34mb.txt[0m
+  │ ┡╸[32mb.txt.py[0m
+  │ └╴[31md.txt[0m ⇡
+  ╰╴[34mc.txt[0m
+  │ ┡╸[32mc.txt.py[0m
+  │ │ ┗╸[32mc.txt.py.py[0m
+  │ └╴[31md.txt[0m ⇡
+  ╰╴[34mlinked-src.html[0m
+  ╰╴[34mmodule-import.txt[0m
+    ┡╸[32mmodule-import.txt.py[0m
+    └╴[31ma.txt[0m ⇡

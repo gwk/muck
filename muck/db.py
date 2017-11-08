@@ -129,3 +129,8 @@ class DB:
     return val
 
 
+  def get_inferred_deps(self, target: str) -> Tuple[str, ...]:
+    record = self.get_record(target)
+    assert record is not None
+    return record.deps
+

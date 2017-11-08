@@ -28,8 +28,6 @@ def py_dependencies(src_path: str, src_file: TextIO, dir_names: Any) -> Iterable
   except SyntaxError as e:
     raise src_error(src_path, e.lineno, e.offset, 'syntax error', e.text.rstrip('\n')) from e
 
-  # TODO: track which muck symbols have been imported.
-
   def walk_import(module_name: Optional[str], dir_names: Any) -> Iterable[str]:
     if module_name is None: raise ValueError
     src_dir = path_dir(src_path)

@@ -10,6 +10,11 @@ from .constants import *
 from .db import DB
 
 
+class Dependent(NamedTuple):
+  kind: str # 'source', 'inferred', or 'observed'.
+  target: str
+
+
 class Ctx(NamedTuple):
   args: argparse.Namespace
   db: DB
@@ -19,7 +24,7 @@ class Ctx(NamedTuple):
   dbg: Callable[..., None]
   change_times: Dict[str, Optional[int]] = {}
   dir_names: Dict[str, List[str]] = {}
-  dependents: DefaultDict[str, Set[str]] = DefaultDict(set)
+  dependents: DefaultDict[str, Set[Dependent]] = DefaultDict(set)
 
   def is_product_path(self, path: str) -> bool:
     return path.startswith(self.build_dir_slash)

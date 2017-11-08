@@ -13,3 +13,5 @@ _misc/
 docs/_muck
 docs/*.wu
 todo.txt
+try-interpose.sh
+muck/_libmuck.*.so

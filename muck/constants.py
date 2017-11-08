@@ -4,6 +4,7 @@
 Muck constants.
 '''
 
+
 out_ext = '.out'
 tmp_ext = '.tmp'
 manifest_ext = '.tmp_manifest'

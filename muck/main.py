@@ -18,21 +18,23 @@ import time
 from argparse import ArgumentParser, Namespace
 from datetime import datetime
 from hashlib import sha256
+from importlib.util import find_spec as find_module_spec
+from os import O_CREAT, O_EXCL, O_RDONLY, O_RDWR, O_WRONLY
 from typing import *
 from typing import BinaryIO, IO, Match, TextIO
 
-from .pithy.ansi import TXT_L_ERR, TXT_Y_ERR, RST_ERR
+from .pithy.ansi import *
 from .pithy.format import format_to_re
 from .pithy.fs import *
 from .pithy.io import *
-from .pithy.iterable import fan_by_pred
+from .pithy.iterable import fan_by_pred, first_el
 from .pithy.json_utils import load_json, write_json
 from .pithy.path_encode import path_for_url
 from .pithy.pipe import DuplexPipe
 from .pithy.string_utils import format_byte_count
 from .pithy.task import launch, runC
 
-from .ctx import Ctx, InvalidTarget, validate_target
+from .ctx import Ctx, Dependent, InvalidTarget, validate_target
 from .db import TargetRecord, DB, DBError
 from .constants import *
 from .paths import manifest_path
@@ -111,10 +113,10 @@ def main() -> None:
   db_path = path_join(args.build_dir, db_name)
 
   if args.dbg:
-    def dbg(path: str, *items: str) -> None:
+    def dbg(path: str, *items: Any) -> None:
       errL('muck dbg: ', path, ': ', *items)
   else:
-    def dbg(path: str, *items: str) -> None: pass
+    def dbg(path: str, *items: Any) -> None: pass
 
   make_dirs(args.build_dir) # required to create new DB.
 
@@ -140,7 +142,7 @@ def muck_build(ctx: Ctx) -> None:
   for target in ctx.args.targets:
     if path_exists(target):
       stem, ext = split_stem_ext(target)
-      if ext in dependency_fns:
+      if ext in ext_tools:
         note(target, f'specified target is a source and not a product; building {stem!r}...')
         target = stem
       else:
@@ -176,47 +178,62 @@ def muck_deps(ctx: Ctx) -> None:
     update_dependency(ctx, target, dependent=None)
 
   roots = set(ctx.args.targets)
-  roots.update(t for t, s in ctx.dependents.items() if len(s) > 1)
+  roots.update(t for t, dpdts in ctx.dependents.items() if len(dpdts) > 1)
 
-  def visit(depth: int, target: str) -> None:
+  visited_roots: Set[str] = set()
+
+  def visit(target: str, *indents: str, sub:str='  ', color='') -> None:
     record = ctx.db.get_record(target)
     assert record is not None
     dependents = ctx.dependents[target]
     src = record.src
-    deps = record.deps
-    dyn_deps = record.dyn_deps
-    some = bool(src) or bool(deps) or bool(dyn_deps)
-    if depth == 0 and len(dependents) > 0:
-      suffix = f' (dependents: {" ".join(sorted(dependents))}):'
-    elif len(dependents) > 1: suffix = '*'
-    elif some: suffix = ':'
+    observed_deps = record.dyn_deps
+    inferred_deps = record.deps
+    some = bool(src) or bool(observed_deps) or bool(inferred_deps)
+    if not indents and len(dependents) > 0:
+      dpdt_names = ', '.join(f'{dependent_colors[d.kind]}{d.target}{RST}' for d in sorted(dependents, key=lambda d: d.target))
+      suffix = f' (⇠ {dpdt_names})'
+    elif len(dependents) > 1: suffix = (arrow_up if target in visited_roots else arrow_down)
     else: suffix = ''
-    outL('  ' * depth, target, suffix)
-    if depth > 0 and len(dependents) > 1: return
+    outL(*indents, color, target, RST, suffix)
+    if indents and len(dependents) > 1: return
+    sub_indents = indents and indents[:-1] + (sub,)
     if src is not None:
-      visit(depth + 1, src)
-    for dep in deps:
-      visit(depth + 1, dep)
-    for dyn_dep in dyn_deps:
-      visit(depth + 1, dyn_dep)
+      visit(src, *sub_indents, ('┡╸' if observed_deps else '┗╸'), sub=('│ ' if observed_deps else '  '), color=TXT_G)
+    for i, dep in enumerate(observed_deps):
+      above = i < len(observed_deps) - 1
+      visit(dep, *sub_indents, ('├╴' if above else '└╴'), sub=('│ ' if above else '  '), color=TXT_R)
+    for i, dep in enumerate(inferred_deps):
+      above = i < len(inferred_deps) - 1
+      visit(dep, *sub_indents, '╰╴', sub=('│ ' if above else '  '), color=TXT_B)
 
   for root in sorted(roots):
     outL()
-    visit(0, root)
+    visit(target=root)
+    visited_roots.add(root)
+
+arrow_up    = ' ⇡'
+arrow_down  = ' ⇣'
+
+dependent_colors = {
+  'source'  : TXT_G,
+  'observed' : TXT_R,
+  'inferred' : TXT_B,
+}
 
 
 def muck_deps_list(ctx: Ctx) -> None:
   '`muck deps-list` command.'
   for target in ctx.args.targets:
     update_dependency(ctx, target, dependent=None)
-  outLL(*sorted(ctx.change_times))
+  outLL(*sorted(ctx.change_times.keys()))
 
 
 def muck_prod_list(ctx: Ctx) -> None:
   '`muck prod-list` command.'
   for target in ctx.args.targets:
     update_dependency(ctx, target, dependent=None)
-  outLL(*sorted(ctx.product_path_for_target(t) for t in ctx.change_times))
+  outLL(*sorted(ctx.product_path_for_target(t) for t in ctx.change_times.keys()))
 
 
 def muck_create_patch(ctx: Ctx) -> None:
@@ -282,7 +299,7 @@ def muck_move_to_fetched_url(args: Namespace) -> None:
 # main update algorithm.
 
 
-def update_dependency(ctx: Ctx, target: str, dependent: Optional[str], force=False) -> int:
+def update_dependency(ctx: Ctx, target: str, dependent: Optional[Dependent], force=False) -> int:
   'returns transitive change_time.'
   validate_target_or_error(ctx, target)
 
@@ -357,7 +374,7 @@ def update_product(ctx: Ctx, target: str, actual_path: str, needs_update: bool, 
     note(target, f'source path of target product changed\n  was: {old.src}\n  now: {src}')
 
   last_update_time = 0 if old is None else old.update_time
-  src_change_time = update_dependency(ctx, src, dependent=target)
+  src_change_time = update_dependency(ctx, src, dependent=Dependent(kind='source', target=target))
   needs_update = needs_update or last_update_time < src_change_time
   update_time = max(last_update_time, src_change_time)
 
@@ -366,7 +383,7 @@ def update_product(ctx: Ctx, target: str, actual_path: str, needs_update: bool, 
     # if they have not, then no rebuild is necessary.
     assert old is not None
     for dyn_dep in old.dyn_deps:
-      dep_change_time = update_dependency(ctx, dyn_dep, dependent=target)
+      dep_change_time = update_dependency(ctx, dyn_dep, dependent=Dependent(kind='observed', target=target))
       update_time = max(update_time, dep_change_time)
   needs_update = needs_update or last_update_time < update_time
 
@@ -459,6 +476,7 @@ def update_non_product(ctx: Ctx, target: str, needs_update: bool, old: Optional[
 def update_deps_and_record(ctx, target: str, actual_path: str, is_changed: bool, size: int, mtime: float,
  change_time: int, update_time: int, file_hash: bytes, src: Optional[str], dyn_deps: Tuple[str, ...], old: Optional[TargetRecord]) -> int:
   'returns transitive change_time.'
+
   ctx.dbg(target, 'update_deps_and_record')
   if is_changed:
     deps = calc_dependencies(actual_path, ctx.dir_names)
@@ -469,8 +487,9 @@ def update_deps_and_record(ctx, target: str, actual_path: str, is_changed: bool,
   else:
     assert old is not None
     deps = old.deps
+
   for dep in deps:
-    dep_change_time = update_dependency(ctx, dep, dependent=target)
+    dep_change_time = update_dependency(ctx, dep, dependent=Dependent(kind='inferred', target=target))
     change_time = max(change_time, dep_change_time)
   update_time = max(update_time, change_time)
 
@@ -495,12 +514,11 @@ def calc_dependencies(path: str, dir_names: Dict[str, Tuple[str, ...]]) -> Tuple
   Infer the dependencies for the file at `path`.
   '''
   ext = path_ext(path)
-  try:
-    dep_fn = dependency_fns[ext]
-  except KeyError:
-    return ()
+  try: deps_fn = ext_tools[ext].deps_fn
+  except KeyError: return ()
+  if deps_fn is None: return ()
   with open(path) as f:
-    return tuple(dep_fn(path, f, dir_names))
+    return tuple(deps_fn(path, f, dir_names))
 
 
 def list_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
@@ -543,17 +561,6 @@ def writeup_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, T
   return writeup.v0.writeup_dependencies(src_path=src_path, text_lines=src_file) # type: ignore
 
 
-dependency_fns: Dict[str, Callable[..., Iterable[str]]] = {
-  '.bash' : sh_dependencies,
-  '.list' : list_dependencies,
-  '.pat' : pat_dependencies,
-  '.py' : py_dependencies,
-  '.sh' : sh_dependencies,
-  '.sql' : sqlite3_dependencies,
-  '.wu' : writeup_dependencies,
-}
-
-
 # Build.
 
 
@@ -568,64 +575,78 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   prod_path_out = prod_path + out_ext
   prod_path_tmp = prod_path + tmp_ext
 
-  build_tool: List[str]
+  tool: Tool
   if is_file_executable_by_owner(src_prod_path):
-    src_to_stdin = False
-    build_tool = []
+    tool = Tool(cmd=(), deps_fn=None, env_fn=None)
   else:
-    try:
-      src_to_stdin, build_tool = build_tools[src_ext]
-    except KeyError:
-      # TODO: fall back to generic .deps file.
-      raise error(target, f'unsupported source file extension: {src_ext!r}')
-    if not build_tool:
+    # TODO: check for explicit deps file.
+    try: tool = ext_tools[src_ext]
+    except KeyError as e: raise error(target, f'unsupported source file extension: {src_ext!r}') from e
+    if not tool.cmd: # TODO: weird now that we create an empty tool cmd above.
       note(target, 'no op.')
       return 0, (), [] # no product.
-
-  make_dirs(prod_dir)
-  remove_file_if_exists(prod_path_out)
-  remove_file_if_exists(prod_path_tmp)
 
   # Extract args from the combination of wilds in the source and the matching target.
   m = match_wilds(target_path_for_source(ctx, src_path), target)
   if m is None:
     raise error(target, f'internal error: match failed; src_path: {src_path!r}')
   args = tuple(m.groups())
-  src_arg = cast(Tuple[str, ...], () if src_to_stdin else (src_path,))
-  cmd = tuple(build_tool) + src_arg + args
+  src_arg = cast(Tuple[str, ...], () if tool.src_to_stdin else (src_path,))
+  cmd = tool.cmd + src_arg + args
+
+  manif_path = ctx.build_dir_slash + manifest_path(src_path, args)
+
+  # get set of source's inferred dependencies, to be ignored when observing target dependencies.
+  ignored_deps = set(ctx.db.get_inferred_deps(target=src_path))
+  ignored_deps.update((src_path, manif_path, prod_path_tmp,))
+
+  make_dirs(prod_dir)
+  remove_file_if_exists(prod_path_out)
+  remove_file_if_exists(prod_path_tmp)
+
+  msg_stdin = f' < {src_path}' if tool.src_to_stdin else ''
+  note(target, f"building: `{' '.join(shlex.quote(w) for w in cmd)}{msg_stdin}`")
 
   env = os.environ.copy()
-  try:
-    env_fn: Callable[[], Dict[str, str]] = build_tool_env_fns[src_ext]
-  except KeyError: pass
-  else:
-    env.update(env_fn())
-  msg_stdin = f' < {src_path}' if src_to_stdin else ''
-  note(target, f"building: `{' '.join(shlex.quote(w) for w in cmd)}{msg_stdin}`")
+  if tool.env_fn is not None:
+    env.update(tool.env_fn())
+  env['DYLD_INSERT_LIBRARIES'] = libmuck_path
+  #env['DYLD_PRINT_LIBRARIES'] = 'TRUE'
+  #env['MUCK_DEPS_DBG'] = 'TRUE'
+
   dyn_time = 0
   dyn_deps: List[str] = []
   with open(prod_path_out, 'wb') as out_file, DuplexPipe() as pipe:
     deps_recv, deps_send = pipe.left_files()
     env.update(zip(('MUCK_DEPS_RECV', 'MUCK_DEPS_SEND'), [str(fd) for fd in pipe.right_fds]))
     env['MUCK_OUT'] = path_rel_to_ancestor_or_abs(prod_path_tmp, ancestor=ctx.build_dir)
-    task_stdin = open(src_prod_path, 'rb') if src_to_stdin else None
+    task_stdin = open(src_prod_path, 'rb') if tool.src_to_stdin else None
     time_start = time.time()
     proc, _ = launch(cmd, cwd=ctx.build_dir, env=env, stdin=task_stdin, out=out_file, files=pipe.right_fds)
     if task_stdin: task_stdin.close()
     pipe.close_right()
     while True:
       dep_line = deps_recv.readline()
-      if not dep_line: break
-      dep = dep_line.rstrip('\n')
-      ctx.dbg(target, 'dep: ', dep)
-      dyn_deps.append(dep)
-      try:
-        dep_time = update_dependency(ctx, dep, dependent=target) # ignore return value.
-        dyn_time = max(dyn_time, dep_time)
-      except (Exception, SystemExit):
-        proc.kill() # this avoids a confusing exception message from the script when muck fails.
-        raise
-      print(dep, file=deps_send, flush=True)
+      if not dep_line: break # no more data; child is done.
+      tab_idx = dep_line.rindex('\t')
+      dep_str = dep_line[:tab_idx]
+      mode = dep_line[tab_idx+1:-1]
+      dep = normalize_dep_path(dep_str, build_dir=ctx.build_dir)
+      ctx.dbg(target, f'dep: {dep}; mode: {mode}')
+      # TODO: verify that script is not accessing files that should be restricted, e.g. prod_path_out, build db, etc, source dir, etc.
+      if not (is_path_abs(dep) or (dep in ignored_deps) or (path_ext(dep) in ignored_dep_exts)):
+        if mode in 'RU':
+          #if mode == 'U': # TODO: remove existing?
+          dyn_deps.append(dep)
+          try:
+            dep_time = update_dependency(ctx, dep, dependent=Dependent(kind='observed', target=target))
+            dyn_time = max(dyn_time, dep_time)
+          except (Exception, SystemExit):
+            proc.kill() # this avoids a confusing exception message from the child script when muck fails.
+            raise
+        else:
+          assert mode in 'AMW'
+      print('\x06', end='', file=deps_send, flush=True) # Ascii ACK.
     code = proc.wait()
     time_elapsed = time.time() - time_start
 
@@ -638,7 +659,6 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
     else:
       warn(target, f'wrote data to {actual_dst_msg};\n  ignoring output captured in `{prod_path_out}`')
 
-  manif_path = ctx.build_dir_slash + manifest_path(src_path, args)
   try: f = open(manif_path)
   except FileNotFoundError: # no manifest.
     if path_exists(prod_path_tmp):
@@ -662,25 +682,49 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   return dyn_time, tuple(dyn_deps), tmp_paths
 
 
-build_tools: Dict[str, Tuple[bool, List[str]]] = {
-  # The boolean inicates that the tool expects the source as stdin.
-  '.list' : (False, []), # no-op.
-  '.csv'  : (False, ['csv-to-html']),
-  '.md'   : (False, ['cmark-gfm']),
-  '.pat'  : (False, ['pat', 'apply']),
-  '.py'   : (False, ['python3']),
-  '.sh'   : (False, ['sh']),
-  '.sql'  : (True, ['sqlite3', '-batch']),
-  '.wu'   : (False, ['writeup']),
-}
+def normalize_dep_path(path: str, build_dir: str) -> str:
+  if is_path_abs(path): return path
+  path = normalize_path(path_join(build_dir, path))
+  return path_rel_to_ancestor_or_abs(path, ancestor=build_dir) # TODO: this could be more efficient.
 
 
 def py_env() -> Dict[str, str]:
   return { 'PYTHONPATH' : current_dir() }
 
-build_tool_env_fns = {
-  '.py' : py_env
+
+DependencyFn = Callable[[str, TextIO, Dict[str, Tuple[str, ...]]], Iterable[str]]
+EnvFn = Callable[[], Dict[str, str]]
+
+class Tool(NamedTuple):
+  cmd: Tuple[str, ...]
+  deps_fn: Optional[DependencyFn]
+  env_fn: Optional[EnvFn]
+  src_to_stdin: bool = False
+
+
+ext_tools: Dict[str, Tool] = {
+  # The boolean inicates that the tool expects the source as stdin.
+  '.bash' : Tool(('bash',), sh_dependencies, None),
+  '.csv'  : Tool(('csv-to-html',), None, None),
+  '.list' : Tool((), list_dependencies, None),
+  '.md'   : Tool(('cmark-gfm',), None, None),
+  '.pat'  : Tool(('pat', 'apply'), pat_dependencies, None),
+  '.py'   : Tool(('python3',), py_dependencies, py_env),
+  '.sh'   : Tool(('sh',), sh_dependencies, None),
+  '.sql'  : Tool(('sqlite3', '-batch'), sqlite3_dependencies, None, src_to_stdin=True),
+  '.wu'   : Tool(('writeup',), writeup_dependencies, None),
 }
+
+ignored_dep_exts = {
+  '.sqlite3-wal',
+  '.sqlite3-shm',
+}
+
+
+# Currently libmuck is installed as a Python C extension,
+# which allows us to easily determine the path to the shared library.
+libmuck_path = cast(str, find_module_spec('muck._libmuck').origin)
+assert libmuck_path is not None
 
 
 # Targets and paths.
@@ -754,11 +798,14 @@ def source_candidate(ctx: Ctx, target: str, src_dir: str, prod_name: str) -> str
   if len(candidates) == 1:
     return candidates[0]
   # error.
-  deps = ', '.join(sorted(ctx.dependents[target])) or target
+  # Use dependent to describe error if possible; often the dependent code is naming something that does not exist.
+  # TODO: use source locations wherever possible.
+  dpdts = ctx.dependents[target]
+  dpdt_name = first_el(dpdts).target if dpdts else target
   if len(candidates) == 0:
-    raise error(deps, f'no source candidates matching `{target}` in `{src_dir}`')
+    raise error(dpdt_name, f'no source candidates matching `{target}` in `{src_dir}`')
   else:
-    raise error(deps, f'multiple source candidates matching `{target}`: {candidates}')
+    raise error(dpdt_name, f'multiple source candidates matching `{target}`: {candidates}')
 
 
 def list_dir_filtered(ctx: Ctx, src_dir: str) -> List[str]:
