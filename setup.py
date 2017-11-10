@@ -18,9 +18,6 @@ setup(
     'muck=muck.main:main',
     'csv-to-html=muck.csv_to_html:main',
   ]},
-  install_requires=[
-    'requests',
-  ],
   keywords=[
     'build tool', 'data science',
   ],
