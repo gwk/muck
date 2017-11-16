@@ -5,21 +5,21 @@
   "presentation": {},
   "tasks": [
     {
-      "taskName": "typecheck-current",
+      "label": "typecheck-current",
       "command": "craft-py-check",
       "args": ["${relativeFile}"],
       "group": {"kind": "build", "isDefault": true},
       "problemMatcher": "$craft"
     },
     {
-      "taskName": "typecheck",
+      "label": "typecheck",
       "command": "craft-py-check",
       "args": ["muck"],
       "group": "build",
       "problemMatcher": "$craft"
     },
     {
-      "taskName": "test and typecheck",
+      "label": "test and typecheck",
       "command": "make",
       "args": [],
       "group": {"kind": "test", "isDefault": true},
