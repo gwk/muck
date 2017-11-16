@@ -531,18 +531,16 @@ def sqlite3_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, T
 
 
 def pat_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
-  try: from pat import pat_dependency # type: ignore
-  except ImportError:
-      raise error(src_path, '`pat` is not installed; run `pip install pat-tool`.')
-  dep = pat_dependency(src_path=src_path, src_file=src_file)
+  try: import pat
+  except ImportError: raise error(src_path, '`pat` is not installed; run `pip install pat-tool`.')
+  dep = pat.pat_dependency(src_path=src_path, src_file=src_file)
   return [dep]
 
 
 def writeup_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
-  try: from writeup.v0 import writeup_dependencies as _gen_deps # type: ignore
-  except ImportError:
-    raise error(src_path, '`writeup` is not installed; run `pip install writeup-tool`.')
-  return _gen_deps(src_path=src_path, text_lines=src_file) # type: ignore
+  try: import writeup.v0 # type: ignore
+  except ImportError: raise error(src_path, '`writeup` is not installed; run `pip install writeup-tool`.')
+  return writeup.v0.writeup_dependencies(src_path=src_path, text_lines=src_file) # type: ignore
 
 
 dependency_fns: Dict[str, Callable[..., Iterable[str]]] = {
