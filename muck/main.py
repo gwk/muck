@@ -592,9 +592,9 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   m = match_wilds(target_path_for_source(ctx, src_path), target)
   if m is None:
     raise error(target, f'internal error: match failed; src_path: {src_path!r}')
-  args =  list(m.groups())
-  src_arg = ([] if src_to_stdin else [src_path])
-  cmd = build_tool + src_arg + args
+  args = tuple(m.groups())
+  src_arg = cast(Tuple[str, ...], () if src_to_stdin else (src_path,))
+  cmd = tuple(build_tool) + src_arg + args
 
   env = os.environ.copy()
   try:

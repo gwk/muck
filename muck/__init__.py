@@ -57,7 +57,7 @@ def dst_file(encoding='UTF-8', **kwargs: str) -> IO:
   '''
   global _manifest_file
   src = argv[0]
-  args = argv[1:]
+  args = tuple(argv[1:])
   if not has_formatter(src): # single destination; no need for manifest.
     if kwargs:
       raise Exception(f'source path contains no formatters but bindings provided to `dst_file`: {src}')
@@ -86,7 +86,7 @@ def load(file_or_path: Any, ext:str=None, **kwargs) -> Any:
   '''
   if isinstance(file_or_path, str):
     if '{' in file_or_path: # might have format; expand.
-      file_or_path = file_or_path.format(**bindings_from_args(src=argv[0], args=argv[1:]))
+      file_or_path = file_or_path.format(**bindings_from_args(src=argv[0], args=tuple(argv[1:])))
   return _load(file_or_path, open=_open, ext=ext, **kwargs)
 
 
@@ -100,7 +100,7 @@ def open(path: str, **kwargs) -> IO:
   TODO: support the other pathlike objects.
   '''
   if '{' in path: # might have format; expand.
-    path = path.format(**bindings_from_args(src=argv[0], args=argv[1:]))
+    path = path.format(**bindings_from_args(src=argv[0], args=tuple(argv[1:])))
   return _open(path, **kwargs)
 
 
