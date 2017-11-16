@@ -14,6 +14,9 @@ def serve_build(ctx: Ctx, main_target: str, update_target: Callable[[str], None]
   addr_str = f'http://{host}:{port}/{main_target}'
   should_rebuild = False # starts from built state.
 
+  ignored_paths = {
+    'apple-touch-icon-precomposed.png',
+  }
 
   class Handler(SimpleHTTPRequestHandler):
 
@@ -37,13 +40,14 @@ def serve_build(ctx: Ctx, main_target: str, update_target: Callable[[str], None]
       '''
       nonlocal should_rebuild
 
-      target = self.target_for_url_path()
-      if target == main_target:
-        if should_rebuild: ctx.reset()
-        should_rebuild = True
+      if self.path not in ignored_paths:
+        target = self.target_for_url_path()
+        if target == main_target:
+          if should_rebuild: ctx.reset()
+          should_rebuild = True
+        ctx.dbg(f'local request: {self.path}; target: {target}')
+        update_target(target)
 
-      ctx.dbg(f'local request: {self.path}; target: {target}')
-      update_target(target)
       return super().send_head() # type: ignore # this is technically a private method.
 
 
