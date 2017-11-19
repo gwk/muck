@@ -52,6 +52,8 @@ def validate_target(ctx: Ctx, target: str) -> None:
     raise InvalidTarget(target, 'empty string.')
   inv_m  =target_invalids_re.search(target)
   if inv_m:
+    if target.startswith('../_fetch/'): # TODO: this is a hack.
+      return
     raise InvalidTarget(target, f'cannot contain {inv_m[0]!r}.')
   if target.startswith('-'):
     raise InvalidTarget(target, "cannot begin with '-'.")

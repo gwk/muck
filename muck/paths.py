@@ -9,7 +9,6 @@ from itertools import product
 from .pithy.format import format_partial, parse_formatters
 from .pithy.fs import path_stem
 from .pithy.string_utils import pluralize
-from .constants import manifest_ext
 from typing import *
 
 
@@ -19,10 +18,6 @@ def dflt_prod_path_for_source(source_path: str) -> str: # TODO: rename? this is 
   as implied by the source stem.
   '''
   return path_stem(source_path) # strip off source ext.
-
-
-def manifest_path(src: str, args: Tuple[str, ...]) -> str:
-  return dst_path(src, args, override_bindings={}) + manifest_ext
 
 
 def bindings_from_args(src: str, args: Tuple[str, ...]) -> Dict[str, str]:

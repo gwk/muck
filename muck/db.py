@@ -33,6 +33,7 @@ idx_id, idx_path, idx_size, idx_mtime, idx_change_time, idx_update_time, idx_has
 class DB:
 
   def __init__(self, path: str) -> None:
+    self.path = path
     self.conn = connect(path)
     self.conn.isolation_level = None # autocommit mode.
 

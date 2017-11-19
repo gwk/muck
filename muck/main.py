@@ -37,7 +37,6 @@ from .pithy.task import launch, runC
 from .ctx import Ctx, Dependent, InvalidTarget, validate_target
 from .db import TargetRecord, DB, DBError
 from .constants import *
-from .paths import manifest_path
 from .py_deps import py_dependencies
 from .server import serve_build
 
@@ -338,7 +337,6 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[Dependent], for
     except FileNotFoundError: pass
     if old is not None:
       if size is None:
-        note(target, 'old product was deleted.')
         is_changed = True
       else:
         check_product_not_modified(ctx, target, actual_path, size=size, mtime=mtime, old=old)
@@ -388,14 +386,15 @@ def update_product(ctx: Ctx, target: str, actual_path: str, needs_update: bool, 
   needs_update = needs_update or last_update_time < update_time
 
   if needs_update: # must rebuild product.
-    dyn_change_time, dyn_deps, tmp_paths = build_product(ctx, target, src, actual_path)
+    dyn_change_time, dyn_deps, all_outs = build_product(ctx, target=target, src_path=src, prod_path=actual_path)
     update_time = max(update_time, dyn_change_time)
-    ctx.dbg(target, f'tmp_paths: {tmp_paths}')
-    assert tmp_paths
-    for tmp_path in tmp_paths:
-      a_target, a_change_time = update_product_with_tmp(ctx, src=src, dyn_deps=dyn_deps, tmp_path=tmp_path, update_time=update_time)
-      if a_target == target:
-        change_time = a_change_time
+    ctx.dbg(target, f'all_outs: {all_outs}')
+    assert target in all_outs
+    change_time = 0
+    for product in sorted(all_outs):
+      product_change_time = update_product_with_output(ctx, target=product, src=src, dyn_deps=dyn_deps, update_time=update_time)
+      if product == target:
+        change_time = product_change_time
     assert change_time > 0
     return change_time
   else: # not needs_update.
@@ -405,31 +404,22 @@ def update_product(ctx: Ctx, target: str, actual_path: str, needs_update: bool, 
       change_time=old.change_time, update_time=update_time, file_hash=old.hash, src=src, dyn_deps=old.dyn_deps, old=old)
 
 
-def update_product_with_tmp(ctx: Ctx, src: str, dyn_deps: Tuple[str, ...], tmp_path: str, update_time: int) -> Tuple[str, int]:
+def update_product_with_output(ctx: Ctx, target: str, src: str, dyn_deps: Tuple[str, ...], update_time: int) -> int:
   'Returns (target, change_time).'
-  product_path, ext = split_stem_ext(tmp_path)
-  if ext not in (out_ext, tmp_ext):
-    raise error(tmp_path, f'product output path has unexpected extension: {ext!r}')
-  if not ctx.is_product_path(product_path):
-     raise error(product_path, 'product path is not in build dir.')
-  target = product_path[len(ctx.build_dir_slash):]
   old = ctx.db.get_record(target=target)
-  size, mtime = file_size_and_mtime(tmp_path)
-  file_hash = hash_for_path(tmp_path)
+  path = ctx.product_path_for_target(target)
+  size, mtime = file_size_and_mtime(path)
+  file_hash = hash_for_path(path)
   is_changed = (old is None or size != old.size or file_hash != old.hash)
   if is_changed:
     change_time = update_time
     change_verb = 'is new' if old is None else 'changed'
-    ctx.db.delete_record(target=target) # delete metadata if it exists, just before overwrite, in case muck fails before update.
-    move_file(tmp_path, product_path, overwrite=True)
   else:
     assert old is not None
     change_time = old.change_time
     change_verb = 'did not change'
-    mtime = old.mtime # we are abandoning the new file.
-    remove_file(tmp_path) # do not overwrite old because we want to preserve the old mtime.
   note(target, f"product {change_verb}; {format_byte_count(size)}.")
-  return target, update_deps_and_record(ctx, target=target, actual_path=product_path, is_changed=is_changed, size=size, mtime=mtime,
+  return update_deps_and_record(ctx, target=target, actual_path=path, is_changed=is_changed, size=size, mtime=mtime,
     change_time=change_time, update_time=update_time, file_hash=file_hash, src=src, dyn_deps=dyn_deps, old=old)
 
 
@@ -564,7 +554,7 @@ def writeup_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, T
 # Build.
 
 
-def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple[int, Tuple[str, ...], List[str]]:
+def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple[int, Tuple[str, ...], Set[str]]:
   '''
   Run a source file, producing zero or more products.
   Return a list of produced product paths.
@@ -573,7 +563,6 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   src_ext = path_ext(src_path)
   prod_dir = path_dir(prod_path)
   prod_path_out = prod_path + out_ext
-  prod_path_tmp = prod_path + tmp_ext
 
   tool: Tool
   if is_file_executable_by_owner(src_prod_path):
@@ -584,7 +573,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
     except KeyError as e: raise error(target, f'unsupported source file extension: {src_ext!r}') from e
     if not tool.cmd: # TODO: weird now that we create an empty tool cmd above.
       note(target, 'no op.')
-      return 0, (), [] # no product.
+      return 0, (), set() # no product.
 
   # Extract args from the combination of wilds in the source and the matching target.
   m = match_wilds(target_path_for_source(ctx, src_path), target)
@@ -594,18 +583,26 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   src_arg = cast(Tuple[str, ...], () if tool.src_to_stdin else (src_path,))
   cmd = tool.cmd + src_arg + args
 
-  manif_path = ctx.build_dir_slash + manifest_path(src_path, args)
+  msg_stdin = f' < {src_path}' if tool.src_to_stdin else ''
+  note(target, f"building: `{' '.join(shlex.quote(w) for w in cmd)}{msg_stdin}`")
 
   # get set of source's inferred dependencies, to be ignored when observing target dependencies.
   ignored_deps = set(ctx.db.get_inferred_deps(target=src_path))
-  ignored_deps.update((src_path, manif_path, prod_path_tmp,))
+  ignored_deps.update((src_path,))
+
+  restricted_deps_rd = {
+    ctx.db.path,
+    prod_path_out,
+  }
+  restricted_deps_wr = {
+    ctx.db.path,
+    prod_path_out, # muck process opens this for the child.
+    src_path,
+  }
 
   make_dirs(prod_dir)
   remove_file_if_exists(prod_path_out)
-  remove_file_if_exists(prod_path_tmp)
-
-  msg_stdin = f' < {src_path}' if tool.src_to_stdin else ''
-  note(target, f"building: `{' '.join(shlex.quote(w) for w in cmd)}{msg_stdin}`")
+  remove_file_if_exists(prod_path)
 
   env = os.environ.copy()
   if tool.env_fn is not None:
@@ -616,76 +613,65 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
 
   dyn_time = 0
   dyn_deps: List[str] = []
+  all_outs: Set[str] = set()
   with open(prod_path_out, 'wb') as out_file, DuplexPipe() as pipe:
     deps_recv, deps_send = pipe.left_files()
     env.update(zip(('MUCK_DEPS_RECV', 'MUCK_DEPS_SEND'), [str(fd) for fd in pipe.right_fds]))
-    env['MUCK_OUT'] = path_rel_to_ancestor_or_abs(prod_path_tmp, ancestor=ctx.build_dir)
+    env['MUCK_OUT'] = path_rel_to_ancestor_or_abs(prod_path, ancestor=ctx.build_dir)
     task_stdin = open(src_prod_path, 'rb') if tool.src_to_stdin else None
     time_start = time.time()
     proc, _ = launch(cmd, cwd=ctx.build_dir, env=env, stdin=task_stdin, out=out_file, files=pipe.right_fds)
     if task_stdin: task_stdin.close()
     pipe.close_right()
-    while True:
-      dep_line = deps_recv.readline()
-      if not dep_line: break # no more data; child is done.
-      tab_idx = dep_line.rindex('\t')
-      dep_str = dep_line[:tab_idx]
-      mode = dep_line[tab_idx+1:-1]
-      dep = normalize_dep_path(dep_str, build_dir=ctx.build_dir)
-      ctx.dbg(target, f'dep: {dep}; mode: {mode}')
-      # TODO: verify that script is not accessing files that should be restricted, e.g. prod_path_out, build db, etc, source dir, etc.
-      if not (is_path_abs(dep) or (dep in ignored_deps) or (path_ext(dep) in ignored_dep_exts)):
-        if mode in 'RU':
-          #if mode == 'U': # TODO: remove existing?
-          dyn_deps.append(dep)
-          try:
+    try:
+      while True:
+        dep_line = deps_recv.readline()
+        if not dep_line: break # no more data; child is done.
+        tab_idx = dep_line.rindex('\t')
+        dep_str = dep_line[:tab_idx]
+        mode = dep_line[tab_idx+1:-1]
+        dep = normalize_path(dep_str)
+        ctx.dbg(target, f'{mode} dep: {dep}')
+        # Verify that script is not accessing files that should be restricted.
+        # TODO: further verifications: build db, etc, source dir, etc.
+        if not (is_path_abs(dep) or (dep in ignored_deps) or (path_ext(dep) in ignored_dep_exts) or dep.startswith('../_fetch/')):
+          if mode == 'R':
+            if dep in restricted_deps_rd: error(target, f'attempted to open restricted file for reading: {dep!r}')
             dep_time = update_dependency(ctx, dep, dependent=Dependent(kind='observed', target=target))
             dyn_time = max(dyn_time, dep_time)
-          except (Exception, SystemExit):
-            proc.kill() # this avoids a confusing exception message from the child script when muck fails.
-            raise
-        else:
-          assert mode in 'AMW'
-      print('\x06', end='', file=deps_send, flush=True) # Ascii ACK.
+            dyn_deps.append(dep)
+          elif mode in 'UW':
+            if dep in restricted_deps_wr: error(target, f'attempted to open restricted file for writing: {dep!r}')
+            validate_target_or_error(ctx, dep)
+            all_outs.add(dep)
+          elif mode in 'AM':
+            desc = 'appending' if mode == 'A' else 'mutating (writing without truncation)'
+            raise error(target, f'attempted to open file for {desc}: {dep!r}')
+          else: raise ValueError(f'invalid mode received from libmuck: {mode}')
+        print('\x06', end='', file=deps_send, flush=True) # Ascii ACK.
+    except (Exception, SystemExit):
+      proc.kill() # this avoids a confusing exception message from the child script when muck fails.
+      raise
     code = proc.wait()
     time_elapsed = time.time() - time_start
 
-  if code != 0:
-    raise error(target, f'build failed with code: {code}')
+  if code != 0: raise error(target, f'build failed with code: {code}')
 
-  def cleanup_out(actual_dst_msg) -> None:
+  if path_exists(prod_path):
+    via = 'open'
+    if target not in all_outs:
+      warn(target, f'wrote data to {prod_path}, but muck did not observe `open` system call.')
     if file_size(prod_path_out) == 0:
       remove_file(prod_path_out)
     else:
-      warn(target, f'wrote data to {actual_dst_msg};\n  ignoring output captured in `{prod_path_out}`')
-
-  try: f = open(manif_path)
-  except FileNotFoundError: # no manifest.
-    if path_exists(prod_path_tmp):
-      via = 'tmp'
-      tmp_paths = [prod_path_tmp]
-      cleanup_out(actual_dst_msg=f'$MUCK_OUT ({prod_path_tmp})')
-    else: # no tmp; use captured stdout.
-      via = 'stdout'
-      tmp_paths = [prod_path_out]
-  else: # found manifest.
-    via = 'manifest'
-    tmp_paths = [ctx.product_path_for_target(line.rstrip('\n')) for line in f]
-    cleanup_out(actual_dst_msg='manifest files')
-    if prod_path_tmp not in tmp_paths:
-      errL('prod_path_tmp: ', prod_path_tmp)
-      errSL(*tmp_paths)
-      raise error(target, f'product does not appear in manifest ({len(tmp_paths)} records): {manif_path}')
-    remove_file(manif_path)
+      warn(target, f'wrote data to {prod_path} via `open`; ignoring output captured in `{prod_path_out}`')
+  else: # no new file; use captured stdout.
+    via = 'stdout'
+    move_file(prod_path_out, prod_path)
+  all_outs.add(target)
   time_msg = '' if ctx.args.no_times else f'{time_elapsed:0.2f} seconds '
   note(target, f'finished: {time_msg}(via {via}).')
-  return dyn_time, tuple(dyn_deps), tmp_paths
-
-
-def normalize_dep_path(path: str, build_dir: str) -> str:
-  if is_path_abs(path): return path
-  path = normalize_path(path_join(build_dir, path))
-  return path_rel_to_ancestor_or_abs(path, ancestor=build_dir) # TODO: this could be more efficient.
+  return dyn_time, tuple(dyn_deps), all_outs
 
 
 def py_env() -> Dict[str, str]:

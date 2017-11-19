@@ -28,8 +28,7 @@ from .pithy.path_encode import path_for_url
 from .pithy.task import runCO
 from .pithy.transform import Transformer
 
-from .constants import tmp_ext
-from .paths import bindings_from_args, dflt_prod_path_for_source, dst_path, manifest_path
+from .paths import bindings_from_args, dflt_prod_path_for_source, dst_path
 
 
 # module exports.
@@ -45,31 +44,24 @@ __all__ = [
   'transform',
 ]
 
+
 _dst_vars_opened: Set[Tuple[Tuple[str, str], ...]] = set()
-_manifest_file = None
 
 def dst_file(encoding='UTF-8', **kwargs: str) -> IO:
   '''
   Open an output file for writing, expanding target path formatters with `kwargs`.
-
-  This function can be used to get a binary output file handle using the `binary` parameter.
-  It can also be used to output many files from a single script.
   '''
-  global _manifest_file
   src = argv[0]
   args = tuple(argv[1:])
-  if not has_formatter(src): # single destination; no need for manifest.
-    if kwargs:
-      raise Exception(f'source path contains no formatters but bindings provided to `dst_file`: {src}')
-    return _std_open(dflt_prod_path_for_source(src) + tmp_ext, mode=('wb' if encoding is None else 'w'))
   kwargs_tuple = tuple(sorted(kwargs.items())) # need kwargs as a hash key.
   if kwargs_tuple in _dst_vars_opened:
     raise Exception(f'file already opened for `dst_file` arguments: {kwargs_tuple}')
+  if not has_formatter(src): # single destinatio.
+    if kwargs:
+      raise Exception(f'source path contains no formatters but bindings provided to `dst_file`: {src}')
+    return _std_open(dflt_prod_path_for_source(src), mode=('wb' if encoding is None else 'w'))
   _dst_vars_opened.add(kwargs_tuple)
-  path = dst_path(src, args, kwargs) + tmp_ext
-  if _manifest_file is None:
-    _manifest_file = _std_open(manifest_path(src, args), 'w')
-  print(path, file=_manifest_file)
+  path = dst_path(src, args, kwargs)
   if encoding is None: # binary.
     return _std_open(path, mode='wb')
   else:
