@@ -28,10 +28,10 @@ from .pithy.format import format_to_re
 from .pithy.fs import *
 from .pithy.io import *
 from .pithy.iterable import fan_by_pred, first_el
-from .pithy.json_utils import load_json, write_json
+from .pithy.json import load_json, write_json
 from .pithy.path_encode import path_for_url
 from .pithy.pipe import DuplexPipe
-from .pithy.string_utils import format_byte_count
+from .pithy.string import format_byte_count
 from .pithy.task import launch, runC
 
 from .ctx import Ctx, Dependent, InvalidTarget, validate_target
@@ -620,7 +620,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
     env['MUCK_OUT'] = path_rel_to_ancestor_or_abs(prod_path, ancestor=ctx.build_dir)
     task_stdin = open(src_prod_path, 'rb') if tool.src_to_stdin else None
     time_start = time.time()
-    proc, _ = launch(cmd, cwd=ctx.build_dir, env=env, stdin=task_stdin, out=out_file, files=pipe.right_fds)
+    cmd, proc, _ = launch(cmd, cwd=ctx.build_dir, env=env, stdin=task_stdin, out=out_file, files=pipe.right_fds)
     if task_stdin: task_stdin.close()
     pipe.close_right()
     try:
