@@ -180,12 +180,12 @@ def fetch(url: str, cache_path: str=None, params: Dict[str, str]={}, headers: Di
 def load_url(url: str, ext: str=None, cache_path: str=None, params: Dict[str, str]={}, headers: Dict[str, str]={}, expected_status_code=200, timeout=30, delay=0, delay_range=0, spoof_ua=False, **kwargs: Any) -> Any:
   'Fetch the data at `url` and then load using `muck.load`.'
   if ext is None:
-    # extract the extension from the url path;
-    # load will try to extract it from the encoded path,
-    # which may have url path/parameters/query/fragment.
     if cache_path:
       ext = path_ext(cache_path)
     else:
+      # extract the extension from the url path;
+      # we cannot leave it to load because it sees the encoded path,
+      # which may have url path/parameters/query/fragment.
       parts = urlparse(url)
       ext = path_ext(parts.path) # TODO: support compound extensions, e.g. 'tar.gz'.
   path = fetch(url, cache_path=cache_path, params=params, headers=headers, expected_status_code=expected_status_code,
