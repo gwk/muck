@@ -1,54 +1,67 @@
 writeup v0
 Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
 
+
 # Muck
 
-Muck is a build tool for data projects. Given a target (a file to be built), it looks in the current directory tree for a source file with a matching name, determines its dependencies, recursively builds those, and then builds the target. Unlike Make and other traditional build systems, Muck does not use a "makefile". Instead, Muck determines the dependencies of a given file by analyzing its contents.
+Muck is a build tool for data analysis projects. Given a target (a file to be built), it looks in the current directory tree for a source file with a matching name, determines its static dependencies, recursively builds those, and then builds the target, possibly building additional dynamic dependencies as necessary. For example, if we ask Muck to build `some.txt`, it will run any source file with `some.txt` as a prefix, e.g. `some.txt.py`, `some.txt.sh`, or `some.txt.md` (there must be a single source candidate). If `some.txt.py` opens `data.txt`, Muck will suspend the execution of the process and update `data.txt`.
 
-With Muck, programmers can organize projects into discrete steps with arbitrary dependencies between them. When the source code for a particular step changes, Muck will rebuild that step and all dependent ("downstream") steps, but will not redo any work that is not affected by the change. This incremental rebuild behavior can speed up the development process dramatically, and helps prevent errors due to stale product files getting used by accident.
+Unlike Make and other traditional build systems, Muck does not use a "makefile". Instead, Muck determines the dependencies of a given file using static analysis and runtime interposition of the Unix `open` system call. With Muck, programmers can organize projects into discrete steps with arbitrary file dependencies between them. When the source code for a particular step changes, Muck will rebuild that step and all dependent ("downstream") steps, but will not redo any work that is not affected by the change. This incremental rebuild behavior speeds up the development process and helps prevent errors due to stale product files.
 
-The project is hosted at <https://github.com/gwk/muck>, with documentation at <https://gwk.github.io/muck>.
+Muck is most useful for projects where the various products can be given descriptive, discrete names. It is less useful for problems that can be framed as processing a continuous stream of inputs; these are better served by an application server.
 
-The development of this project is sponsored by the <https://towcenter.org Tow Center for Digital Journalism>.
 
-Muck is limited to source languages that it understands, and to source code written using Muck conventions. In particular, Muck provides a few functions that scripts must use to make data dependencies explicit to the analyzer.
+## Getting Started
 
-By choosing sensible names for each step, the programmer can make the purpose of each step clear. Muck can print the entire dependency graph of the project, resulting in a precise, high-level description of how the code is organized.
+Muck is a work in progress. I encourage people to try it out, with the caveat that it is not yet entirely stable. If you run into issues, I am more than happy to help you work through them. The project is hosted at <https://github.com/gwk/muck>, with documentation at <https://gwk.github.io/muck>. To get started, read the "Installation" section.
 
-Muck is a good choice for projects where the products can be given descriptive, discrete names.
 
 ## License
+
 All of the source code and documentation is dedicated to the public domain under CC0: <https://creativecommons.org/.publicdomain/zero/1.0/>.
+
+
+## Status
+
+Muck is still in development. Currently it only runs on Mac OS, but Linux support is coming soon. It has been used for a variety of experimental projects, but more work is needed to make it production-ready. In particular, Linux support has recently fallen behind, and the test suite and documentation need improvement.
+
+
+## Issues
+
+Please file any bugs, questions, or comments at <https://github.com/gwk/muck/issues>.
 
 
 # Installation
 
 ## Python 3.6
 Muck requires Python 3.6. (In the future it will support running project scripts in any available version).
-* macOS: install from http://python.org, or perhaps use Homebrew.
-* Ubuntu:
-  * `$ sudo apt-get python3.6`
-  * For versions of Ubuntu that do not ship with a Python 3.6 package, use Felix Krull's <https://launchpad.net/~fkrull/+archive/ubuntu/deadsnakes deadsnakes> PPA (personal package archive):
-| $ sudo add-apt-repository ppa:fkrull/deadsnakes
-| $ sudo apt-get update
-| $ sudo apt-get install python3.6
-For more information, see: <http://askubuntu.com/questions/682869/how-do-i-install-newer-python-versions-using-apt-get>
+* macOS: install from http://python.org, or use Homebrew. You will end up with multiple versions of Python on the system, so make sure that the `python3` and `pip3` that you are using are what you think they are. `python3 --version` and `pip3 --version`. You can also use `python3.6` and `pip3.6` (or a later version) if you do not want to change your default installation.
+
+## Git
+To install the latest revision of Muck:
+| cd external # Or whatever directory you like to check out code.
+| git clone git@github.com:gwk/muck.git # Clones the Muck repository.
+| muck/update-subs.sh # Check out Muck's dependencies as git submodules.
+| pip3 install -e muck # Install Muck from the repository in editable/development mode. Substitute `pip3.6` or other as appropriate.
 
 ## Pip
-Muck should be installable with a single command: `pip3 install muck`. Once installed, it should be available on the command line. If it is not, it may be that the `PATH` environment variable in your shell is not configured to point to console scripts installed by pip.
+Muck is available via the Python Package Index (PyPI), but due to ongoing development the published version is often out of date. Once Muck enters a more stable phase of development, users should install with `pip3 install muck`.
 
-## Development
-See <link:dev-setup.html dev-setup>.
+## Troubleshooting
+
+Once installed, `muck` should be available on the command line. If it is not, it may be that the `PATH` environment variable in your shell is not configured to point to console scripts installed by pip. Please open an issue and I am happy to help get you started.
+
 
 # Usage
 
 `muck` takes a list of targets as command line arguments. If no targets are provided it defaults to `index.html`.
 Given a target `dir/stem.ext`, muck tries to produce the target file using the following steps:
-* If the target exists as named, then it does nothing.
-* If a source file exists that begins with the whole target name, e.g. `dir/stem.ext.py`, then that file is executed and its standard output is written to `_build/dir/stem.ext`.
+* If the target exists as named in the project directory, then it does nothing.
+* If a source file exists that consists of the whole target name plus an extension, e.g. `dir/stem.ext.py`, then that file is executed and its standard output is written to `_build/dir/stem.ext`.
+* If a matching source file exists with multiple extensions, e.g. 'dir/stem.ext.py.py', then that file is executed to produce a new source file `dir/stem/ext.py`, and the resulting product is then executed as a source file.
 * Otherwise Muck issues an error.
 
-When a script is run, it is first analyzed by Muck for any dependencies, which will be built before running the script. Dependency analysis is limited to the conventions that Muck understands.
+When a script is run, it is first analyzed by Muck for any static dependencies, which will be updated before running the script. Dependency analysis is limited to source languages that Muck understands. Additionally, Muck intercepts calls to `open` at the OS level, using DYLD_INSERT_LIBRARIES on macOS and eventually LD_PRELOAD on Linux. This information is used to calculate a complete dependency graph for arbitrary processes on the fly.
 
 
 # An Example
@@ -58,7 +71,7 @@ Suppose we want to produce a document that contains two charts, A and B. Each of
 * `chartA.svg.py`, referencing `data.csv`.
 * `chartB.svg.py`, referencing `data.csv`.
 * `data.csv.py`.
-This project has a dependency graph whose shape is essentially a diamond, with `document.html` at the root, and `data.csv.py` having no dependencies.
+This project has a dependency graph whose shape is essentially a diamond, with `document.html` at the root, and `data.csv.py` having no dependencies. Note that `.wu` files indicate a markup format called <https://gwk.github.io/writeup Writeup>, similar to Markdown. Markdown support is in progress.
 
 The programmer can build the document by invoking `muck document.html` on the command line. Muck will then take the following steps:
 * `document.html`: does not exist; infer source: `document.html.wu`.
@@ -78,3 +91,7 @@ The programmer can build the document by invoking `muck document.html` on the co
 * `document.html`:
   * run `writeup document.html.wu`, which reads `_build/chartA.svg`, `_build/chartB.svg`, and writes `_build/document.html`.
 
+
+# Credits
+
+Muck is developed by <https://gwk.github.io George King>, and was initially sponsored by the <https://towcenter.org Tow Center for Digital Journalism>. Professor <https://journalism.columbia.edu/faculty/mark-hansen Mark Hansen> and the <https://brown.columbia.edu/about/ Brown Institute> have supported this research since it began in 2015. <https://massivesci.com/people/gabe-stein Gabe Stein> has collaborated on design and testing.
