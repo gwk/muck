@@ -11,7 +11,7 @@
 _default: test typecheck
 
 clean:
-	rm -rf _build/* muck/libmuck.*.so
+	rm -rf _build/* docs/* muck/libmuck.*.so
 
 cov:
 	iotest -fail-fast -coverage
