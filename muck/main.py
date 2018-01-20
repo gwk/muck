@@ -702,8 +702,9 @@ ext_tools: Dict[str, Tool] = {
 }
 
 ignored_dep_exts = {
-  '.sqlite3-wal',
+  '.sqlite3-journal',
   '.sqlite3-shm',
+  '.sqlite3-wal',
 }
 
 
