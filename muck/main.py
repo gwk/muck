@@ -436,7 +436,7 @@ def update_non_product(ctx: Ctx, target: str, needs_update: bool, old: Optional[
     if not path_exists(product_link): # link was deleted? replace it.
       make_link(target, product_link, make_dirs=True)
     else:
-      error(target, 'non-product link in build directory appears to have been replaced with a different file.')
+      raise error(target, 'non-product link in build directory appears to have been replaced with a different file.')
 
   if needs_update:
     is_changed = True
