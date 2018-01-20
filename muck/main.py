@@ -554,6 +554,14 @@ def writeup_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, T
 # Build.
 
 
+class DepCtx(NamedTuple):
+  ignored_deps: Set[str]
+  restricted_deps_rd: Set[str]
+  restricted_deps_wr: Set[str]
+  dyn_deps: List[str]
+  all_outs: Set[str]
+
+
 def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple[int, Tuple[str, ...], Set[str]]:
   '''
   Run a source file, producing zero or more products.
@@ -586,20 +594,6 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   msg_stdin = f' < {src_path}' if tool.src_to_stdin else ''
   note(target, f"building: `{' '.join(shlex.quote(w) for w in cmd)}{msg_stdin}`")
 
-  # get set of source's inferred dependencies, to be ignored when observing target dependencies.
-  ignored_deps = set(ctx.db.get_inferred_deps(target=src_path))
-  ignored_deps.update((src_path,))
-
-  restricted_deps_rd = {
-    ctx.db.path,
-    prod_path_out,
-  }
-  restricted_deps_wr = {
-    ctx.db.path,
-    prod_path_out, # muck process opens this for the child.
-    src_path,
-  }
-
   make_dirs(prod_dir)
   remove_file_if_exists(prod_path_out)
   remove_file_if_exists(prod_path)
@@ -611,9 +605,25 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   #env['DYLD_PRINT_LIBRARIES'] = 'TRUE'
   #env['MUCK_DEPS_DBG'] = 'TRUE'
 
+  # Get the source's inferred dependencies, to be ignored when observing target dependencies.
+  ignored_deps = set(ctx.db.get_inferred_deps(target=src_path))
+  ignored_deps.update((src_path,))
+
+  depCtx = DepCtx(
+    ignored_deps=ignored_deps,
+    restricted_deps_rd={
+      ctx.db.path,
+      prod_path_out,
+    },
+    restricted_deps_wr={
+      ctx.db.path,
+      prod_path_out, # muck process opens this for the child.
+      src_path,
+    },
+    dyn_deps=[],
+    all_outs=set())
+
   dyn_time = 0
-  dyn_deps: List[str] = []
-  all_outs: Set[str] = set()
   with open(prod_path_out, 'wb') as out_file, DuplexPipe() as pipe:
     deps_recv, deps_send = pipe.left_files()
     env.update(zip(('MUCK_DEPS_RECV', 'MUCK_DEPS_SEND'), [str(fd) for fd in pipe.right_fds]))
@@ -627,27 +637,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
       while True:
         dep_line = deps_recv.readline()
         if not dep_line: break # no more data; child is done.
-        tab_idx = dep_line.rindex('\t')
-        dep_str = dep_line[:tab_idx]
-        mode = dep_line[tab_idx+1:-1]
-        dep = normalize_path(dep_str)
-        ctx.dbg(target, f'{mode} dep: {dep}')
-        # Verify that script is not accessing files that should be restricted.
-        # TODO: further verifications: build db, etc, source dir, etc.
-        if not (is_path_abs(dep) or (dep in ignored_deps) or (path_ext(dep) in ignored_dep_exts) or dep.startswith('../_fetch/')):
-          if mode == 'R':
-            if dep in restricted_deps_rd: error(target, f'attempted to open restricted file for reading: {dep!r}')
-            dep_time = update_dependency(ctx, dep, dependent=Dependent(kind='observed', target=target))
-            dyn_time = max(dyn_time, dep_time)
-            dyn_deps.append(dep)
-          elif mode in 'UW':
-            if dep in restricted_deps_wr: error(target, f'attempted to open restricted file for writing: {dep!r}')
-            validate_target_or_error(ctx, dep)
-            all_outs.add(dep)
-          elif mode in 'AM':
-            desc = 'appending' if mode == 'A' else 'mutating (writing without truncation)'
-            raise error(target, f'attempted to open file for {desc}: {dep!r}')
-          else: raise ValueError(f'invalid mode received from libmuck: {mode}')
+        dyn_time = process_dep_line(ctx, depCtx=depCtx, target=target, dep_line=dep_line, dyn_time=dyn_time)
         print('\x06', end='', file=deps_send, flush=True) # Ascii ACK.
     except (Exception, SystemExit):
       proc.kill() # this avoids a confusing exception message from the child script when muck fails.
@@ -659,7 +649,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
 
   if path_exists(prod_path):
     via = 'open'
-    if target not in all_outs:
+    if target not in depCtx.all_outs:
       warn(target, f'wrote data to {prod_path}, but muck did not observe `open` system call.')
     if file_size(prod_path_out) == 0:
       remove_file(prod_path_out)
@@ -668,10 +658,54 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   else: # no new file; use captured stdout.
     via = 'stdout'
     move_file(prod_path_out, prod_path)
-  all_outs.add(target)
+  depCtx.all_outs.add(target)
   time_msg = '' if ctx.args.no_times else f'{time_elapsed:0.2f} seconds '
   note(target, f'finished: {time_msg}(via {via}).')
-  return dyn_time, tuple(dyn_deps), all_outs
+  return dyn_time, tuple(depCtx.dyn_deps), depCtx.all_outs
+
+
+def process_dep_line(ctx: Ctx, depCtx: DepCtx, target: str, dep_line: str, dyn_time: int) -> int:
+  '''
+  Parse a dependency line sent from a child build process.
+  This is trick because the parent and child processes have different current working directories.
+  '''
+  tab_idx = dep_line.rindex('\t')
+  dep_str = dep_line[:tab_idx]
+  mode = dep_line[tab_idx+1:-1]
+  dep = norm_path(dep_str)
+
+  if is_path_abs(dep):
+    abs_fetch = abs_path('_fetch') + '/' # abs_path removes the trailing slash due to normpath.
+    if dep.startswith(abs_fetch): return dyn_time
+    try: dep = path_rel_to_ancestor(dep, ancestor=abs_path(ctx.build_dir), dot=True)
+    except PathIsNotDescendantError:
+      try:
+        local_path = path_rel_to_ancestor(dep, ancestor=current_dir(), dot=True)
+        raise error(target, f'attempted to open absolute path in project but outside of build directory; local path: {local_path!r}')
+      except PathIsNotDescendantError: return dyn_time # outside of project completely; ignore.
+  else: # relative.
+    if dep.startswith('../_fetch/'): return dyn_time
+    if dep.startswith('..'): raise error(target, f'attempted to open relative path outside of build directory: {dep!r}')
+
+  if (dep in depCtx.ignored_deps) or (path_ext(dep) in ignored_dep_exts): return dyn_time
+  # TODO: further verifications? source dir, etc.
+
+  ctx.dbg(target, f'{mode} dep: {dep}')
+  assert not is_path_abs(dep)
+  if mode == 'R':
+    if dep in depCtx.restricted_deps_rd: raise error(target, f'attempted to open restricted file for reading: {dep!r}')
+    dep_time = update_dependency(ctx, dep, dependent=Dependent(kind='observed', target=target))
+    dyn_time = max(dyn_time, dep_time)
+    depCtx.dyn_deps.append(dep)
+  elif mode in 'UW':
+    if dep in depCtx.restricted_deps_wr: raise error(target, f'attempted to open restricted file for writing: {dep!r}')
+    validate_target_or_error(ctx, dep)
+    depCtx.all_outs.add(dep)
+  elif mode in 'AM':
+    desc = 'appending' if mode == 'A' else 'mutating (writing without truncation)'
+    raise error(target, f'attempted to open file for {desc}: {dep!r}')
+  else: raise ValueError(f'invalid mode received from libmuck: {mode}')
+  return dyn_time
 
 
 def py_env() -> Dict[str, str]:
