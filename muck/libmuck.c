@@ -11,18 +11,23 @@
 #include <string.h>
 #include <unistd.h>
 
-// This dynamic library provides a replacement of the system's `open` function,
-// and is meant to be loaded by Muck client processes using or DYLD_INSERT_LIBRARIES (macOS) or LD_PRELOAD (Linux).
-// The replacement wraps the original, but first notifies the Muck parent process of the file being opened,
+// This dynamic library provides a replacement of several system calls, most notably the `open` function.
+// It is meant to be loaded by Muck client processes via DYLD_INSERT_LIBRARIES (macOS) or LD_PRELOAD (Linux).
+// The replacement functions wrap the originals, but first notify the Muck parent process of the file being opened,
 // thus providing the build system with an opportunity to update dependencies.
 
+// We will probably need to implement additional syscall wrappers.
+// Choosing which ones to wrap is a critical design concern,
+// because we are essentially creating on-demand semantics for the file system.
+
+// For a list of system calls on a unix system, try `apropos . | grep '(2)'`.
+
 // Currently, libmuck is installed as a Python C extension dynamic library.
-// This is admittedly a hack, because it is not a legitimate Python extension.
+// This is something of a hack, because it is not a legitimate Python extension.
 // If you try to import it you will get: `ImportError: dynamic module does not define module export function (PyInit_libmuck)`.
 // We could behave like a real python module, but there is no real benefit.
-// Downside would be that it might cause extra dynamic linking whenever this library is loaded for every client process.
+// Downside would be that a real module might require extra dynamic linking whenever this library is loaded for every client process.
 //PyMODINIT_FUNC PyInit_libmuck(void) { return PyModule_Create(&libmuck); }
-
 
 
 // source: https://opensource.apple.com/source/dyld/dyld-519.2.1/include/mach-o/dyld-interposing.h
@@ -50,7 +55,7 @@ static const char* program_name = "?";
 static size_t buffer_size = 0;
 
 
-static void muck_communicate(const char* filename, char mode) {
+static void muck_communicate(const char* call_name, char mode_char, const char* file_path) {
   if (!is_setup) {
     is_setup = 1;
     #if defined(__APPLE__) || defined(__FreeBSD__)
@@ -70,21 +75,22 @@ static void muck_communicate(const char* filename, char mode) {
   }
 
   // Write the path and mode to the buffer.
-  size_t path_len = strlen(filename);
-  size_t req_size = path_len + 4; // path, tab, mode, newline, null.
+  size_t call_len = strlen(call_name);
+  size_t path_len = strlen(file_path);
+  size_t req_size = call_len + 1 + 1 + 1 + path_len + 2; // call, tab, mode, tab, path, newline, null.
   if (buffer_size < req_size) {
     buffer_size = malloc_good_size(req_size);
     buffer = (char*)realloc(buffer, buffer_size);
     assert(buffer);
   }
-  int act_len = snprintf(buffer, buffer_size, "%s\t%c\n", filename, mode);
+  int act_len = snprintf(buffer, buffer_size, "%s\t%c\t%s\n", call_name, mode_char, file_path);
   assert(act_len > 0 && (size_t)act_len < buffer_size);
 
   if (dbg) { errF("%s", buffer); }
 
   if (fd_send) { // communicate with the muck build process.
     if (write(fd_send, buffer, (size_t)act_len) != (ssize_t)act_len) {
-      fail("MUCK_DEPS_SEND write failed: %s; path: %s\n", strerror(errno), filename);
+      fail("MUCK_DEPS_SEND write failed: %s; path: %s\n", strerror(errno), file_path);
     }
     // Read the confirmation byte from the receive channel;
     // the read blocks this process until the parent build process is done updating dependencies.
@@ -107,7 +113,7 @@ static int muck_open(const char* filename, int oflag, int mode) {
   }
   else { mode_char = 'R'; } // read-only.
 
-  muck_communicate(filename, mode_char);
+  muck_communicate("open", mode_char, filename);
   return open(filename, oflag, mode);
 }
 

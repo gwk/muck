@@ -669,10 +669,12 @@ def process_dep_line(ctx: Ctx, depCtx: DepCtx, target: str, dep_line: str, dyn_t
   Parse a dependency line sent from a child build process.
   This is trick because the parent and child processes have different current working directories.
   '''
-  tab_idx = dep_line.rindex('\t')
-  dep_str = dep_line[:tab_idx]
-  mode = dep_line[tab_idx+1:-1]
-  dep = norm_path(dep_str)
+  try:
+    dep_line_parts = dep_line.split('\t')
+    call, mode, dep = dep_line_parts
+    if not (dep and dep[-1] == '\n'): raise ValueError
+    dep = dep[:-1] # remove final newline.
+  except ValueError as e: raise error(target, f'child process sent bad dependency line:\n{dep_line!r}') from e
 
   if is_path_abs(dep):
     abs_fetch = abs_path('_fetch') + '/' # abs_path removes the trailing slash due to normpath.
