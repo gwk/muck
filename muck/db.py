@@ -2,7 +2,7 @@
 
 '''
 Muck stores build info in an sqlite3 database.
-However the database operations are simple and could be replaced with a simple key-value store.
+However the database could be replaced with a key-value store.
 '''
 
 from marshal import dumps as to_marshalled, loads as from_marshalled
