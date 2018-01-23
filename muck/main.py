@@ -497,60 +497,6 @@ def update_deps_and_record(ctx, target: str, actual_path: str, is_changed: bool,
   return change_time
 
 
-# Dependency calculation.
-
-def calc_dependencies(path: str, dir_names: Dict[str, Tuple[str, ...]]) -> Tuple[str, ...]:
-  '''
-  Infer the dependencies for the file at `path`.
-  '''
-  ext = path_ext(path)
-  try: deps_fn = ext_tools[ext].deps_fn
-  except KeyError: return ()
-  if deps_fn is None: return ()
-  with open(path) as f:
-    return tuple(deps_fn(path, f, dir_names))
-
-
-def list_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
-  'Calculate dependencies for .list files.'
-  lines = (line.strip() for line in src_file)
-  return [l for l in lines if l and not l.startswith('#')]
-
-
-def md_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
-  return []
-
-
-def sh_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> Iterable[str]:
-  'Calculate dependencies for .sh files.'
-  for line in src_file:
-    for token in shlex.split(line):
-      if path_ext(token):
-        yield token
-
-
-def sqlite3_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> Iterable[str]:
-  'Calculate dependencies for .sql files (assumed to be sqlite3 commands).'
-  for i, line in enumerate(src_file, 1):
-    tokens = shlex.split(line)
-    for j, token in enumerate(tokens):
-      if token == '.open' and j+1 < len(tokens):
-        yield tokens[j+1]
-
-
-def pat_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
-  try: import pat
-  except ImportError: raise error(src_path, '`pat` is not installed; run `pip install pat-tool`.')
-  dep = pat.pat_dependency(src_path=src_path, src_file=src_file)
-  return [dep]
-
-
-def writeup_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
-  try: import writeup.v0 # type: ignore
-  except ImportError: raise error(src_path, '`writeup` is not installed; run `pip install writeup-tool`.')
-  return writeup.v0.writeup_dependencies(src_path=src_path, text_lines=src_file) # type: ignore
-
-
 # Build.
 
 
@@ -709,6 +655,62 @@ def process_dep_line(ctx: Ctx, depCtx: DepCtx, target: str, dep_line: str, dyn_t
   else: raise ValueError(f'invalid mode received from libmuck: {mode}')
   return dyn_time
 
+
+# Dependency inference.
+
+def calc_dependencies(path: str, dir_names: Dict[str, Tuple[str, ...]]) -> Tuple[str, ...]:
+  '''
+  Infer the dependencies for the file at `path`.
+  '''
+  ext = path_ext(path)
+  try: deps_fn = ext_tools[ext].deps_fn
+  except KeyError: return ()
+  if deps_fn is None: return ()
+  with open(path) as f:
+    return tuple(deps_fn(path, f, dir_names))
+
+
+def list_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
+  'Calculate dependencies for .list files.'
+  lines = (line.strip() for line in src_file)
+  return [l for l in lines if l and not l.startswith('#')]
+
+
+def md_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
+  return []
+
+
+def sh_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> Iterable[str]:
+  'Calculate dependencies for .sh files.'
+  for line in src_file:
+    for token in shlex.split(line):
+      if path_ext(token):
+        yield token
+
+
+def sqlite3_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> Iterable[str]:
+  'Calculate dependencies for .sql files (assumed to be sqlite3 commands).'
+  for i, line in enumerate(src_file, 1):
+    tokens = shlex.split(line)
+    for j, token in enumerate(tokens):
+      if token == '.open' and j+1 < len(tokens):
+        yield tokens[j+1]
+
+
+def pat_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
+  try: import pat
+  except ImportError: raise error(src_path, '`pat` is not installed; run `pip install pat-tool`.')
+  dep = pat.pat_dependency(src_path=src_path, src_file=src_file)
+  return [dep]
+
+
+def writeup_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
+  try: import writeup.v0 # type: ignore
+  except ImportError: raise error(src_path, '`writeup` is not installed; run `pip install writeup-tool`.')
+  return writeup.v0.writeup_dependencies(src_path=src_path, text_lines=src_file) # type: ignore
+
+
+# Tools.
 
 def py_env() -> Dict[str, str]:
   return { 'PYTHONPATH' : current_dir() }
