@@ -50,7 +50,7 @@ target_invalids_re = re.compile(r'[\s]|\.\.|\./|//')
 def validate_target(ctx: Ctx, target: str) -> None:
   if not target:
     raise InvalidTarget(target, 'empty string.')
-  inv_m  =target_invalids_re.search(target)
+  inv_m = target_invalids_re.search(target)
   if inv_m:
     if target.startswith('../_fetch/'): # TODO: this is a hack.
       return
