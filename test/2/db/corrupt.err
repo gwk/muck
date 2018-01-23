@@ -1,1 +1,1 @@
-muck error: database is outdated or corrupt; run `muck clean-all`.
+muck error: build database is outdated or corrupt; run `muck clean-all`.

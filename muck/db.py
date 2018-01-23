@@ -6,7 +6,7 @@ However the database could be replaced with a key-value store.
 '''
 
 from marshal import dumps as to_marshalled, loads as from_marshalled
-from sqlite3 import Cursor, DatabaseError, IntegrityError, connect, sqlite_version, version as module_version
+from sqlite3 import Cursor, DatabaseError, IntegrityError, OperationalError, connect, sqlite_version, version as module_version
 from typing import *
 from .pithy.fs import path_join
 from .pithy.io import errL, errSL
@@ -41,39 +41,56 @@ class DB:
       self.run('SELECT COUNT(*) FROM sqlite_master') # dummy query to check file integrity.
     except DatabaseError as e:
       if e.args[0] in {'file is not a database', 'file is encrypted or is not a database'}:
-        exit('muck error: database is outdated or corrupt; run `muck clean-all`.')
+        exit('muck error: build database is outdated or corrupt; run `muck clean-all`.')
       raise #!cov-ignore.
 
-    self.run('''
-    CREATE TABLE IF NOT EXISTS targets (
-      id INTEGER PRIMARY KEY,
-      path TEXT,
-      size INT,
-      mtime REAL,
-      change_time INT,
-      update_time INT,
-      hash BLOB,
-      src TEXT,
-      deps BLOB,
-      dyn_deps BLOB
-    )''')
+    self.create_table('targets',
+      'id INTEGER PRIMARY KEY',
+      'path TEXT',
+      'size INT',
+      'mtime REAL',
+      'change_time INT',
+      'update_time INT',
+      'hash BLOB',
+      'src TEXT',
+      'deps BLOB',
+      'dyn_deps BLOB')
 
-    self.run('CREATE UNIQUE INDEX IF NOT EXISTS targets_paths ON targets(path)')
+    self.create('UNIQUE INDEX', 'targets_paths', 'ON targets(path)')
 
-    self.run('''
-    CREATE TABLE IF NOT EXISTS globals (
-      id INTEGER PRIMARY KEY,
-      key BLOB,
-      val BLOB
-    )''')
+    self.create_table('globals',
+      'id INTEGER PRIMARY KEY',
+      'key BLOB',
+      'val BLOB')
 
-    self.run('CREATE UNIQUE INDEX IF NOT EXISTS globals_keys ON globals(key)')
+    self.create('UNIQUE INDEX', 'globals_keys', 'ON globals(key)')
+
     self.run('INSERT OR IGNORE INTO globals (key, val) VALUES ("ptime", 0)')
 
 
 
   def run(self, query: str, **args: Any) -> Cursor:
     return self.conn.execute(query, args)
+
+
+  def fetch_opt(self, query: str, **args: Any) -> Optional[List[Any]]:
+    return self.run(query, **args).fetchone() # type: ignore
+
+
+  def create(self, type: str, name: str, *words: str) -> None:
+    'Run a create query, and check that any existing schema matches the current one.'
+    row = self.fetch_opt('SELECT sql FROM sqlite_master WHERE name=:name', name=name)
+    sql = ' '.join(('CREATE', type, name) + words)
+    if row is None:
+      try: self.run(sql)
+      except OperationalError:
+        errSL('sql:', sql)
+        raise
+    elif sql != row[0]: exit('muck error: build database is outdated; run `muck clean-all`.')
+
+
+  def create_table(self, name: str, *columns: str) -> None:
+    self.create('TABLE', name, f"({', '.join(columns)})")
 
 
   def dbg_query(self, *stmts: str) -> None:
@@ -86,9 +103,8 @@ class DB:
 
 
   def contains_record(self, target: str) -> bool:
-    c = self.run('SELECT COUNT(*) FROM targets WHERE path=:path', path=target)
-    count = c.fetchone()[0]
-    return bool(count)
+    row = self.run('SELECT COUNT(*) FROM targets WHERE path=:path', path=target).fetchone()
+    return bool(row[0])
 
 
   def get_record(self, target: str) -> Optional[TargetRecord]:
