@@ -295,7 +295,7 @@ def muck_move_to_fetched_url(args: Namespace) -> None:
 
 
 
-# main update algorithm.
+# Core update algorithm.
 
 
 def update_dependency(ctx: Ctx, target: str, dependent: Optional[Dependent], force=False) -> int:
