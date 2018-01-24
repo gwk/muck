@@ -316,7 +316,7 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[Dependent], for
   ctx.change_times[target] = None # recursion sentinal is replaced before return by update_deps_and_record.
 
   ctx.dbg(target, f'examining... (dependent={dependent})')
-  is_product = not path_exists(target)
+  is_product = not path_exists(target) # The semantic definition of a product.
   if is_product and is_link(target):
     raise error(target, f'target is a dangling symlink to: {read_link(target)}')
   actual_path = ctx.product_path_for_target(target) if is_product else target
