@@ -427,14 +427,14 @@ def update_non_product(ctx: Ctx, target: str, needs_update: bool, old: Optional[
   'returns transitive change_time.'
   ctx.dbg(target, 'update_non_product')
   size, mtime = file_size_and_mtime(target)
-  product_link = ctx.product_path_for_target(target) # non_products get linked into build dir.
+  prod_path = ctx.product_path_for_target(target)
 
   if needs_update:
-    remove_file_if_exists(product_link)
-    make_link(target, product_link, make_dirs=True)
-  elif not is_link(product_link):
-    if not path_exists(product_link): # link was deleted? replace it.
-      make_link(target, product_link, make_dirs=True)
+    remove_file_if_exists(prod_path)
+    make_link(target, prod_path, make_dirs=True)
+  elif not is_link(prod_path):
+    if not path_exists(prod_path): # link was deleted? replace it.
+      make_link(target, prod_path, make_dirs=True)
     else:
       raise error(target, 'non-product link in build directory appears to have been replaced with a different file.')
 
