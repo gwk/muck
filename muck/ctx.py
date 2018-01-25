@@ -22,6 +22,7 @@ class Ctx(NamedTuple):
   build_dir_slash: str
   reserved_names: FrozenSet
   dbg: Callable[..., None]
+  dbg_libmuck: bool
   change_times: Dict[str, Optional[int]] = {}
   dir_names: Dict[str, List[str]] = {}
   dependents: DefaultDict[str, Set[Dependent]] = DefaultDict(set)

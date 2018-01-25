@@ -59,6 +59,7 @@ def main() -> None:
     parser.set_defaults(fn=fn, builds=builds, targets_dflt=targets_dflt, takes_ctx=takes_ctx)
     parser.add_argument('-build-dir', default='_build', help="specify build directory; defaults to '_build'.")
     parser.add_argument('-dbg', action='store_true', help='log lots of details to stderr.')
+    parser.add_argument('-dbg-libmuck', action='store_true', help='log lots of details to stderr.')
     if builds:
       parser.add_argument('-no-times', action='store_true', help='do not report process times.')
       parser.add_argument('-force', action='store_true', help='rebuild specified targets even if they are up to date.')
@@ -124,7 +125,7 @@ def main() -> None:
     return
 
   ctx = Ctx(args=args, db=DB(path=db_path), build_dir=args.build_dir, build_dir_slash=args.build_dir + '/',
-    reserved_names=frozenset(reserved_names), dbg=dbg)
+    reserved_names=frozenset(reserved_names), dbg=dbg, dbg_libmuck=args.dbg_libmuck)
 
   args.fn(ctx)
 
@@ -549,7 +550,8 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
     env.update(tool.env_fn())
   env['DYLD_INSERT_LIBRARIES'] = libmuck_path
   #env['DYLD_PRINT_LIBRARIES'] = 'TRUE'
-  #env['MUCK_DEPS_DBG'] = 'TRUE'
+  if ctx.dbg_libmuck:
+    env['MUCK_DEPS_DBG'] = 'TRUE'
 
   # Get the source's inferred dependencies, to be ignored when observing target dependencies.
   ignored_deps = set(ctx.db.get_inferred_deps(target=src_path))
