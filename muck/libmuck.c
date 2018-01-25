@@ -1,6 +1,7 @@
 // Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
 
 #include <assert.h>
+#include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -9,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 // This dynamic library provides a replacement of several system calls, most notably the `open` function.
@@ -36,6 +38,8 @@ __attribute__((used)) static struct{ const void* replacement; const void* replac
 __attribute__ ((section ("__DATA,__interpose"))) = \
 { (const void*)(unsigned long)&_replacement, (const void*)(unsigned long)&_replacee }
 
+#define INTERPOSE(name) DYLD_INTERPOSE(muck_##name, name)
+
 
 #define errF(fmt, ...) { \
   fputs("libmuck: ", stderr); \
@@ -54,6 +58,8 @@ static char* buffer = NULL;
 static const char* program_name = "?";
 static size_t buffer_size = 0;
 
+
+#define COMMUNICATE(mode_char, file_path) muck_communicate(__func__+5, mode_char, file_path)
 
 static void muck_communicate(const char* call_name, char mode_char, const char* file_path) {
   if (!is_setup) {
@@ -104,17 +110,69 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
   }
 }
 
+
+// fcntl.h.
+
+
 static int muck_open(const char* filename, int oflag, int mode) {
   char mode_char = '?';
   if (oflag & O_RDWR) { mode_char = 'U'; }
   else if (oflag & O_WRONLY) {
     if (oflag & O_TRUNC) { mode_char = 'W'; } // clean write.
+    else if (oflag & O_APPEND) { mode_char = 'A'; } // append write.
     else { mode_char = 'M'; } // mutating write.
   }
   else { mode_char = 'R'; } // read-only.
 
-  muck_communicate("open", mode_char, filename);
+  COMMUNICATE(mode_char, filename);
   return open(filename, oflag, mode);
 }
+INTERPOSE(open);
 
-DYLD_INTERPOSE(muck_open, open);
+
+// sys/stat.h.
+
+static int muck_stat(const char *restrict path, struct stat *restrict buf) {
+  COMMUNICATE('S', path);
+  return stat(path, buf);
+}
+INTERPOSE(stat);
+
+static int muck_lstat(const char *restrict path, struct stat *restrict buf) {
+  COMMUNICATE('S', path);
+  return lstat(path, buf);
+}
+INTERPOSE(lstat);
+
+static int muck_fstatat(int fd, const char *path, struct stat *buf, int flag) {
+  fail("fstatat is not yet supported.")
+}
+INTERPOSE(fstatat);
+
+
+static FILE *muck_fopen(const char* __restrict __filename, const char* __restrict __mode) {
+  // libc.
+  char mode_char = '?';
+  const char* m = __mode;
+  while (*m) {
+    switch (*m) {
+      case 'r': mode_char = 'R'; break;
+      case 'w': mode_char = 'W'; break;
+      case 'a': mode_char = 'A'; break;
+      case '+': mode_char = 'U'; break;
+      default: continue;
+    }
+    m++;
+  }
+  muck_communicate("fopen", mode_char, __filename);
+  return fopen(__filename, __mode);
+}
+INTERPOSE(fopen);
+
+
+static DIR* muck_opendir(const char *name) {
+  // libc.
+  muck_communicate("opendir", 'R', name);
+  return opendir(name);
+}
+INTERPOSE(opendir);

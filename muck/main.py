@@ -555,7 +555,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
 
   # Get the source's inferred dependencies, to be ignored when observing target dependencies.
   ignored_deps = set(ctx.db.get_inferred_deps(target=src_path))
-  ignored_deps.update((src_path,))
+  ignored_deps.update(['.', src_path])
 
   depCtx = DepCtx(
     ignored_deps=ignored_deps,
@@ -629,10 +629,11 @@ def process_dep_line(ctx: Ctx, depCtx: DepCtx, target: str, dep_line: str, dyn_t
     if dep.startswith(abs_fetch): return dyn_time
     try: dep = path_rel_to_ancestor(dep, ancestor=abs_path(ctx.build_dir), dot=True)
     except PathIsNotDescendantError:
-      try:
-        local_path = path_rel_to_ancestor(dep, ancestor=current_dir(), dot=True)
-        raise error(target, f'attempted to open absolute path in project but outside of build directory; local path: {local_path!r}')
-      except PathIsNotDescendantError: return dyn_time # outside of project completely; ignore.
+      # We cannot differentiate between harmless and ill-advised accesses to the source directory,
+      # so long as it is the parent of the build dir.
+      # For example, Python access the parent directory during startup.
+      # Therefore our only option is to ignore access to parent dirs.
+      return dyn_time
   else: # relative.
     if dep.startswith('../_fetch/'): return dyn_time
     if dep.startswith('..'): raise error(target, f'attempted to open relative path outside of build directory: {dep!r}')
@@ -642,7 +643,7 @@ def process_dep_line(ctx: Ctx, depCtx: DepCtx, target: str, dep_line: str, dyn_t
 
   ctx.dbg(target, f'{mode} dep: {dep}')
   assert not is_path_abs(dep)
-  if mode == 'R':
+  if mode in 'RS':
     if dep in depCtx.restricted_deps_rd: raise error(target, f'attempted to open restricted file for reading: {dep!r}')
     dep_time = update_dependency(ctx, dep, dependent=Dependent(kind='observed', target=target))
     dyn_time = max(dyn_time, dep_time)
@@ -789,6 +790,15 @@ def hash_for_path(path: str) -> bytes:
   '''
   Return a hash string for the contents of the file at `path`.
   '''
+  if is_file(path): return hash_for_file_contents(path)
+  if is_dir(path): return hash_for_dir(path)
+  raise error(path, f'path is a {FileStatus.of(path).type_desc}')
+
+
+def hash_for_file_contents(path: str) -> bytes:
+  '''
+  Return a hash string for the contents of the file at `path`.
+  '''
   hash_chunk_size = 1 << 16
   #^ a quick timing experiment suggested that chunk sizes larger than this are not faster.
   try: f = open(path, 'rb')
@@ -798,6 +808,18 @@ def hash_for_path(path: str) -> bytes:
     chunk = f.read(hash_chunk_size)
     if not chunk: break
     h.update(chunk)
+  return h.digest()
+
+
+def hash_for_dir(path: str) -> bytes:
+  '''
+  Return a hash string for the complete directory tree rooted at `path`.
+  '''
+  # TODO: cache tree hashes.
+  h = sha256()
+  for child in list_dir_paths(path, hidden=True): # Ignore hidden files.
+    h.update(child.encode()) # path name.
+    h.update(hash_for_path(child)) # path contents.
   return h.digest()
 
 
