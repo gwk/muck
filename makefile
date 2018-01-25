@@ -22,7 +22,7 @@ docs:
 
 lib:
 	clang -fsyntax-only -Weverything -Wno-gnu-zero-variadic-macro-arguments muck/libmuck.c
-	python3 setup.py build -e .
+
 
 pip-develop:
 	pip3 install -e .
