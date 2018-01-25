@@ -10,6 +10,7 @@ from sqlite3 import Cursor, DatabaseError, IntegrityError, OperationalError, con
 from typing import *
 from .pithy.fs import path_join
 from .pithy.io import errL, errSL
+from .pithy.string import le32
 
 
 class TargetRecord(NamedTuple):
@@ -22,6 +23,15 @@ class TargetRecord(NamedTuple):
   src: Optional[str] # None for non-product sources.
   deps: Tuple[str, ...] # sorted tuple of target path strings.
   dyn_deps: Tuple[str, ...]
+
+  def __str__(self) -> str:
+    opts = []
+    if self.src: opts.append(f'src={self.src}')
+    if self.deps: opts.append(f'deps=[{" ".join(self.deps)}]')
+    if self.dyn_deps: opts.append(f'dyn_deps=[{" ".join(self.dyn_deps)}]')
+    return (
+      f'TargetRecord(path={self.path} size={self.size} mtime={self.mtime} change_time={self.change_time} update_time={self.update_time} '
+      f'hash={le32(self.hash)}{" " if opts else ""}{" ".join(opts)})')
 
 
 class DBError(Exception): pass
