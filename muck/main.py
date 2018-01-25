@@ -647,13 +647,10 @@ def process_dep_line(ctx: Ctx, depCtx: DepCtx, target: str, dep_line: str, dyn_t
     dep_time = update_dependency(ctx, dep, dependent=Dependent(kind='observed', target=target))
     dyn_time = max(dyn_time, dep_time)
     depCtx.dyn_deps.append(dep)
-  elif mode in 'UW':
+  elif mode in 'AMUW':
     if dep in depCtx.restricted_deps_wr: raise error(target, f'attempted to open restricted file for writing: {dep!r}')
     validate_target_or_error(ctx, dep)
     depCtx.all_outs.add(dep)
-  elif mode in 'AM':
-    desc = 'appending' if mode == 'A' else 'mutating (writing without truncation)'
-    raise error(target, f'attempted to open file for {desc}: {dep!r}')
   else: raise ValueError(f'invalid mode received from libmuck: {mode}')
   return dyn_time
 
