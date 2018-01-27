@@ -125,7 +125,7 @@ def main() -> None:
     return
 
   ctx = Ctx(args=args, db=DB(path=db_path), build_dir=args.build_dir, build_dir_slash=args.build_dir + '/',
-    reserved_names=frozenset(reserved_names), dbg=dbg, dbg_libmuck=args.dbg_libmuck)
+    build_dir_abs=abs_path(args.build_dir), reserved_names=frozenset(reserved_names), dbg=dbg, dbg_libmuck=args.dbg_libmuck)
 
   args.fn(ctx)
 
@@ -624,19 +624,15 @@ def process_dep_line(ctx: Ctx, depCtx: DepCtx, target: str, dep_line: str, dyn_t
     dep = dep[:-1] # remove final newline.
   except ValueError as e: raise error(target, f'child process sent bad dependency line:\n{dep_line!r}') from e
 
-  if is_path_abs(dep):
-    abs_fetch = abs_path('_fetch') + '/' # abs_path removes the trailing slash due to normpath.
-    if dep.startswith(abs_fetch): return dyn_time
-    try: dep = path_rel_to_ancestor(dep, ancestor=abs_path(ctx.build_dir), dot=True)
-    except PathIsNotDescendantError:
-      # We cannot differentiate between harmless and ill-advised accesses to the source directory,
-      # so long as it is the parent of the build dir.
-      # For example, Python access the parent directory during startup.
-      # Therefore our only option is to ignore access to parent dirs.
-      return dyn_time
-  else: # relative.
-    if dep.startswith('../_fetch/'): return dyn_time
-    if dep.startswith('..'): raise error(target, f'attempted to open relative path outside of build directory: {dep!r}')
+  assert is_path_abs(dep), dep # libmuck converts all paths to absolute; only the client knows its own current directory.
+  try: dep = path_rel_to_ancestor(dep, ancestor=ctx.build_dir_abs, dot=True)
+  except PathIsNotDescendantError:
+    # We cannot differentiate between harmless and ill-advised accesses outside of the build directory.
+    # In particular, as long as the project dir is the parent of build_dir,
+    # we cannot sensibly prevent a script from accessing the project dir directly.
+    # For example, Python accesses the parent directory during startup.
+    # Therefore our only option is to ignore access to parent dirs.
+    return dyn_time
 
   if (dep in depCtx.ignored_deps) or (path_ext(dep) in ignored_dep_exts): return dyn_time
   # TODO: further verifications? source dir, etc.
@@ -644,6 +640,7 @@ def process_dep_line(ctx: Ctx, depCtx: DepCtx, target: str, dep_line: str, dyn_t
   ctx.dbg(target, f'{mode} dep: {dep}')
   assert not is_path_abs(dep)
   if mode in 'RS':
+    if mode == 'S' and dep == target: return dyn_time # sqlite stats the db before opening. Imperfect, but better than nothing.
     if dep in depCtx.restricted_deps_rd: raise error(target, f'attempted to open restricted file for reading: {dep!r}')
     dep_time = update_dependency(ctx, dep, dependent=Dependent(kind='observed', target=target))
     dyn_time = max(dyn_time, dep_time)

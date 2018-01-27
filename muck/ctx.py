@@ -20,6 +20,7 @@ class Ctx(NamedTuple):
   db: DB
   build_dir: str
   build_dir_slash: str
+  build_dir_abs: str
   reserved_names: FrozenSet
   dbg: Callable[..., None]
   dbg_libmuck: bool

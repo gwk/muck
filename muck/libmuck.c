@@ -12,6 +12,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sys/param.h>
 
 // This dynamic library provides a replacement of several system calls, most notably the `open` function.
 // It is meant to be loaded by Muck client processes via DYLD_INSERT_LIBRARIES (macOS) or LD_PRELOAD (Linux).
@@ -41,6 +42,8 @@ __attribute__ ((section ("__DATA,__interpose"))) = \
 #define INTERPOSE(name) DYLD_INTERPOSE(muck_##name, name)
 
 
+static const char* program_name = "?";
+
 #define errF(fmt, ...) { \
   fputs("libmuck: ", stderr); \
   fputs(program_name, stderr); \
@@ -48,22 +51,95 @@ __attribute__ ((section ("__DATA,__interpose"))) = \
   fflush(stderr); \
 }
 
-#define fail(fmt, ...) { errF("error: " fmt, ## __VA_ARGS__); exit(1); }
+#define errFL(fmt, ...) errF(fmt "\n", ## __VA_ARGS__)
 
-static int is_setup = 0;
+#define fail(fmt, ...) { errFL("error: " fmt, ## __VA_ARGS__); exit(1); }
+
+#define check(cond, fmt, ...) { if (!(cond)) {fail(fmt, ## __VA_ARGS__);} }
+
+
+typedef struct {
+  char* ptr;
+  size_t len; // length, excluding null terminator.
+  size_t cap; // capacity, excluding null terminator. Always 2**n - 1.
+} Str;
+
+static char* str_end(Str* str) { return str->ptr + str->len; }
+
+static void str_clear(Str* str) { str->len = 0; }
+
+static void str_grow_to(Str* str, size_t cap) {
+  while (str->cap < cap) {
+    str->cap += str->cap + 1; // Guarantees that cap is 2**n - 1.
+  }
+  str->ptr = (char*)realloc(str->ptr, str->cap);
+  check(str->ptr, "grow_str failed.");
+}
+
+static void str_grow_by(Str* str, size_t increase) {
+  str_grow_to(str, str->len + increase);
+}
+
+static void str_append_char(Str* str, char c) {
+  str_grow_by(str, 1);
+  char* end = str_end(str);
+  end[0] = c;
+  end[1] = 0;
+  str->len++;
+}
+
+static void str_append_chars(Str* str, const char* chars) {
+  size_t chars_len = strlen(chars);
+  str_grow_by(str, chars_len);
+  char* end = str_end(str);
+  memcpy(end, chars, chars_len+1); // +1 includes null terminator.
+  str->len += chars_len;
+}
+
+static void str_append_str(Str* str, const Str s) {
+  str_grow_by(str, s.len);
+  char* end = str_end(str);
+  memcpy(end, s.ptr, s.len+1); // +1 includes null terminator.
+  str->len += s.len;
+}
+
+static void str_write(Str* str, int fd) {
+  check((size_t)write(fd, str->ptr, str->len) == str->len, "write failed: %s.\n", strerror(errno));
+}
+
+
+static bool is_setup = 0;
 static int fd_send = 0;
 static int fd_recv = 0;
 static int dbg = 0;
-static char* buffer = NULL;
-static const char* program_name = "?";
-static size_t buffer_size = 0;
+static Str msg = {};
+
+
+static char curr_dir[MAXPATHLEN] = {};
+
+static void update_curr_dir() {
+  // Update the current working directory buffer.
+  // We cannot use getcwd, because it calls stat, which would put muck_communicate into infinite recursion.
+  // Instead, we use a lower-level, platform specific approach.
+  int fd = open(".", O_RDONLY); // Note: this does not trigger libmuck's own interposition.
+  check(fd >= 0, "update_curr_dir: open failed.");
+  #
+  // This approach was extracted from the getcwd implementation in macOS Libc-1244.1.7.
+#if __APPLE__
+	int err = fcntl(fd, F_GETPATH, curr_dir);
+#else
+  #error "unsupported platform."
+#endif
+	check(!err, "update_curr_dir; fcntl failed.");
+  close(fd);
+}
 
 
 #define COMMUNICATE(mode_char, file_path) muck_communicate(__func__+5, mode_char, file_path)
 
 static void muck_communicate(const char* call_name, char mode_char, const char* file_path) {
   if (!is_setup) {
-    is_setup = 1;
+    is_setup = true;
     #if defined(__APPLE__) || defined(__FreeBSD__)
     program_name = getprogname();
     #elif defined(_GNU_SOURCE)
@@ -75,44 +151,39 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
       fd_send = atoi(fd_send_str);
       fd_recv = atoi(fd_recv_str);
     } else {
-      errF("NOTE: build process env is not set; MUCK_DEPS_SEND: %s; MUCK_DEPS_RECV: %s.\n", fd_send_str, fd_recv_str);
+      errFL("NOTE: build process env is not set; MUCK_DEPS_SEND: %s; MUCK_DEPS_RECV: %s.", fd_send_str, fd_recv_str);
     }
     dbg = (getenv("MUCK_DEPS_DBG") != NULL);
   }
 
-  // Write the path and mode to the buffer.
-  size_t call_len = strlen(call_name);
-  size_t path_len = strlen(file_path);
-  size_t req_size = call_len + 1 + 1 + 1 + path_len + 2; // call, tab, mode, tab, path, newline, null.
-  if (buffer_size < req_size) {
-    buffer_size = malloc_good_size(req_size);
-    buffer = (char*)realloc(buffer, buffer_size);
-    assert(buffer);
+  // Write the path and mode to message buffer.
+  str_clear(&msg);
+  str_append_chars(&msg, call_name);
+  str_append_char(&msg, '\t');
+  str_append_char(&msg, mode_char);
+  str_append_char(&msg, '\t');
+  if (file_path[0] != '/') { // not absolute path; must prefix with current working directory.
+    update_curr_dir();
+    str_append_chars(&msg, curr_dir);
+    str_append_char(&msg, '/');
   }
-  int act_len = snprintf(buffer, buffer_size, "%s\t%c\t%s\n", call_name, mode_char, file_path);
-  assert(act_len > 0 && (size_t)act_len < buffer_size);
+  str_append_chars(&msg, file_path);
+  str_append_char(&msg, '\n');
 
-  if (dbg) { errF("%s", buffer); }
+  if (dbg) { errF("%s", msg.ptr); }
 
   if (fd_send) { // communicate with the muck build process.
-    if (write(fd_send, buffer, (size_t)act_len) != (ssize_t)act_len) {
-      fail("MUCK_DEPS_SEND write failed: %s; path: %s\n", strerror(errno), file_path);
-    }
+    str_write(&msg, fd_send);
     // Read the confirmation byte from the receive channel;
     // the read blocks this process until the parent build process is done updating dependencies.
     unsigned char ack = 0;
-    if (read(fd_recv, &ack, 1) != 1) {
-      fail("MUCK_DEPS_RECV read failed: %s.\n", strerror(errno));
-    }
-    if (ack != 0x6) { // Ascii ACK.
-      fail("MUCK_DEP_RECV expected ACK (0x6) byte confirmation; received: %02x\n", (int)ack)
-    }
+    check(read(fd_recv, &ack, 1) == 1, "MUCK_DEPS_RECV read failed: %s.\n", strerror(errno));
+    check(ack == 0x6, "MUCK_DEP_RECV expected ACK (0x6) byte confirmation; received: 0x%02x.\n", (int)ack);
   }
 }
 
 
 // fcntl.h.
-
 
 static int muck_open(const char* filename, int oflag, int mode) {
   char mode_char = '?';
@@ -132,26 +203,27 @@ INTERPOSE(open);
 
 // sys/stat.h.
 
-static int muck_stat(const char *restrict path, struct stat *restrict buf) {
+static int muck_stat(const char* restrict path, struct stat* restrict buf) {
   COMMUNICATE('S', path);
   return stat(path, buf);
 }
 INTERPOSE(stat);
 
-static int muck_lstat(const char *restrict path, struct stat *restrict buf) {
+static int muck_lstat(const char* restrict path, struct stat* restrict buf) {
   COMMUNICATE('S', path);
   return lstat(path, buf);
 }
 INTERPOSE(lstat);
 
-static int muck_fstatat(int fd, const char *path, struct stat *buf, int flag) {
-  fail("fstatat is not yet supported.")
+static int muck_fstatat(int fd, const char* path, struct stat* buf, int flag) {
+  fail("fstatat is not yet supported; fd=%d, path=%s, buf=%p, flag=0x%x", fd, path, (void*)buf, flag)
 }
 INTERPOSE(fstatat);
 
 
-static FILE *muck_fopen(const char* __restrict __filename, const char* __restrict __mode) {
-  // libc.
+// libc.
+
+static FILE* muck_fopen(const char* __restrict __filename, const char* __restrict __mode) {
   char mode_char = '?';
   const char* m = __mode;
   while (*m) {
@@ -164,15 +236,14 @@ static FILE *muck_fopen(const char* __restrict __filename, const char* __restric
     }
     m++;
   }
-  muck_communicate("fopen", mode_char, __filename);
+  COMMUNICATE(mode_char, __filename);
   return fopen(__filename, __mode);
 }
 INTERPOSE(fopen);
 
 
-static DIR* muck_opendir(const char *name) {
-  // libc.
-  muck_communicate("opendir", 'R', name);
+static DIR* muck_opendir(const char* name) {
+  COMMUNICATE('R', name);
   return opendir(name);
 }
 INTERPOSE(opendir);
