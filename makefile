@@ -21,10 +21,15 @@ docs:
 	writeup -bare -section Muck doc/index.html.wu readme.md
 
 lib:
-	clang -fsyntax-only -Weverything -Wno-gnu-zero-variadic-macro-arguments muck/libmuck.c
+	clang -fsyntax-only \
+	-Weverything \
+	-Wno-gnu-zero-variadic-macro-arguments \
+	-Wno-gnu-empty-initializer \
+	-Wno-unused-function \
+	muck/libmuck.c
 
 
-pip-develop:
+pip-develop: lib
 	pip3 install -e .
 
 pip-install:
