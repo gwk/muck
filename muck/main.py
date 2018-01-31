@@ -306,6 +306,7 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[Dependent], for
   if dependent is not None:
     ctx.dependents[target].add(dependent)
 
+  # Recursion check.
   try: change_time = ctx.change_times[target]
   except KeyError: pass
   else: # if in ctx.change_times, this path has already been visited during this build process run.
@@ -374,6 +375,9 @@ def update_product(ctx: Ctx, target: str, actual_path: str, needs_update: bool, 
     needs_update = True
     note(target, f'source path of target product changed\n  was: {old.src}\n  now: {src}')
 
+  # Update and change times are logical times (incrementing counters), depending only on internal DB state.
+  # This design avoids dependency on file system time stamps and OS clocks.
+  # For file systems with poor time resolution (e.g. HFS mtime is 1 sec resolution), this is important.
   last_update_time = 0 if old is None else old.update_time
   src_change_time = update_dependency(ctx, src, dependent=Dependent(kind='source', target=target))
   needs_update = needs_update or last_update_time < src_change_time
