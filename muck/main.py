@@ -341,7 +341,7 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[Dependent], for
         needs_update = True
       else:
         check_product_not_modified(ctx, target, actual_path, size=size, mtime=mtime, old=old)
-    return update_product(ctx, target, actual_path, needs_update=needs_update, size=size, mtime=mtime, old=old)
+    return update_product(ctx, target, actual_path, needs_update=needs_update, mtime=mtime, old=old)
   else:
     return update_non_product(ctx, target, needs_update=needs_update, old=old)
 
@@ -361,9 +361,11 @@ def check_product_not_modified(ctx: Ctx, target: str, actual_path: str, size: in
     f'  Otherwise, save your changes if necessary and then `muck clean {target}`.')
 
 
-def update_product(ctx: Ctx, target: str, actual_path: str, needs_update: bool, size: Optional[int], mtime: float,
- old: Optional[TargetRecord]) -> int:
-  'returns transitive change_time.'
+def update_product(ctx: Ctx, target: str, actual_path: str, needs_update: bool, mtime: float, old: Optional[TargetRecord]) -> int:
+  '''
+  Returns transitive change_time.
+  Note: we must pass the just-retrieved mtime, in case it has changed but product contents have not.
+  '''
   ctx.dbg(target, 'update_product')
   src = source_for_target(ctx, target)
   validate_target_or_error(ctx, src)
@@ -399,9 +401,8 @@ def update_product(ctx: Ctx, target: str, actual_path: str, needs_update: bool, 
     assert change_time > 0
     return change_time
   else: # not needs_update.
-    assert size is not None
     assert old is not None
-    return update_deps_and_record(ctx, target=target, actual_path=actual_path, is_changed=False, size=size, mtime=mtime,
+    return update_deps_and_record(ctx, target=target, actual_path=actual_path, is_changed=False, size=old.size, mtime=mtime,
       change_time=old.change_time, update_time=update_time, file_hash=old.hash, src=src, dyn_deps=old.dyn_deps, old=old)
 
 
