@@ -337,8 +337,8 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[Dependent], for
     try: size, mtime = file_size_and_mtime(actual_path)
     except FileNotFoundError: pass
     if old is not None:
-      if size is None:
-        is_changed = True
+      if size is None: # Old product was deleted.
+        needs_update = True
       else:
         check_product_not_modified(ctx, target, actual_path, size=size, mtime=mtime, old=old)
     return update_product(ctx, target, actual_path, needs_update=needs_update, size=size, mtime=mtime, old=old)
