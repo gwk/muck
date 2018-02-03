@@ -56,7 +56,7 @@ def dst_file(encoding='UTF-8', **kwargs: str) -> IO:
   kwargs_tuple = tuple(sorted(kwargs.items())) # need kwargs as a hash key.
   if kwargs_tuple in _dst_vars_opened:
     raise Exception(f'file already opened for `dst_file` arguments: {kwargs_tuple}')
-  if not has_formatter(src): # single destinatio.
+  if not has_formatter(src): # single destination.
     if kwargs:
       raise Exception(f'source path contains no formatters but bindings provided to `dst_file`: {src}')
     return _std_open(dflt_prod_path_for_source(src), mode=('wb' if encoding is None else 'w'))
