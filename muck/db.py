@@ -15,6 +15,7 @@ from .pithy.string import le32
 
 class TargetRecord(NamedTuple):
   path: str # target path (not product paths prefixed with build dir).
+  is_dir: bool
   size: int
   mtime: float
   change_time: int
@@ -30,14 +31,16 @@ class TargetRecord(NamedTuple):
     if self.deps: opts.append(f'deps=[{" ".join(self.deps)}]')
     if self.dyn_deps: opts.append(f'dyn_deps=[{" ".join(self.dyn_deps)}]')
     return (
-      f'TargetRecord(path={self.path} size={self.size} mtime={self.mtime} change_time={self.change_time} update_time={self.update_time} '
+      f'TargetRecord(path={self.path} is_dir={self.is_dir} size={self.size} mtime={self.mtime} '
+      f'change_time={self.change_time} update_time={self.update_time} '
       f'hash={le32(self.hash)}{" " if opts else ""}{" ".join(opts)})')
 
 
+idx_id, idx_path, idx_is_dir, idx_size, idx_mtime, idx_change_time, idx_update_time, idx_hash, \
+idx_src, idx_deps, idx_dyn_deps = range(11)
+
+
 class DBError(Exception): pass
-
-
-idx_id, idx_path, idx_size, idx_mtime, idx_change_time, idx_update_time, idx_hash, idx_src, idx_deps, idx_dyn_deps = range(10)
 
 
 class DB:
@@ -57,6 +60,7 @@ class DB:
     self.create_table('targets',
       'id INTEGER PRIMARY KEY',
       'path TEXT',
+      'is_dir BOOL',
       'size INT',
       'mtime REAL',
       'change_time INT',
@@ -124,8 +128,9 @@ class DB:
       raise DBError(f'multiple rows matching target path: {target!r}') #!cov-ignore.
     if rows:
       r = rows[0]
-      return TargetRecord(target, r[idx_size], r[idx_mtime], r[idx_change_time], r[idx_update_time], r[idx_hash], r[idx_src],
-        from_marshalled(r[idx_deps]), from_marshalled(r[idx_dyn_deps]))
+      return TargetRecord(path=target, is_dir=bool(r[idx_is_dir]), size=r[idx_size], mtime=r[idx_mtime],
+        change_time=r[idx_change_time], update_time=r[idx_update_time], hash=r[idx_hash], src=r[idx_src],
+        deps=from_marshalled(r[idx_deps]), dyn_deps=from_marshalled(r[idx_dyn_deps]))
     else:
       return None
 
@@ -133,9 +138,10 @@ class DB:
   def insert_or_replace_record(self, record: TargetRecord) -> None:
     try:
       self.run(
-        'INSERT OR REPLACE INTO targets (path, size, mtime, change_time, update_time, hash, src, deps, dyn_deps) '
-        'VALUES (:path, :size, :mtime, :change_time, :update_time, :hash, :src, :deps, :dyn_deps)',
-        path=record.path, size=record.size, mtime=record.mtime, change_time=record.change_time, update_time=record.update_time,
+        'INSERT OR REPLACE INTO targets (path, is_dir, size, mtime, change_time, update_time, hash, src, deps, dyn_deps) '
+        'VALUES (:path, :is_dir, :size, :mtime, :change_time, :update_time, :hash, :src, :deps, :dyn_deps)',
+        path=record.path, is_dir=record.is_dir, size=record.size, mtime=record.mtime,
+        change_time=record.change_time, update_time=record.update_time,
         hash=record.hash, src=record.src,
         deps=to_marshalled(record.deps), dyn_deps=to_marshalled(record.dyn_deps))
     except IntegrityError as e: #!cov-ignore.

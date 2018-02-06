@@ -168,7 +168,7 @@ def muck_clean(ctx: Ctx) -> None:
       errL(f'muck clean note: {target}: skipping unknown target.')
       continue
     prod_path = ctx.product_path_for_target(target)
-    remove_file_if_exists(prod_path)
+    remove_path_if_exists(prod_path)
     ctx.db.delete_record(target=target)
 
 
@@ -319,10 +319,12 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[Dependent], for
   ctx.change_times[target] = None # recursion sentinal is replaced before return by update_deps_and_record.
 
   ctx.dbg(target, f'examining... (dependent={dependent})')
-  is_product = not path_exists(target) # The semantic definition of a product.
-  if is_product and is_link(target):
+
+  status = file_status(target) # follows symlinks.
+  if status is None and is_link(target):
     raise error(target, f'target is a dangling symlink to: {read_link(target)}')
-  actual_path = ctx.product_path_for_target(target) if is_product else target
+
+  is_product = status is None # A target is a product if it does not exist in the source tree.
 
   old = ctx.db.get_record(target=target)
   needs_update = force or (old is None)
@@ -334,41 +336,44 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[Dependent], for
       needs_update = True
 
   if is_product:
-    size: Optional[int] = None
-    mtime = 0.0
-    try: size, mtime = file_size_and_mtime(actual_path)
-    except FileNotFoundError: pass
-    if old is not None:
-      if size is None: # Old product was deleted.
-        needs_update = True
-      else:
-        check_product_not_modified(ctx, target, actual_path, size=size, mtime=mtime, old=old)
-    return update_product(ctx, target, actual_path, needs_update=needs_update, mtime=mtime, old=old)
+    return update_product(ctx, target, needs_update=needs_update, old=old)
   else:
-    return update_non_product(ctx, target, needs_update=needs_update, old=old)
+    assert status
+    return update_non_product(ctx, target, status, needs_update=needs_update, old=old)
 
 
-def check_product_not_modified(ctx: Ctx, target: str, actual_path: str, size: int, mtime: float, old: TargetRecord) -> None:
-  # existing product should not have been modified since record was stored.
-  # if the size changed then it was definitely modified.
-  # otherwise, if the mtime is unchanged, assume that the contents are unchanged, for speed.
-  if size == old.size and mtime == old.mtime: return
-  # if mtime is changed but contents are not, the user might have made an accidental edit and then reverted it.
-  if size == old.size and hash_for_path(actual_path) == old.hash:
-    note(target, f'product mtime changed but contents did not: {disp_mtime(old.mtime)} -> {disp_mtime(mtime)}.')
-    # TODO: revert mtime?
-    return
+def check_product_not_modified(ctx: Ctx, target: str, prod_path: str, is_prod_dir: int, size: int, mtime: float, old: TargetRecord) -> None:
+  # Existing product should not have been modified since record was stored.
+  # If is_dir or size changed then it was definitely modified.
+  if is_prod_dir == old.is_dir and size == old.size:
+    # Otherwise, if the mtime is unchanged, assume that the contents are unchanged, for speed.
+    if mtime == old.mtime: return
+    # if mtime is changed but contents are not, the user might have made an accidental edit and then reverted it.
+    if hash_for_path(prod_path) == old.hash:
+      note(target, f'product mtime changed but contents did not: {disp_mtime(old.mtime)} -> {disp_mtime(mtime)}.')
+      # TODO: revert mtime?
+      return
   # TODO: change language depending on whether product is derived from a patch?
   raise error(target, 'existing product has changed; did you mean to update a patch?\n'
     f'  Otherwise, save your changes if necessary and then `muck clean {target}`.')
 
 
-def update_product(ctx: Ctx, target: str, actual_path: str, needs_update: bool, mtime: float, old: Optional[TargetRecord]) -> int:
+def update_product(ctx: Ctx, target: str, needs_update: bool, old: Optional[TargetRecord]) -> int:
   '''
   Returns transitive change_time.
   Note: we must pass the just-retrieved mtime, in case it has changed but product contents have not.
   '''
   ctx.dbg(target, 'update_product')
+  prod_path = ctx.product_path_for_target(target)
+
+  is_prod_dir, size, mtime = file_stats(prod_path)
+
+  if old is not None: # Old record exists.
+    if size < 0: # Old file was deleted.
+      needs_update = True
+    else:
+      check_product_not_modified(ctx, target, prod_path=prod_path, is_prod_dir=is_prod_dir, size=size, mtime=mtime, old=old)
+
   src = source_for_target(ctx, target)
   validate_target_or_error(ctx, src)
   ctx.dbg(target, f'src: ', src)
@@ -394,7 +399,7 @@ def update_product(ctx: Ctx, target: str, actual_path: str, needs_update: bool, 
   needs_update = needs_update or last_update_time < update_time
 
   if needs_update: # must rebuild product.
-    dyn_change_time, dyn_deps, all_outs = build_product(ctx, target=target, src_path=src, prod_path=actual_path)
+    dyn_change_time, dyn_deps, all_outs = build_product(ctx, target=target, src_path=src, prod_path=prod_path)
     update_time = max(update_time, dyn_change_time)
     ctx.dbg(target, f'all_outs: {all_outs}')
     assert target in all_outs
@@ -407,15 +412,15 @@ def update_product(ctx: Ctx, target: str, actual_path: str, needs_update: bool, 
     return change_time
   else: # not needs_update.
     assert old is not None
-    return update_deps_and_record(ctx, target=target, actual_path=actual_path, is_changed=False, size=old.size, mtime=mtime,
-      change_time=old.change_time, update_time=update_time, file_hash=old.hash, src=src, dyn_deps=old.dyn_deps, old=old)
+    return update_deps_and_record(ctx, target=target, is_target_dir=False, actual_path=prod_path, is_changed=False, size=old.size,
+      mtime=mtime, change_time=old.change_time, update_time=update_time, file_hash=old.hash, src=src, dyn_deps=old.dyn_deps, old=old)
 
 
 def update_product_with_output(ctx: Ctx, target: str, src: str, dyn_deps: Tuple[str, ...], update_time: int) -> int:
   'Returns (target, change_time).'
   old = ctx.db.get_record(target=target)
   path = ctx.product_path_for_target(target)
-  size, mtime = file_size_and_mtime(path)
+  is_target_dir, size, mtime = file_stats(path)
   file_hash = hash_for_path(path)
   is_changed = (old is None or size != old.size or file_hash != old.hash)
   if is_changed:
@@ -426,51 +431,76 @@ def update_product_with_output(ctx: Ctx, target: str, src: str, dyn_deps: Tuple[
     change_time = old.change_time
     change_verb = 'did not change'
   note(target, f"product {change_verb}; {format_byte_count(size)}.")
-  return update_deps_and_record(ctx, target=target, actual_path=path, is_changed=is_changed, size=size, mtime=mtime,
+  return update_deps_and_record(ctx, target=target, is_target_dir=is_target_dir, actual_path=path, is_changed=is_changed, size=size, mtime=mtime,
     change_time=change_time, update_time=update_time, file_hash=file_hash, src=src, dyn_deps=dyn_deps, old=old)
 
 
-def update_non_product(ctx: Ctx, target: str, needs_update: bool, old: Optional[TargetRecord]) -> int:
+def update_non_product(ctx: Ctx, target: str, status: FileStatus, needs_update: bool, old: Optional[TargetRecord]) -> int:
   'returns transitive change_time.'
   ctx.dbg(target, 'update_non_product')
-  size, mtime = file_size_and_mtime(target)
-  prod_path = ctx.product_path_for_target(target)
 
-  if needs_update:
-    remove_file_if_exists(prod_path)
-    make_link(target, link=prod_path, make_dirs=True)
-  elif not is_link(prod_path):
-    if not path_exists(prod_path): # link was deleted? replace it.
-      make_link(target, link=prod_path, make_dirs=True)
-    else:
-      raise error(target, 'non-product link in build directory appears to have been replaced with a different file.')
+  is_target_dir = status.is_dir
+  size = status.size
+  mtime = status.mtime
+  prod_path = ctx.product_path_for_target(target)
+  prod_status = file_status(prod_path)
 
   if needs_update:
     is_changed = True
-    file_hash = hash_for_path(target)
-  else: # all we know so far is that the file exists and status as a non-product has not changed.
+    target_hash = hash_for_path(target)
+  else: # all we know so far is that the asset exists and status as an asset has not changed.
     if (old is None or size != old.size or mtime != old.mtime): # appears changed; check if contents actually changed.
-      file_hash = hash_for_path(target)
-      is_changed = (old is None or old.hash != file_hash)
+      target_hash = hash_for_path(target)
+      is_changed = (old is None or old.hash != target_hash)
     else: # assume not changed based on size/mtime; otherwise we constantly recalculate hashes for large sources.
       is_changed = False
-      file_hash = old.hash
+      target_hash = old.hash
 
   if is_changed:
+
+    if is_target_dir:
+      if prod_status and prod_status.is_dir: # true dir, not link.
+        # TODO: clean up zombie products.
+        pass
+      else: # old product is not a directory.
+        if prod_status: remove_file(prod_path)
+        make_dirs(prod_path)
+      # Link contents of source dir into prod dir.
+      prod_entries = {e.path : e for e in scan_dir(prod_path)}
+      for entry in scan_dir(target):
+        entry_prod_path = ctx.product_path_for_target(entry.path)
+        prod_entry = prod_entries.get(entry_prod_path)
+        if entry.is_dir:
+          if not prod_entry:
+            make_dir(entry_prod_path)
+          elif not prod_entry.is_dir(follow_symlinks=False): # Child already exists, but not a directory.
+            remove_file(entry_prod_path)
+            make_dir(entry_prod_path)
+        else: # asset is a file.
+          # For now just always rewrite the links. Could try to optimize this but need to read_link and compare which is tricky.
+          if prod_entry: remove_path(entry_prod_path)
+          make_link(entry.path, link=entry_prod_path)
+
+    else: # target is regular file.
+      if prod_status: remove_path(prod_path)
+      make_link(target, link=prod_path, make_dirs=True)
+
     if not needs_update: note(target, 'source changed.') # only want to report this on subsequent changes.
     change_time = ctx.db.inc_ptime()
-  else:
+
+  else: # not changed.
     assert old is not None
     change_time = old.change_time
-    file_hash = old.hash
+    target_hash = old.hash
     if mtime != old.mtime:
       note(target, f'source modification time changed but contents did not.')
-  return update_deps_and_record(ctx, target, actual_path=target, is_changed=is_changed,
-    size=size, mtime=mtime, change_time=change_time, update_time=change_time, file_hash=file_hash, src=None, dyn_deps=(), old=old)
+
+  return update_deps_and_record(ctx, target, is_target_dir=False, actual_path=target, is_changed=is_changed,
+    size=size, mtime=mtime, change_time=change_time, update_time=change_time, file_hash=target_hash, src=None, dyn_deps=(), old=old)
   # TODO: non_product update_time is meaningless? mark as -1?
 
 
-def update_deps_and_record(ctx, target: str, actual_path: str, is_changed: bool, size: int, mtime: float,
+def update_deps_and_record(ctx, target: str, is_target_dir: bool, actual_path: str, is_changed: bool, size: int, mtime: float,
  change_time: int, update_time: int, file_hash: bytes, src: Optional[str], dyn_deps: Tuple[str, ...], old: Optional[TargetRecord]) -> int:
   'returns transitive change_time.'
 
@@ -497,8 +527,8 @@ def update_deps_and_record(ctx, target: str, actual_path: str, is_changed: bool,
   # TODO: change this from an assertion to an informative error.
   ctx.change_times[target] = change_time # replace sentinal with final value.
   # always update record, because even if is_changed=False, mtime may have changed.
-  record = TargetRecord(path=target, size=size, mtime=mtime, change_time=change_time, update_time=update_time,
-    hash=file_hash, src=src, deps=deps, dyn_deps=dyn_deps)
+  record = TargetRecord(path=target, is_dir=is_target_dir, size=size, mtime=mtime,
+    change_time=change_time, update_time=update_time, hash=file_hash, src=src, deps=deps, dyn_deps=dyn_deps)
   ctx.dbg(target, f'updated: ', record)
   ctx.db.insert_or_replace_record(record)
   return change_time
@@ -548,8 +578,8 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   note(target, f"building: `{' '.join(shlex.quote(w) for w in cmd)}{msg_stdin}`")
 
   make_dirs(prod_dir)
-  remove_file_if_exists(prod_path_out)
-  remove_file_if_exists(prod_path)
+  remove_path_if_exists(prod_path_out)
+  remove_path_if_exists(prod_path)
 
   env = os.environ.copy()
   if tool.env_fn is not None:
@@ -783,9 +813,11 @@ def hash_for_path(path: str) -> bytes:
   '''
   Return a hash string for the contents of the file at `path`.
   '''
-  if is_file(path): return hash_for_file_contents(path)
-  if is_dir(path): return hash_for_dir(path)
-  raise error(path, f'path is a {FileStatus.of(path).type_desc}')
+  s = file_status(path)
+  assert s is not None
+  if s.is_file: return hash_for_file_contents(path)
+  if s.is_dir: return hash_for_dir_listing(path)
+  raise error(path, f'path is a {s.type_desc}')
 
 
 def hash_for_file_contents(path: str) -> bytes:
@@ -804,21 +836,28 @@ def hash_for_file_contents(path: str) -> bytes:
   return h.digest()
 
 
-def hash_for_dir(path: str) -> bytes:
+def hash_for_dir_listing(path: str) -> bytes:
   '''
-  Return a hash string for the complete directory tree rooted at `path`.
+  Return a hash string for the directory tree at `path`.
+  We define the hash of a directory to include the name and file type of the immediate children.
+  This may seem overly simplistic, but consider that when a syscall is made on a directory,
+  that is essentially the information that is obtainable;
+  recursion into the deep tree by the process requires additional syscalls,
+  and will thus trigger additional dependency analysis.
   '''
-  # TODO: cache tree hashes.
   h = sha256()
-  for child in list_dir_paths(path, hidden=True): # Ignore hidden files.
-    h.update(child.encode()) # path name.
-    h.update(hash_for_path(child)) # path contents.
+  for entry in scan_dir(path, hidden=False): # Ignore hidden files.
+    h.update(dir_entry_type_char(entry).encode())
+    h.update(entry.name.encode())
+    h.update(b'\0')
   return h.digest()
 
 
-def file_size_and_mtime(path: str) -> Tuple[int, float]:
-  stats = os.stat(path)
-  return (stats.st_size, stats.st_mtime)
+def file_stats(path: str) -> Tuple[bool, int, float]:
+  'Returns (is_dir, size, mtime). Negative size indicates file does not exist.'
+  s = file_status(path)
+  if s is None: return (False, -1, -1)
+  return (s.is_dir, s.size, s.mtime)
 
 
 def source_for_target(ctx: Ctx, target: str) -> str:
