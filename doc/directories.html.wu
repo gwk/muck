@@ -1,0 +1,37 @@
+writeup v0
+
+
+# Directory Assets
+
+
+
+# Directory Targets
+
+Directories can be targets as well as files.
+
+For a given product file with a directory source, it is not possible for any parent directory to be a product,
+because the direct source lives in that directory.
+
+However it is possible for an auxiliary product to be placed in an arbitrary directory.
+This means that the aux product could be placed into a directory that was itself the product of a different step.
+
+
+
+
+# Test scenarios
+
+read from asset dir
+* add asset
+* remove asset
+* target dir from asset to product.
+
+
+product dir produced by script
+* adds files
+* removes files
+* change target dir from product to asset.
+
+
+change target from asset:
+* …product to:
+  *

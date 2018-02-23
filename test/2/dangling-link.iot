@@ -1,8 +1,5 @@
 {
+  'compile': ['ln -s nonexistant dangling-link'],
   'cmd': '$MUCK dangling-link',
-  'links': {'nonexistant': 'dangling-link'},
-  'err-mode': 'match',
-  'err-val': '''\
-~ muck error: dangling-link: target is a dangling symlink to: .+/nonexistant
-'''
+  'err-val': 'muck error: dangling-link: target is a dangling symlink to: nonexistant\n'
 }
