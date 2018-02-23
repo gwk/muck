@@ -5,7 +5,7 @@ import re
 from typing import *
 from .pithy.format import FormatError, parse_formatters
 
-from .pithy.fs import path_join, path_ext, path_name_stem
+from .pithy.fs import norm_path, path_ext, path_join, path_name_stem
 from .constants import *
 from .db import DB
 
@@ -38,6 +38,10 @@ class Ctx(NamedTuple):
     self.change_times.clear()
     self.dir_names.clear()
     self.dependents.clear()
+
+  @property
+  def targets(self) -> List[str]:
+    return [norm_path(t) for t in self.args.targets]
 
 
 class InvalidTarget(Exception):

@@ -139,7 +139,7 @@ def muck_build(ctx: Ctx) -> None:
   def update_target(target: str) -> None: # closure to pass to serve_build.
     update_dependency(ctx, target, dependent=None, force=ctx.args.force)
 
-  for target in ctx.args.targets:
+  for target in ctx.targets:
     if path_exists(target):
       stem, ext = split_stem_ext(target)
       if ext in ext_tools:
@@ -160,7 +160,7 @@ def muck_clean_all(args: Namespace) -> None:
 
 def muck_clean(ctx: Ctx) -> None:
   '`muck clean` command.'
-  targets = ctx.args.targets
+  targets = ctx.targets
   if not targets:
     exit('muck clean: no targets specified; did you mean `muck clean-all`?')
   for target in targets:
@@ -174,10 +174,11 @@ def muck_clean(ctx: Ctx) -> None:
 
 def muck_deps(ctx: Ctx) -> None:
   '`muck deps` command.'
-  for target in ctx.args.targets:
+  targets = ctx.targets
+  for target in targets:
     update_dependency(ctx, target, dependent=None)
 
-  roots = set(ctx.args.targets)
+  roots = set(targets)
   roots.update(t for t, dpdts in ctx.dependents.items() if len(dpdts) > 1)
 
   visited_roots: Set[str] = set()
@@ -224,22 +225,22 @@ dependent_colors = {
 
 def muck_deps_list(ctx: Ctx) -> None:
   '`muck deps-list` command.'
-  for target in ctx.args.targets:
+  for target in ctx.targets:
     update_dependency(ctx, target, dependent=None)
   outLL(*sorted(ctx.change_times.keys()))
 
 
 def muck_prod_list(ctx: Ctx) -> None:
   '`muck prod-list` command.'
-  for target in ctx.args.targets:
+  for target in ctx.targets:
     update_dependency(ctx, target, dependent=None)
   outLL(*sorted(ctx.product_path_for_target(t) for t in ctx.change_times.keys()))
 
 
 def muck_create_patch(ctx: Ctx) -> None:
   '`muck create-patch` command.'
-  original = ctx.args.original
-  modified = ctx.args.modified
+  original = norm_path(ctx.args.original)
+  modified = norm_path(ctx.args.modified)
   validate_target_or_error(ctx, original)
   validate_target_or_error(ctx, modified)
   patch = modified + '.pat'
@@ -260,7 +261,7 @@ def muck_create_patch(ctx: Ctx) -> None:
 
 def muck_update_patch(ctx: Ctx) -> None:
   '`muck update-patch` command.'
-  patch_path = ctx.args.patch
+  patch_path = norm_path(ctx.args.patch)
   validate_target_or_error(ctx, patch_path)
   if path_ext(patch_path) != '.pat':
     exit(f'muck update-patch error: argument does not specify a .pat file: {patch_path!r}')
