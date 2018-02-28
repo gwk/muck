@@ -326,6 +326,15 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[Dependent], for
 
   is_product = status is None # A target is a product if it does not exist in the source tree.
 
+  if is_product:
+    target_dir = path_dir(target)
+    if target_dir and not path_exists(target_dir): # Not possible to find a source; must be the contents of a built directory.
+      update_dependency(ctx, target=target_dir, dependent=Dependent(kind='directory contents', target=target), force=force)
+      change_time = ctx.change_times[target]
+      if change_time is None: # build of parent failed to create this product.
+        raise error(target, f'target resides in a product directory but was not created by building that directory')
+      return change_time # TODO: verify that we should be returning this change_time and not the result of target_dir update.
+
   old = ctx.db.get_record(target=target)
   needs_update = force or (old is None)
 
