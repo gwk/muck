@@ -31,7 +31,9 @@ def py_dependencies(src_path: str, src_file: TextIO, dir_names: Any) -> Iterable
   def walk_import(module_name: Optional[str], dir_names: Any) -> Iterable[str]:
     if module_name is None: raise ValueError
     src_dir = path_dir(src_path)
-    leading_dots_count = re.match('\.*', module_name).end()
+    m = re.match('\.*', module_name)
+    assert m
+    leading_dots_count = m.end()
     module_parts = ['..'] * leading_dots_count + module_name[leading_dots_count:].split('.')
     module_path = path_join(src_dir, *module_parts) + '.py'
     if is_file(module_path):
