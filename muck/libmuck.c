@@ -45,9 +45,9 @@ __attribute__ ((section ("__DATA,__interpose"))) = \
 static const char* program_name = "?";
 
 #define errF(fmt, ...) { \
-  fputs("libmuck: ", stderr); \
+  fputs("\x1b[36mlibmuck: ", stderr); \
   fputs(program_name, stderr); \
-  fprintf(stderr, ": " fmt, ## __VA_ARGS__); \
+  fprintf(stderr, ":\x1b[0m " fmt, ## __VA_ARGS__); \
   fflush(stderr); \
 }
 
@@ -67,6 +67,11 @@ typedef struct {
 static char* str_end(Str* str) { return str->ptr + str->len; }
 
 static void str_clear(Str* str) { str->len = 0; }
+
+static void str_truncate_by(Str* str, size_t n) {
+  str->len -= n;
+  str->ptr[str->len] = '\0';
+}
 
 static void str_grow_to(Str* str, size_t cap) {
   while (str->cap < cap) {
@@ -123,7 +128,6 @@ static void update_curr_dir() {
   // Instead, we use a lower-level, platform specific approach.
   int fd = open(".", O_RDONLY); // Note: this does not trigger libmuck's own interposition.
   check(fd >= 0, "update_curr_dir: open failed.");
-  #
   // This approach was extracted from the getcwd implementation in macOS Libc-1244.1.7.
 #if __APPLE__
 	int err = fcntl(fd, F_GETPATH, curr_dir);
@@ -168,9 +172,8 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
     str_append_char(&msg, '/');
   }
   str_append_chars(&msg, file_path);
+  if (dbg) { errFL("\x1b[36m%s\x1b[0m", msg.ptr); }
   str_append_char(&msg, '\n');
-
-  if (dbg) { errF("%s", msg.ptr); }
 
   if (fd_send) { // communicate with the muck build process.
     str_write(&msg, fd_send);
@@ -179,6 +182,10 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
     unsigned char ack = 0;
     check(read(fd_recv, &ack, 1) == 1, "MUCK_DEPS_RECV read failed: %s.\n", strerror(errno));
     check(ack == 0x6, "MUCK_DEP_RECV expected ACK (0x6) byte confirmation; received: 0x%02x.\n", (int)ack);
+  }
+  if (dbg) { // show that the client is no longer blocked.
+    str_truncate_by(&msg, 1);
+    errFL("\x1b[30m%s -- done.\x1b[0m", msg.ptr)
   }
 }
 
