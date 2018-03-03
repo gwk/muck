@@ -621,7 +621,8 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
 def process_dep_line(ctx: Ctx, depCtx: DepCtx, target: str, dep_line: str, dyn_time: int) -> int:
   '''
   Parse a dependency line sent from a child build process.
-  This is trick because the parent and child processes have different current working directories.
+  Since the parent and child processes have different current working directories,
+  libmuck (executing in the child process) always sends absolute paths.
   '''
   try:
     dep_line_parts = dep_line.split('\t')
