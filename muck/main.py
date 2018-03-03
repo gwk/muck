@@ -680,14 +680,6 @@ def list_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tupl
   return [l for l in lines if l and not l.startswith('#')]
 
 
-def sh_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> Iterable[str]:
-  'Calculate dependencies for .sh files.'
-  for line in src_file:
-    for token in shlex.split(line):
-      if path_ext(token):
-        yield token
-
-
 def sqlite3_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> Iterable[str]:
   'Calculate dependencies for .sql files (assumed to be sqlite3 commands).'
   for i, line in enumerate(src_file, 1):
@@ -728,13 +720,14 @@ class Tool(NamedTuple):
 
 ext_tools: Dict[str, Tool] = {
   # The boolean inicates that the tool expects the source as stdin.
-  '.bash' : Tool(('bash',), sh_dependencies, None),
+  '.bash' : Tool(('bash',), None, None),
   '.csv'  : Tool(('csv-to-html',), None, None),
+  '.dash' : Tool(('dash',), None, None),
   '.list' : Tool((), list_dependencies, None),
   '.md'   : Tool(('cmark-gfm',), None, None),
   '.pat'  : Tool(('pat', 'apply'), pat_dependencies, None),
   '.py'   : Tool(('python3',), py_dependencies, py_env),
-  '.sh'   : Tool(('sh',), sh_dependencies, None),
+  '.sh'   : Tool(('sh',), None, None),
   '.sql'  : Tool(('sqlite3', '-batch'), sqlite3_dependencies, None, src_to_stdin=True),
   '.wu'   : Tool(('writeup',), writeup_dependencies, None),
 }
