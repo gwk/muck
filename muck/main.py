@@ -680,10 +680,6 @@ def list_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tupl
   return [l for l in lines if l and not l.startswith('#')]
 
 
-def md_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
-  return []
-
-
 def sh_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> Iterable[str]:
   'Calculate dependencies for .sh files.'
   for line in src_file:
