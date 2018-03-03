@@ -234,14 +234,13 @@ static FILE* muck_fopen(const char* __restrict __filename, const char* __restric
   char mode_char = '?';
   const char* m = __mode;
   while (*m) {
-    switch (*m) {
-      case 'r': mode_char = 'R'; break;
-      case 'w': mode_char = 'W'; break;
-      case 'a': mode_char = 'A'; break;
+    switch (*m++) {
       case '+': mode_char = 'U'; break;
+      case 'r': mode_char = 'R'; continue;
+      case 'w': mode_char = 'W'; continue;
+      case 'a': mode_char = 'A'; continue;
       default: continue;
     }
-    m++;
   }
   COMMUNICATE(mode_char, __filename);
   return fopen(__filename, __mode);
