@@ -1,3 +1,6 @@
 [submodule "pithy"]
 	path = pithy
 	url = https://github.com/gwk/pithy.git
+[submodule "demos"]
+	path = demos
+	url = git@github.com:gwk/muck-demos.git
