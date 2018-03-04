@@ -17,7 +17,7 @@ cov:
 	iotest -fail-fast -coverage
 
 docs:
-	(cd doc && muck -build-dir=../docs)
+	(cd doc && muck publish index.html dev-setup.html -to=../docs)
 	writeup -bare -section Muck doc/index.html.wu readme.md
 
 lib:

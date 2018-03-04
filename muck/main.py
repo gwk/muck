@@ -17,6 +17,7 @@ import time
 
 from argparse import ArgumentParser, Namespace
 from datetime import datetime
+from glob import iglob as walk_glob, has_magic as is_glob_pattern # type: ignore # has_magic is private.
 from hashlib import sha256
 from importlib.util import find_spec as find_module_spec
 from os import O_CREAT, O_EXCL, O_RDONLY, O_RDWR, O_WRONLY
@@ -99,6 +100,11 @@ def main() -> None:
     description="move a manually downloaded file to the '_fetch' folder.")
   move_to_fetched_url_parser.add_argument('path', help='the local file to be moved')
   move_to_fetched_url_parser.add_argument('url', help='the url from which the file was downloaded')
+
+  publish_parser = add_parser('publish', muck_publish, builds=True, targets_dflt=True,
+    description='build the specified targets, then copy to the directory specified with `-to`.')
+  publish_parser.add_argument('-files', nargs='*', default=[], help='glob patterns specifying additional files to publish.')
+  publish_parser.add_argument('-to', required=True, help='directory to copy files to.')
 
   # add build_parser last so that we can describe other commands in its epilog.
   cmds_str = ', '.join(parsers)
@@ -307,6 +313,27 @@ def muck_move_to_fetched_url(args: Namespace) -> None:
   try: move_file(path, fetch_path)
   except OSError as e: exit(e)
 
+
+def muck_publish(ctx: Ctx) -> None:
+  '`muck build` (default) command: update each specified target.'
+  dst_root = ctx.args.to
+  make_dirs(dst_root)
+  remove_dir_contents(dst_root)
+
+  copied_products: Set[str] = set()
+  for target in ctx.targets:
+    update_dependency(ctx, target, dependent=None, force=ctx.args.force)
+    product = ctx.product_path_for_target(target)
+    clone(src=product, dst=path_join(dst_root, target))
+    copied_products.add(product)
+
+  for pattern in ctx.args.files:
+    if not is_glob_pattern(pattern): raise error(f'not a glob pattern: {pattern!r}')
+    if pattern.startswith('/'): raise error(f'invalid glob pattern: leading slash: {pattern!r}')
+    for product in walk_glob(ctx.product_path_for_target(pattern)):
+      if product in copied_products: continue
+      clone(src=product, dst=path_join(dst_root, target_for_product(ctx, product)))
+      copied_products.add(product)
 
 
 # Core update algorithm.
@@ -805,6 +832,13 @@ def validate_target_or_error(ctx: Ctx, target: str) -> None:
   try: validate_target(ctx, target)
   except InvalidTarget as e:
     exit(f'muck error: invalid target: {e.target!r}; {e.msg}')
+
+
+
+def target_for_product(ctx: Ctx, product_path: str) -> str:
+  'Return the target path for `product_path`.'
+  assert ctx.is_product_path(product_path)
+  return product_path[len(ctx.build_dir_slash):]
 
 
 def target_path_for_source(ctx: Ctx, source_path: str) -> str:
