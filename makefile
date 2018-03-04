@@ -20,6 +20,10 @@ docs:
 	(cd doc && muck publish index.html dev-setup.html -to=../docs)
 	writeup -bare -section Muck doc/index.html.wu readme.md
 
+	(cd demos/oecd-health && muck publish -to=../../docs/demos/oecd-health)
+	#writeup -bare -section 0 demos/oecd-health/{index.html.wu,readme.md}
+
+
 lib:
 	clang -fsyntax-only \
 	-Weverything \

@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+ <title>index.html</title>
+ <meta name="description" content="" />
+ <meta name="author" content="" />
+  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgo=" />
+  <style type="text/css">
+a { background-color: transparent; }
+a:active { outline: 0; }
+a:hover { outline: 0; }
+a:link { color: #1010A0; }
+a:visited { color: #301080; border-bottom: 3px solid; }
+blockquote { border-left-color: #E0E0E0; border-left-style: solid; border-left-width: 0.333rem; margin: 0; padding: 0 0.667rem; }
+body { margin: 0 auto; max-width: 64rem; border: transparent solid 0.5rem; }
+body footer { border-top-color: #E8E8E8; border-top-style: solid; border-top-width: 1px; color: #606060; font-size: .875rem; margin: 1rem 0 0 0; }
+code { font-family: source code pro, terminal, monospace; }
+code.inline { background-color: #F0F0F0; border-color: #D0D0D0; border-radius: 2px; border-style: solid; border-width: 0.5px; overflow-wrap: break-word; white-space: pre-wrap; }
+code.line { display: block; margin: 0; overflow-wrap: break-word; padding: 0 0 0 0.5rem; text-indent: -0.5rem; white-space: pre-wrap; }
+div.code-block { background-color: #F8F8F8; border-color: #D0D0D0; border-radius: 4px; border-style: solid; border-width: 0.5px; font-size: 1rem; margin: 1rem 0; padding: 0.1rem; }
+div.embed-label { background-color: #FFFFFF; border-bottom-style: none; border-color: #E0E0E0; border-style: solid solid none solid; border-top-left-radius: 4px; border-top-right-radius: 4px; border-width: 0.5px; color: #404040; display: inline-block; font-family: source code pro, terminal, monospace; font-size: 0.8rem; margin-top: 1rem; }
+div.embed-label + * { border-top-left-radius: 0; margin-top: 0.5px; }
+footer { display: block; }
+h1 { font-size: 1.8rem; margin: 0.9rem 0; }
+h2 { font-size: 1.6rem; margin: 0.8rem 0; }
+h3 { font-size: 1.4rem; margin: 0.7rem 0; }
+h4 { font-size: 1.3rem; margin: 0.65rem 0; }
+h5 { font-size: 1.2rem; margin: 0.6rem 0; }
+h6 { font-size: 1.1rem; margin: 0.55rem 0; }
+header { display: block; }
+html { background: white; color: black; font-family: source sans pro, sans-serif; font-size: 1rem; }
+nav { display: block; }
+p { margin: 0.5rem 0; }
+section { display: block; }
+section.S1 { border-top-color: #E8E8E8; border-top-style: solid; border-top-width: 1px; margin: 1.8rem 0; }
+section.S2 { margin: 1.6rem 0; }
+section.S3 { margin: 1.4rem 0; }
+section.S4 { margin: 1.3rem 0; }
+section.S5 { margin: 1.2rem 0; }
+section.S6 { margin: 1.1rem 0; }
+section#s0 { border-top-width: 0; }
+table { background: #F0F0F0; border-radius: 4px; border: #D0D0D0 0.5px solid; }
+table th { padding: 0.25rem 0.25rem; }
+table th:first-child { padding-left: 0.25rem; text-align: left; }
+table td { background: #FAFAFA; font-family: monospace; padding:0.25rem; white-space: pre; }
+table td:first-child { border-left: 0; padding-left: 0.25rem; text-align: left; }
+table tr { padding-left: 0.25rem; text-align: left; }
+table tr:last-child td { border-bottom: 0; }
+table tr:last-child td:first-child { border-bottom-left-radius: 2px; }
+table tr:last-child td:last-child { border-bottom-right-radius: 2px; }
+table tr:nth-child(odd) td { background: #FFFFFF; }
+table tr:nth-child(even) td { background: #FBFBFB; }
+table tr:hover td { background: #F0F0F0; }
+ul { line-height: 1.333rem; list-style-position: outside; list-style-type: disc; margin-left: 1rem; padding-left: 0.1rem; }
+@media print { @page { margin: 2cm; }
+}
+code.line span.nv{color: #000000;}
+code.line span.p{color: #000000;}
+code.line span.k{color: #800080;}
+code.line span.s1{color: #008000;}
+code.line span.n{color: #000000;}
+code.line span.o{color: #000000;}
+code.line span.ow{color: #000000;}
+code.line span.nf{color: #000000;}
+code.line span.mi{color: #0000E0;}
+code.line span.c1{color: #606060;}
+code.line span.ss{color: #008000;}
+code.line span.kn{color: #800080;}
+code.line span.nn{color: #000000;}
+code.line span.nc{color: #000000;}
+code.line span.nb{color: #000000;}
+code.line span.bp{color: #000000;}
+code.line span.se{color: #008000;}
+code.line span.ne{color: #000000;}
+code.line span.mf{color: #0000E0;}
+  </style>
+  <script type="text/javascript"> "use strict";
+function scrollToElementId(id) {
+  window.scrollTo(0, document.getElementById(id).offsetTop);
+}
+
+var in_pres_mode = false;
+function togglePresentationMode() {
+  in_pres_mode = !in_pres_mode;
+  for (var sid of paging_ids) {
+    var section = document.getElementById(sid);
+    if (section.id == 'body') {
+      // skip; not actually a section.
+    } else {
+      section.style['margin'] = in_pres_mode ? '100vh 0 0 0' : '0';
+    }
+  }
+  var footer = document.getElementById('footer');
+  footer.style['margin'] = in_pres_mode ? '100vh 0 0 0' : '0';
+}
+
+var section_ids = null;
+var paging_ids = null;
+var paging_idx = 0;
+
+window.onkeydown = function(e) {
+  if (e.keyCode === 37) { // left.
+    if (paging_idx > 0) {
+      paging_idx -= 1;
+    }
+    scrollToElementId(paging_ids[paging_idx]);
+  } else if (e.keyCode === 39) { // right.
+    if (paging_idx < paging_ids.length - 1) {
+      paging_idx += 1;
+    }
+    scrollToElementId(paging_ids[paging_idx]);
+  }
+};
+
+window.onkeypress = function(e) {
+  if (e.charCode === 112) { // 'p'.
+    togglePresentationMode();
+  }
+};
+</script>
+</head>
+<body id="body">
+<section class="S1" id="s0">
+  <h1 id="h0">OECD Life Expectancy vs Private Health Costs</h1>
+  <p>
+    This example attempts to reproduce the Guardian Datablog article <a href="https://www.theguardian.com/us-news/datablog/2017/jul/02/us-healthcare-broken-system-one-chart">America's broken healthcare system – in one simple chart</a> using the <a href="https://github.com/gwk/muck">Muck</a> build system. The demo code can be found at <a href="https://github.com/gwk/muck-demos/tree/master/oecd-health">https://github.com/gwk/muck-demos/tree/master/oecd-health</a>, and the result is hosted at <a href="https://gwk.github.io/muck/demos/oecd-health">https://gwk.github.io/muck/demos/oecd-health</a>.
+  </p>
+  <p>
+    Creating a Muck project is as simple as creating an empty source document - in this case, <code class="inline">index.html.wu</code>. Simply run <code class="inline">muck&nbsp;-serve</code> from the project directory, and it will produce <code class="inline">index.html</code> from <code class="inline">index.html.wu</code>, generating any additional dependencies on an as-needed basis.
+  </p>
+  <p>
+    If you look at the implementation of this project, you will see that all of the code boxes in this page are just references to the scripts that generate the actual results - change the code and Muck will bring the entire project up to date. This allows for an iterative style of development, and makes it easier to document the technical process. Most news articles would not show the code of course, but one can easily imagine producing both an article for publication as well as a companion "How it was made" post in tandem.
+  </p>
+</section>
+<section class="S1" id="s1">
+  <h1 id="h1">The Data</h1>
+  <p>
+    The article cites as its data source <a href="http://stats.oecd.org/index.aspx?DataSetCode=HEALTH_STAT">http://stats.oecd.org/index.aspx?DataSetCode=HEALTH_STAT</a>. That link points to the interactive explorer for the entire OECD health data repository, but we can guess that the numbers came from the subsections located at <code class="inline">Health&nbsp;→&nbsp;Health&nbsp;expenditure&nbsp;and&nbsp;financing&nbsp;→&nbsp;Health&nbsp;expenditure&nbsp;and&nbsp;financing</code> and <code class="inline">Health&nbsp;→&nbsp;Health&nbsp;Status&nbsp;→&nbsp;Life&nbsp;Expectancy</code>.
+  </p>
+  <p>
+    Navigating to each of these sections updates the dynamic spreadsheet at the center of the page. To obtain the datasets:
+  </p>
+  <ul class="L1">
+    <li>For each of the sections named above;</li>
+    <li>From the "Export" dropdown menu at the top of the middle pane, select "Text File (CSV)";</li>
+    <li>Press the "Download" button (this may take a few seconds before triggering a download in the browser).</li>
+    <li>Note that the CSV exports do not appear to reflect the settings chosen in the dynamic spreadsheet, just the table selection in the left pane; the Excel exports have different behavior.</li>
+  </ul>
+  <p>
+    At this time it does not appear possible to link to these CSV files directly. For the purposes of this demo, the downloaded files have been renamed <code class="inline">health-expenditure-and-financing.csv</code> (109MB) and <code class="inline">life-expectancy.csv</code> (4MB) respectively, and checked into the git repository, so that readers can run the code without going through the download process.
+  </p>
+</section>
+<section class="S1" id="s2">
+  <h1 id="h2">Exploration</h1>
+  <p>
+    Since the data consists of multiple tables it will be convenient to use relational queries. As a first step we will create an SQLite database from the two tables using a convenient little tool called <a href="https://github.com/gwk/csv-to-sqlite">csv-to-sqlite</a>. This is nice because it automatically infers column names and affinities (data types) for us. (Alternatively we could use plain Python, the sqlite3 shell's <a href="https://sqlite.org/cli.html#csv_import">CSV features</a> or <a href="https://sqlite.org/csv.html">CSV virtual table extension</a>, or CSVKit's <a href="https://csvkit.readthedocs.io/en/1.0.2/scripts/csvsql.html">csvsql</a>).
+  </p>
+  <p>
+    <div class="embed-label">data.sqlite3.sh</div>
+<div class="code-block">
+    <code class="line">csv-to-sqlite health-expenditure-and-financing.csv.bz2 expenditures life-expectancy.csv.bz2 expectancies -output <span class="nv">$MUCK_OUT</span>
+</code>
+    </div>
+  </p>
+  <p>
+    This command creates a database of two tables, 'expenditures' and 'expectancies'. Now that we have the data in database format, we can easily query it. First we query the schema:
+  <br />
+    <div class="embed-label">schema.txt.sql</div>
+<div class="code-block">
+    <code class="line"><span class="p">.</span><span class="k">open</span> <span class="s1">'data.sqlite3'</span>
+</code>
+    <code class="line"><span class="p">.</span><span class="k">schema</span>
+</code>
+    </div>
+  </p>
+  <p>
+    The output shows us the structure of each table:
+  <br />
+    <div class="embed-label">schema.txt</div>
+<div class="code-block">
+    <code class="line">CREATE TABLE expenditures (HF TEXT, Financing_scheme TEXT, HC TEXT, Function TEXT, HP TEXT, Provider TEXT, MEASURE TEXT, Measure_1 TEXT, LOCATION TEXT, Country TEXT, TIME INTEGER, Year INTEGER, Unit_Code TEXT, Unit TEXT, PowerCode_Code INTEGER, PowerCode TEXT, Reference_Period_Code INTEGER, Reference_Period INTEGER, Value REAL, Flag_Codes TEXT, Flags TEXT);
+</code>
+    <code class="line">CREATE TABLE expectancies (VAR TEXT, Variable TEXT, UNIT TEXT, Measure TEXT, COU TEXT, Country TEXT, YEA INTEGER, Year INTEGER, Value REAL, Flag_Codes TEXT, Flags TEXT);
+</code>
+    </div>
+  </p>
+  <p>
+    Both tables are structured so that some columns form pairs consisting of a short coded version followed by a longer human-readable version. Browsing through the tables it is clear that there are many more measurements than what is presented in the original article. We want to find the data points that match to the units presented in the original, namely "private health spending per person in 2016 (US$)" and "average life expectancy at birth".
+  </p>
+  <p>
+    We can see the different units of measure in each table by selecting distinct values for just the columns that specify the nature of the measurements (I identified these by looking at a sample of the data and then querying just the columns that looked relevant).
+  </p>
+  <section class="S2" id="s2.1">
+    <h2 id="h2.1">Health Expenditures</h2>
+    <p>
+      For expenditures, there are several column pairs indicating "nature of measurement".
+    </p>
+    <section class="S3" id="s2.1.1">
+      <h3 id="h2.1.1">HF / Financing_scheme</h3>
+      <p>
+        <div class="embed-label">expenditures-schemes.csv.sql</div>
+<div class="code-block">
+        <code class="line"><span class="p">.</span><span class="k">open</span> <span class="s1">'data.sqlite3'</span>
+</code>
+        <code class="line"><span class="p">.</span><span class="n">mode</span> <span class="n">csv</span>
+</code>
+        <code class="line"><span class="p">.</span><span class="n">headers</span> <span class="k">on</span>
+</code>
+        <code class="line"><span class="k">SELECT</span> <span class="k">DISTINCT</span> <span class="n">HF</span><span class="p">,</span> <span class="n">Financing_scheme</span> <span class="k">FROM</span> <span class="n">expenditures</span><span class="p">;</span>
+</code>
+        </div>
+      <br />
+        <div class="embed-label">expenditures-schemes.csv</div>
+<table>
+        <thead><tr>
+          <th>HF</th><th>Financing_scheme</th>
+        </tr></thead><tbody>
+          <tr><td>HFTOT</td><td>All financing schemes</td></tr>
+          <tr><td>HF1</td><td>Government/compulsory schemes</td></tr>
+          <tr><td>HF2HF3</td><td>Voluntary schemes/household out-of-pocket payments</td></tr>
+        </tbody>
+        </table>
+      </p>
+      <p>
+        The only candidate for "private expenditure" seems to be "Voluntary schemes/household out-of-pocket payments". The table in the article also shows "Total expenditure, incl. government," which probably came from "All financing schemes".
+      </p>
+    </section>
+    <section class="S3" id="s2.1.2">
+      <h3 id="h2.1.2">HC / Function</h3>
+      <p>
+        <div class="embed-label">expenditures-functions.csv</div>
+<table>
+        <thead><tr>
+          <th>HC</th><th>Function</th>
+        </tr></thead><tbody>
+          <tr><td>HCTOT</td><td>Current expenditure on health (all functions)</td></tr>
+          <tr><td>HC1HC2</td><td>Curative and rehabilitative care</td></tr>
+          <tr><td>HC11HC21</td><td>Inpatient curative and rehabilitative care</td></tr>
+          <tr><td>HC12HC22</td><td>Day curative and rehabilitative care</td></tr>
+          <tr><td>HC13HC23</td><td>Outpatient curative and rehabilitative care</td></tr>
+          <tr><td>HC14HC24</td><td>Home-based curative and rehabilitative care</td></tr>
+          <tr><td>HC3</td><td>Long-term care (health)</td></tr>
+          <tr><td>HC4</td><td>Ancillary services (non-specified by function)</td></tr>
+          <tr><td>HC5</td><td>Medical goods (non-specified by function)</td></tr>
+          <tr><td>HC6</td><td>Preventive care</td></tr>
+          <tr><td>HC7</td><td>Governance and health system and financing administration</td></tr>
+        </tbody>
+        </table>
+      </p>
+      <p>
+        Clearly we want "Current expenditure on health (all functions)".
+      </p>
+    </section>
+    <section class="S3" id="s2.1.3">
+      <h3 id="h2.1.3">HP / Provider</h3>
+      <p>
+        <div class="embed-label">expenditures-providers.csv</div>
+<table>
+        <thead><tr>
+          <th>HP</th><th>Provider</th>
+        </tr></thead><tbody>
+          <tr><td>HPTOT</td><td>All providers</td></tr>
+          <tr><td>HP1</td><td>Hospitals</td></tr>
+          <tr><td>HP2</td><td>Residential long-term care facilities</td></tr>
+          <tr><td>HP3</td><td>Providers of ambulatory health care</td></tr>
+          <tr><td>HP4</td><td>Providers of ancillary services</td></tr>
+          <tr><td>HP5</td><td>Retailers and other providers of medical goods</td></tr>
+          <tr><td>HP6</td><td>Providers of preventive care</td></tr>
+          <tr><td>HP7</td><td>Providers of health care system administration and financing</td></tr>
+          <tr><td>HP8</td><td>Rest of the economy</td></tr>
+          <tr><td>HP9</td><td>Rest of the world</td></tr>
+        </tbody>
+        </table>
+      </p>
+      <p>
+        Similarly, the article probably used "All providers".
+      </p>
+    </section>
+    <section class="S3" id="s2.1.4">
+      <h3 id="h2.1.4">Measure and Unit</h3>
+      <p>
+        Choice of measure and unit is trickier. Let's query the remaining relevant columns together to try to get a sense of what "measure" and "unit" mean.
+      </p>
+      <p>
+        <div class="embed-label">expenditures-measures-units.csv.sql</div>
+<div class="code-block">
+        <code class="line"><span class="p">.</span><span class="k">open</span> <span class="s1">'data.sqlite3'</span>
+</code>
+        <code class="line"><span class="p">.</span><span class="n">mode</span> <span class="n">csv</span>
+</code>
+        <code class="line"><span class="p">.</span><span class="n">headers</span> <span class="k">on</span>
+</code>
+        <code class="line"><span class="k">SELECT</span> <span class="k">DISTINCT</span> <span class="n">MEASURE</span><span class="p">,</span> <span class="n">Measure_1</span><span class="p">,</span> <span class="n">Unit_Code</span><span class="p">,</span> <span class="n">Unit</span><span class="p">,</span> <span class="n">PowerCode</span><span class="p">,</span> <span class="n">Reference_Period</span>
+</code>
+        <code class="line"><span class="k">FROM</span> <span class="n">expenditures</span>
+</code>
+        <code class="line"><span class="k">ORDER</span> <span class="k">BY</span> <span class="n">MEASURE</span><span class="p">;</span>
+</code>
+        </div>
+      <br />
+        (Note: the <code class="inline">_1</code> suffix was added to the <code class="inline">Measure</code> column name by <code class="inline">csv-to-sqlite</code> to make the names distinct in SQLite, which is case-insensitive).
+      </p>
+      <p>
+        <div class="embed-label">expenditures-measures-units.csv</div>
+<table>
+        <thead><tr>
+          <th>MEASURE</th><th>Measure_1</th><th>Unit_Code</th><th>Unit</th><th>PowerCode</th><th>Reference_Period</th>
+        </tr></thead><tbody>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>AUD</td><td>Australian Dollar</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>EUR</td><td>Euro</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>CAD</td><td>Canadian Dollar</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>CZK</td><td>Czech Koruna</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>DKK</td><td>Danish Krone</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>ISK</td><td>Iceland Krona</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>HUF</td><td>Forint</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>ILS</td><td>New Israeli Sheqel</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>JPY</td><td>Yen</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>NOK</td><td>Norwegian Krone</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>GBP</td><td>Pound Sterling</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>CHF</td><td>Swiss Franc</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>PLN</td><td>Zloty</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>TRY</td><td>Turkish Lira</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>SEK</td><td>Swedish Krona</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>KRW</td><td>Won</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>NZD</td><td>New Zealand Dollar</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>MXN</td><td>Mexican Peso</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>CLP</td><td>Chilean Peso</td><td>Millions</td><td></td></tr>
+          <tr><td>MLLNCU</td><td>Current prices</td><td>USD</td><td>US Dollar</td><td>Millions</td><td></td></tr>
+          <tr><td>MTMOPP</td><td>Current prices, current PPPs</td><td>USD</td><td>US Dollar</td><td>Millions</td><td></td></tr>
+          <tr><td>PARCUR</td><td>Share of current expenditure on health</td><td>PC</td><td>Percentage</td><td>Units</td><td></td></tr>
+          <tr><td>PARHC</td><td>Share of function</td><td>PC</td><td>Percentage</td><td>Units</td><td></td></tr>
+          <tr><td>PARHF</td><td>Share of financing scheme</td><td>PC</td><td>Percentage</td><td>Units</td><td></td></tr>
+          <tr><td>PARHP</td><td>Share of provider</td><td>PC</td><td>Percentage</td><td>Units</td><td></td></tr>
+          <tr><td>PARPIB</td><td>Share of gross domestic product</td><td>PC</td><td>Percentage</td><td>Units</td><td></td></tr>
+          <tr><td>PPPPER</td><td>Per capita, current prices, current PPPs</td><td>USD</td><td>US Dollar</td><td>Units</td><td></td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>EUR</td><td>Euro</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>AUD</td><td>Australian Dollar</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>DKK</td><td>Danish Krone</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>CZK</td><td>Czech Koruna</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>CAD</td><td>Canadian Dollar</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>HUF</td><td>Forint</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>ISK</td><td>Iceland Krona</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>JPY</td><td>Yen</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>KRW</td><td>Won</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>NOK</td><td>Norwegian Krone</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>PLN</td><td>Zloty</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>SEK</td><td>Swedish Krona</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>CHF</td><td>Swiss Franc</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>TRY</td><td>Turkish Lira</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>GBP</td><td>Pound Sterling</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>ILS</td><td>New Israeli Sheqel</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>NZD</td><td>New Zealand Dollar</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>MXN</td><td>Mexican Peso</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>CLP</td><td>Chilean Peso</td><td>Units</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>USD</td><td>US Dollar</td><td>Units</td><td>2010</td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>AUD</td><td>Australian Dollar</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>HUF</td><td>Forint</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>CAD</td><td>Canadian Dollar</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>EUR</td><td>Euro</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>DKK</td><td>Danish Krone</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>CZK</td><td>Czech Koruna</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>ISK</td><td>Iceland Krona</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>JPY</td><td>Yen</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>KRW</td><td>Won</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>NOK</td><td>Norwegian Krone</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>PLN</td><td>Zloty</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>SEK</td><td>Swedish Krona</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>CHF</td><td>Swiss Franc</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>TRY</td><td>Turkish Lira</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>GBP</td><td>Pound Sterling</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>ILS</td><td>New Israeli Sheqel</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>MXN</td><td>Mexican Peso</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>NZD</td><td>New Zealand Dollar</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>CLP</td><td>Chilean Peso</td><td>Units</td><td></td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>USD</td><td>US Dollar</td><td>Units</td><td></td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>AUD</td><td>Australian Dollar</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>EUR</td><td>Euro</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>CAD</td><td>Canadian Dollar</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>CZK</td><td>Czech Koruna</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>DKK</td><td>Danish Krone</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>JPY</td><td>Yen</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>HUF</td><td>Forint</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>NOK</td><td>Norwegian Krone</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>ILS</td><td>New Israeli Sheqel</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>ISK</td><td>Iceland Krona</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>CHF</td><td>Swiss Franc</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>TRY</td><td>Turkish Lira</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>SEK</td><td>Swedish Krona</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>PLN</td><td>Zloty</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>GBP</td><td>Pound Sterling</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>KRW</td><td>Won</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>CLP</td><td>Chilean Peso</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>MXN</td><td>Mexican Peso</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>NZD</td><td>New Zealand Dollar</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VALREL</td><td>Constant prices, OECD base year</td><td>USD</td><td>US Dollar</td><td>Millions</td><td>2010</td></tr>
+          <tr><td>VRPPPR</td><td>Per capita, constant prices, constant PPPs, OECD base year</td><td>USD</td><td>US Dollar</td><td>Units</td><td>2010</td></tr>
+          <tr><td>VRPPPT</td><td>Constant prices, constant PPPs, OECD base year</td><td>USD</td><td>US Dollar</td><td>Millions</td><td>2010</td></tr>
+        </tbody>
+        </table>
+      </p>
+      <p>
+        The article clearly uses per capita measurement, and the statement "In 2016, the average American spent $4,571 on their health" suggests that we want actual dollars in 2016. "Constant prices, OECD Base Year" seems to refer to 2010, so "Current prices" seems to be the better guess. PPP stands for <a href="https://en.wikipedia.org/wiki/Purchasing_power_parity">https://en.wikipedia.org/wiki/Purchasing_power_parity</a> and is an economic theory that normalizes purchasing power to currencies. This seems like a reasonable choice, but at this point I'm out of my depth; if this were original research I would go back to the OECD site to read the documentation.
+      </p>
+      <p>
+        Perhaps we can eliminate choices by requiring US Dollars expressed in single dollars (as opposed to millions).
+      </p>
+      <p>
+        <div class="embed-label">expenditures-measures-usd.csv.sql</div>
+<div class="code-block">
+        <code class="line"><span class="p">.</span><span class="k">open</span> <span class="s1">'data.sqlite3'</span>
+</code>
+        <code class="line"><span class="p">.</span><span class="n">mode</span> <span class="n">csv</span>
+</code>
+        <code class="line"><span class="p">.</span><span class="n">headers</span> <span class="k">on</span>
+</code>
+        <code class="line"><span class="k">SELECT</span> <span class="k">DISTINCT</span> <span class="n">MEASURE</span><span class="p">,</span> <span class="n">Measure_1</span><span class="p">,</span> <span class="n">Reference_Period</span> <span class="k">AS</span> <span class="s1">'Base Year'</span>
+</code>
+        <code class="line"><span class="k">FROM</span> <span class="n">expenditures</span>
+</code>
+        <code class="line"><span class="k">WHERE</span> <span class="n">Unit_Code</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'USD'</span>
+</code>
+        <code class="line"><span class="ow">AND</span> <span class="n">PowerCode</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'Units'</span>
+</code>
+        <code class="line"><span class="k">ORDER</span> <span class="k">BY</span> <span class="n">MEASURE</span><span class="p">;</span>
+</code>
+        </div>
+      <br />
+        <div class="embed-label">expenditures-measures-usd.csv</div>
+<table>
+        <thead><tr>
+          <th>MEASURE</th><th>Measure_1</th><th>Base Year</th>
+        </tr></thead><tbody>
+          <tr><td>PPPPER</td><td>Per capita, current prices, current PPPs</td><td></td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>2010</td></tr>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td></td></tr>
+          <tr><td>VRPPPR</td><td>Per capita, constant prices, constant PPPs, OECD base year</td><td>2010</td></tr>
+        </tbody>
+        </table>
+      </p>
+      <p>
+        This still leaves us with the choice between current or constant prices, and PPP or non-PPP. Since we are just trying to figure out what the original author did, we can cheat and go looking for values matching the top four rows in the original table. Note that I had to expand the ranges several times until I got sufficient results for countries other than the United States.
+      </p>
+      <p>
+        <div class="embed-label">expenditures-measures-cheat.csv.sql</div>
+<div class="code-block">
+        <code class="line"><span class="p">.</span><span class="k">open</span> <span class="s1">'data.sqlite3'</span>
+</code>
+        <code class="line"><span class="p">.</span><span class="n">mode</span> <span class="n">csv</span>
+</code>
+        <code class="line"><span class="p">.</span><span class="n">headers</span> <span class="k">on</span>
+</code>
+        <code class="line"><span class="k">SELECT</span> <span class="k">DISTINCT</span> <span class="n">MEASURE</span><span class="p">,</span> <span class="n">Measure_1</span><span class="p">,</span> <span class="n">Country</span><span class="p">,</span> <span class="k">Value</span><span class="p">,</span> <span class="nf">Year</span><span class="p">,</span> <span class="n">Reference_Period</span> <span class="k">AS</span> <span class="s1">'Base Year'</span>
+</code>
+        <code class="line"><span class="k">FROM</span> <span class="n">expenditures</span>
+</code>
+        <code class="line"><span class="k">WHERE</span> <span class="n">HF</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'HF2HF3'</span>
+</code>
+        <code class="line"><span class="ow">AND</span> <span class="n">HC</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'HCTOT'</span>
+</code>
+        <code class="line"><span class="ow">AND</span> <span class="n">HP</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'HPTOT'</span>
+</code>
+        <code class="line"><span class="ow">AND</span> <span class="n">Unit_Code</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'USD'</span>
+</code>
+        <code class="line"><span class="ow">AND</span> <span class="n">PowerCode</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'Units'</span>
+</code>
+        <code class="line"><span class="ow">AND</span> <span class="nf">Year</span> <span class="o">=</span> <span class="mi">2016</span>
+</code>
+        <code class="line"><span class="ow">AND</span> <span class="p">(</span>
+</code>
+        <code class="line">     <span class="p">(</span><span class="n">Location</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'USA'</span> <span class="ow">AND</span> <span class="k">Value</span> <span class="ow">BETWEEN</span> <span class="mi">4100</span> <span class="ow">AND</span> <span class="mi">5100</span><span class="p">)</span> <span class="c1">-- article: 4,570.50
+</span></code>
+        <code class="line">  <span class="ow">OR</span> <span class="p">(</span><span class="n">Location</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'CHE'</span> <span class="ow">AND</span> <span class="k">Value</span> <span class="ow">BETWEEN</span> <span class="mi">2600</span> <span class="ow">AND</span> <span class="mi">3600</span><span class="p">)</span> <span class="c1">-- article: 3,097.20
+</span></code>
+        <code class="line">  <span class="ow">OR</span> <span class="p">(</span><span class="n">Location</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'AUS'</span> <span class="ow">AND</span> <span class="k">Value</span> <span class="ow">BETWEEN</span> <span class="mi">1300</span> <span class="ow">AND</span> <span class="mi">2300</span><span class="p">)</span> <span class="c1">-- article: 1,783.90
+</span></code>
+        <code class="line">  <span class="ow">OR</span> <span class="p">(</span><span class="n">Location</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'CAN'</span> <span class="ow">AND</span> <span class="k">Value</span> <span class="ow">BETWEEN</span> <span class="mi">1000</span> <span class="ow">AND</span> <span class="mi">2000</span><span class="p">)</span> <span class="c1">-- article: 1,531.70
+</span></code>
+        <code class="line"><span class="p">)</span>
+</code>
+        <code class="line"><span class="k">ORDER</span> <span class="k">BY</span> <span class="k">Value</span> <span class="k">DESC</span><span class="p">;</span>
+</code>
+        </div>
+      <br />
+        <div class="embed-label">expenditures-measures-cheat.csv</div>
+<table>
+        <thead><tr>
+          <th>MEASURE</th><th>Measure_1</th><th>Country</th><th>Value</th><th>Year</th><th>Base Year</th>
+        </tr></thead><tbody>
+          <tr><td>UNPPER</td><td>Per capita, current prices</td><td>United States</td><td>5032.138</td><td>2016</td><td></td></tr>
+          <tr><td>PPPPER</td><td>Per capita, current prices, current PPPs</td><td>United States</td><td>5032.138</td><td>2016</td><td></td></tr>
+          <tr><td>VRPPPR</td><td>Per capita, constant prices, constant PPPs, OECD base year</td><td>United States</td><td>4570.498</td><td>2016</td><td>2010</td></tr>
+          <tr><td>REPPER</td><td>Per capita, constant prices, OECD base year</td><td>United States</td><td>4570.498</td><td>2016</td><td>2010</td></tr>
+          <tr><td>PPPPER</td><td>Per capita, current prices, current PPPs</td><td>Switzerland</td><td>2880.593</td><td>2016</td><td></td></tr>
+          <tr><td>PPPPER</td><td>Per capita, current prices, current PPPs</td><td>Australia</td><td>1518.2</td><td>2016</td><td></td></tr>
+          <tr><td>VRPPPR</td><td>Per capita, constant prices, constant PPPs, OECD base year</td><td>Australia</td><td>1414.878</td><td>2016</td><td>2010</td></tr>
+          <tr><td>PPPPER</td><td>Per capita, current prices, current PPPs</td><td>Canada</td><td>1394.887</td><td>2016</td><td></td></tr>
+          <tr><td>VRPPPR</td><td>Per capita, constant prices, constant PPPs, OECD base year</td><td>Canada</td><td>1315.15</td><td>2016</td><td>2010</td></tr>
+        </tbody>
+        </table>
+      </p>
+      <p>
+        We see the USA value as stated exactly in the article, using constant prices. This is encouraging, and suggests that we simply have to choose whether to use PPP. The only hits for constant price are Australia and Canada, using PPP. Our methodology here is questionable since we just picked an arbitrary "fudge factor" of +/- $500, but since this is a technical demonstration rather than a serious audit of the original we can move on. It is worth taking a moment though to speculate as to why our numbers are different. Since the USA value remains exact, it perhaps the discrepancy is due to changing exchange rates. This explanation is rather unsatisfactory though, because out of all the measure descriptions, I would expect costs for 2016 expressed in 2010 dollars not to change once calculated, so perhaps we are still missing something.
+      </p>
+      <p>
+        In summary, we will use <code class="inline">HF=='HF2HF3'</code>, <code class="inline">HC=='HCTOT'</code>, <code class="inline">HP=='HPTOT'</code>, and <code class="inline">Measure=='VRPPPR'</code>.
+      </p>
+    </section>
+  </section>
+  <section class="S2" id="s2.2">
+    <h2 id="h2.2">Life Expectancy</h2>
+    <p>
+      For life expectancies, the task is a little simpler.
+    </p>
+    <section class="S3" id="s2.2.1">
+      <h3 id="h2.2.1">VAR / Variable</h3>
+      <p>
+        <div class="embed-label">expectancies-variables.csv.sql</div>
+<div class="code-block">
+        <code class="line"><span class="p">.</span><span class="k">open</span> <span class="s1">'data.sqlite3'</span>
+</code>
+        <code class="line"><span class="p">.</span><span class="n">mode</span> <span class="n">csv</span>
+</code>
+        <code class="line"><span class="p">.</span><span class="n">headers</span> <span class="k">on</span>
+</code>
+        <code class="line"><span class="k">SELECT</span> <span class="k">DISTINCT</span> <span class="nf">VAR</span><span class="p">,</span> <span class="k">Variable</span> <span class="k">FROM</span> <span class="n">expectancies</span><span class="p">;</span>
+</code>
+        </div>
+      <br />
+        <div class="embed-label">expectancies-variables.csv</div>
+<table>
+        <thead><tr>
+          <th>VAR</th><th>Variable</th>
+        </tr></thead><tbody>
+          <tr><td>EVIEFE00</td><td>Females at birth</td></tr>
+          <tr><td>EVIEFE40</td><td>Females at age 40</td></tr>
+          <tr><td>EVIEFE60</td><td>Females at age 60</td></tr>
+          <tr><td>EVIEFE65</td><td>Females at age 65</td></tr>
+          <tr><td>EVIEFE80</td><td>Females at age 80</td></tr>
+          <tr><td>EVIEHO00</td><td>Males at birth</td></tr>
+          <tr><td>EVIEHO40</td><td>Males at age 40</td></tr>
+          <tr><td>EVIEHO60</td><td>Males at age 60</td></tr>
+          <tr><td>EVIEHO65</td><td>Males at age 65</td></tr>
+          <tr><td>EVIEHO80</td><td>Males at age 80</td></tr>
+          <tr><td>EVIETOTA</td><td>Total population at birth</td></tr>
+        </tbody>
+        </table>
+      </p>
+      <p>
+        We will use <code class="inline">EVIETOTA</code> / <code class="inline">Total&nbsp;population&nbsp;at&nbsp;birth</code>.
+      </p>
+    </section>
+    <section class="S3" id="s2.2.2">
+      <h3 id="h2.2.2">UNIT / Measure</h3>
+      <p>
+        <div class="embed-label">expectancies-measures.csv</div>
+<table>
+        <thead><tr>
+          <th>UNIT</th><th>Measure</th>
+        </tr></thead><tbody>
+          <tr><td>EVIDUREV</td><td>Years</td></tr>
+          <tr><td>EVIFHOEV</td><td>Difference female-male (years)</td></tr>
+          <tr><td>EVIHFEEV</td><td>Difference male-female (years)</td></tr>
+        </tbody>
+        </table>
+      <br />
+        Similarly, <code class="inline">EVIDUREV</code> / <code class="inline">Years</code> is the obvious choice.
+      </p>
+    </section>
+    <section class="S3" id="s2.2.3">
+      <h3 id="h2.2.3">Latest Year</h3>
+      <p>
+        Lastly, there is a problem that I did not discover until very late: life expectancy data is not available for 2016 across all countries. The best we can do is select the last year for which it is available:
+      </p>
+      <p>
+        <div class="embed-label">expectancies-latest-year.csv.sql</div>
+<div class="code-block">
+        <code class="line"><span class="p">.</span><span class="k">open</span> <span class="s1">'data.sqlite3'</span>
+</code>
+        <code class="line"><span class="p">.</span><span class="n">mode</span> <span class="n">csv</span>
+</code>
+        <code class="line"><span class="p">.</span><span class="n">headers</span> <span class="k">on</span>
+</code>
+        <code class="line">
+</code>
+        <code class="line"><span class="k">SELECT</span> <span class="n">country</span><span class="p">,</span> <span class="nf">MAX</span><span class="p">(</span><span class="nf">year</span><span class="p">)</span>
+</code>
+        <code class="line"><span class="k">FROM</span> <span class="n">expectancies</span>
+</code>
+        <code class="line"><span class="k">WHERE</span> <span class="nf">var</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'EVIETOTA'</span>
+</code>
+        <code class="line"><span class="ow">AND</span> <span class="n">unit</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'EVIDUREV'</span>
+</code>
+        <code class="line"><span class="k">GROUP</span> <span class="k">BY</span> <span class="n">country</span><span class="p">;</span>
+</code>
+        </div>
+      <br />
+        <div class="embed-label">expectancies-latest-year.csv</div>
+<table>
+        <thead><tr>
+          <th>Country</th><th>MAX(year)</th>
+        </tr></thead><tbody>
+          <tr><td>Australia</td><td>2015</td></tr>
+          <tr><td>Austria</td><td>2015</td></tr>
+          <tr><td>Belgium</td><td>2015</td></tr>
+          <tr><td>Brazil</td><td>2015</td></tr>
+          <tr><td>Canada</td><td>2013</td></tr>
+          <tr><td>Chile</td><td>2016</td></tr>
+          <tr><td>China (People's Republic of)</td><td>2015</td></tr>
+          <tr><td>Colombia</td><td>2015</td></tr>
+          <tr><td>Costa Rica</td><td>2015</td></tr>
+          <tr><td>Czech Republic</td><td>2015</td></tr>
+          <tr><td>Denmark</td><td>2015</td></tr>
+          <tr><td>Estonia</td><td>2015</td></tr>
+          <tr><td>Finland</td><td>2015</td></tr>
+          <tr><td>France</td><td>2015</td></tr>
+          <tr><td>Germany</td><td>2015</td></tr>
+          <tr><td>Greece</td><td>2015</td></tr>
+          <tr><td>Hungary</td><td>2015</td></tr>
+          <tr><td>Iceland</td><td>2015</td></tr>
+          <tr><td>India</td><td>2015</td></tr>
+          <tr><td>Indonesia</td><td>2015</td></tr>
+          <tr><td>Ireland</td><td>2015</td></tr>
+          <tr><td>Israel</td><td>2015</td></tr>
+          <tr><td>Italy</td><td>2015</td></tr>
+          <tr><td>Japan</td><td>2015</td></tr>
+          <tr><td>Korea</td><td>2015</td></tr>
+          <tr><td>Latvia</td><td>2015</td></tr>
+          <tr><td>Lithuania</td><td>2015</td></tr>
+          <tr><td>Luxembourg</td><td>2015</td></tr>
+          <tr><td>Mexico</td><td>2016</td></tr>
+          <tr><td>Netherlands</td><td>2015</td></tr>
+          <tr><td>New Zealand</td><td>2015</td></tr>
+          <tr><td>Norway</td><td>2015</td></tr>
+          <tr><td>Poland</td><td>2015</td></tr>
+          <tr><td>Portugal</td><td>2015</td></tr>
+          <tr><td>Russia</td><td>2015</td></tr>
+          <tr><td>Slovak Republic</td><td>2015</td></tr>
+          <tr><td>Slovenia</td><td>2015</td></tr>
+          <tr><td>South Africa</td><td>2015</td></tr>
+          <tr><td>Spain</td><td>2015</td></tr>
+          <tr><td>Sweden</td><td>2015</td></tr>
+          <tr><td>Switzerland</td><td>2015</td></tr>
+          <tr><td>Turkey</td><td>2015</td></tr>
+          <tr><td>United Kingdom</td><td>2015</td></tr>
+          <tr><td>United States</td><td>2015</td></tr>
+        </tbody>
+        </table>
+      </p>
+      <p>
+        We will have to join 'latest year' to the expectancy values in the final query.
+      </p>
+    </section>
+  </section>
+</section>
+<section class="S1" id="s3">
+  <h1 id="h3">The Table</h1>
+  <p>
+    Now that we know which subset of the data we want, we can formulate a <code class="inline">JOIN</code> query to recreate the table. We use two <code class="inline">LEFT&nbsp;JOIN</code> clauses to effectively add additional columns to the query. First we join <code class="inline">expenditures</code> against itself, distinguishing between the two with the names <code class="inline">privateExpend</code> and <code class="inline">totalExpend</code>. This allows us to select the separate <code class="inline">HF2HF3</code> (private) and <code class="inline">HFTOT</code> (total) values, pair them by country, and show them in the same row. Then we join <code class="inline">expectancies</code> to do the same for the life expectancy values, choosing the latest year for each country.
+  </p>
+  <p>
+    <div class="embed-label">table.csv.sql</div>
+<div class="code-block">
+    <code class="line"><span class="p">.</span><span class="k">open</span> <span class="s1">'data.sqlite3'</span>
+</code>
+    <code class="line"><span class="p">.</span><span class="n">mode</span> <span class="n">csv</span>
+</code>
+    <code class="line"><span class="p">.</span><span class="n">headers</span> <span class="k">on</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="k">SELECT</span>
+</code>
+    <code class="line">  <span class="n">privateExpend</span><span class="p">.</span><span class="n">country</span> <span class="k">AS</span> <span class="n">Country</span><span class="p">,</span>
+</code>
+    <code class="line">  <span class="n">printf</span><span class="p">(</span><span class="ss">"%7.2f"</span><span class="p">,</span> <span class="n">privateExpend</span><span class="p">.</span><span class="k">value</span><span class="p">)</span> <span class="k">AS</span> <span class="s1">'Private Cost'</span><span class="p">,</span>
+</code>
+    <code class="line">  <span class="n">printf</span><span class="p">(</span><span class="ss">"%7.2f"</span><span class="p">,</span> <span class="n">totalExpend</span><span class="p">.</span><span class="k">value</span><span class="p">)</span> <span class="k">AS</span> <span class="s1">'Total Cost'</span><span class="p">,</span>
+</code>
+    <code class="line">  <span class="n">latestExpectancies</span><span class="p">.</span><span class="k">value</span> <span class="k">as</span> <span class="s1">'Life Expectancy'</span><span class="p">,</span>
+</code>
+    <code class="line">  <span class="n">latestExpectancies</span><span class="p">.</span><span class="nf">year</span> <span class="k">as</span> <span class="s1">'LE Year'</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="k">FROM</span> <span class="n">expenditures</span> <span class="k">AS</span> <span class="n">privateExpend</span>
+</code>
+    <code class="line"><span class="nf">LEFT</span> <span class="k">JOIN</span> <span class="n">expenditures</span> <span class="k">AS</span> <span class="n">totalExpend</span> <span class="k">ON</span> <span class="n">privateExpend</span><span class="p">.</span><span class="n">country</span> <span class="o">=</span><span class="o">=</span> <span class="n">totalExpend</span><span class="p">.</span><span class="n">country</span>
+</code>
+    <code class="line"><span class="nf">LEFT</span> <span class="k">JOIN</span>
+</code>
+    <code class="line">  <span class="p">(</span><span class="k">SELECT</span> <span class="k">value</span><span class="p">,</span> <span class="n">country</span><span class="p">,</span> <span class="nf">MAX</span><span class="p">(</span><span class="nf">year</span><span class="p">)</span> <span class="k">as</span> <span class="nf">year</span>
+</code>
+    <code class="line">  <span class="k">FROM</span> <span class="n">expectancies</span>
+</code>
+    <code class="line">  <span class="k">WHERE</span> <span class="nf">var</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'EVIETOTA'</span>
+</code>
+    <code class="line">  <span class="ow">AND</span> <span class="n">unit</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'EVIDUREV'</span>
+</code>
+    <code class="line">  <span class="k">GROUP</span> <span class="k">BY</span> <span class="n">country</span><span class="p">)</span> <span class="k">AS</span> <span class="n">latestExpectancies</span>
+</code>
+    <code class="line"> <span class="k">ON</span> <span class="n">privateExpend</span><span class="p">.</span><span class="n">country</span> <span class="o">=</span><span class="o">=</span> <span class="n">latestExpectancies</span><span class="p">.</span><span class="n">country</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="k">WHERE</span>
+</code>
+    <code class="line">    <span class="n">privateExpend</span><span class="p">.</span><span class="n">HF</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'HF2HF3'</span>
+</code>
+    <code class="line"><span class="ow">AND</span> <span class="n">privateExpend</span><span class="p">.</span><span class="n">HC</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'HCTOT'</span>
+</code>
+    <code class="line"><span class="ow">AND</span> <span class="n">privateExpend</span><span class="p">.</span><span class="n">HP</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'HPTOT'</span>
+</code>
+    <code class="line"><span class="ow">AND</span> <span class="n">privateExpend</span><span class="p">.</span><span class="n">measure</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'VRPPPR'</span>
+</code>
+    <code class="line"><span class="ow">AND</span> <span class="n">privateExpend</span><span class="p">.</span><span class="nf">year</span> <span class="o">=</span><span class="o">=</span> <span class="mi">2016</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="ow">AND</span> <span class="n">totalExpend</span><span class="p">.</span><span class="n">HF</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'HFTOT'</span>
+</code>
+    <code class="line"><span class="ow">AND</span> <span class="n">totalExpend</span><span class="p">.</span><span class="n">HC</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'HCTOT'</span>
+</code>
+    <code class="line"><span class="ow">AND</span> <span class="n">totalExpend</span><span class="p">.</span><span class="n">HP</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'HPTOT'</span>
+</code>
+    <code class="line"><span class="ow">AND</span> <span class="n">totalExpend</span><span class="p">.</span><span class="n">measure</span> <span class="o">=</span><span class="o">=</span> <span class="s1">'VRPPPR'</span>
+</code>
+    <code class="line"><span class="ow">AND</span> <span class="n">totalExpend</span><span class="p">.</span><span class="nf">year</span> <span class="o">=</span><span class="o">=</span> <span class="mi">2016</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="k">ORDER</span> <span class="k">BY</span> <span class="n">privateExpend</span><span class="p">.</span><span class="k">value</span> <span class="k">DESC</span><span class="p">;</span>
+</code>
+    </div>
+  <br />
+    <div class="embed-label">table.csv</div>
+<table>
+    <thead><tr>
+      <th>Country</th><th>Private Cost</th><th>Total Cost</th><th>Life Expectancy</th><th>LE Year</th>
+    </tr></thead><tbody>
+      <tr><td>United States</td><td>4570.50</td><td>8984.75</td><td>78.8</td><td>2015</td></tr>
+      <tr><td>Switzerland</td><td>2443.76</td><td>6718.14</td><td>83.0</td><td>2015</td></tr>
+      <tr><td>Australia</td><td>1414.88</td><td>4387.68</td><td>82.5</td><td>2015</td></tr>
+      <tr><td>Ireland</td><td>1401.52</td><td>4696.48</td><td>81.5</td><td>2015</td></tr>
+      <tr><td>Canada</td><td>1315.15</td><td>4378.23</td><td>81.7</td><td>2013</td></tr>
+      <tr><td>Korea</td><td>1170.49</td><td>2682.48</td><td>82.1</td><td>2015</td></tr>
+      <tr><td>Austria</td><td>1086.24</td><td>4471.12</td><td>81.3</td><td>2015</td></tr>
+      <tr><td>Luxembourg</td><td>1062.26</td><td>6245.69</td><td>82.4</td><td>2015</td></tr>
+      <tr><td>Belgium</td><td> 970.20</td><td>4269.45</td><td>81.1</td><td>2015</td></tr>
+      <tr><td>Finland</td><td> 932.42</td><td>3618.91</td><td>81.6</td><td>2015</td></tr>
+      <tr><td>Netherlands</td><td> 930.68</td><td>4857.66</td><td>81.6</td><td>2015</td></tr>
+      <tr><td>Israel</td><td> 906.58</td><td>2344.04</td><td>82.1</td><td>2015</td></tr>
+      <tr><td>Norway</td><td> 870.85</td><td>5887.07</td><td>82.4</td><td>2015</td></tr>
+      <tr><td>France</td><td> 865.55</td><td>4087.90</td><td>82.4</td><td>2015</td></tr>
+      <tr><td>Spain</td><td> 864.40</td><td>2939.70</td><td>83.0</td><td>2015</td></tr>
+      <tr><td>Portugal</td><td> 818.02</td><td>2423.31</td><td>81.2</td><td>2015</td></tr>
+      <tr><td>Sweden</td><td> 804.52</td><td>4992.97</td><td>82.3</td><td>2015</td></tr>
+      <tr><td>Greece</td><td> 789.63</td><td>1937.93</td><td>81.1</td><td>2015</td></tr>
+      <tr><td>United Kingdom</td><td> 782.08</td><td>3758.75</td><td>81.0</td><td>2015</td></tr>
+      <tr><td>Germany</td><td> 748.11</td><td>4851.78</td><td>80.7</td><td>2015</td></tr>
+      <tr><td>Italy</td><td> 747.68</td><td>2995.29</td><td>82.6</td><td>2015</td></tr>
+      <tr><td>Denmark</td><td> 739.24</td><td>4656.28</td><td>80.8</td><td>2015</td></tr>
+      <tr><td>Slovenia</td><td> 697.11</td><td>2473.50</td><td>80.9</td><td>2015</td></tr>
+      <tr><td>Iceland</td><td> 693.99</td><td>3875.68</td><td>82.5</td><td>2015</td></tr>
+      <tr><td>Chile</td><td> 689.97</td><td>1755.66</td><td>79.2</td><td>2016</td></tr>
+      <tr><td>Japan</td><td> 645.85</td><td>4063.86</td><td>83.9</td><td>2015</td></tr>
+      <tr><td>New Zealand</td><td> 627.14</td><td>3167.91</td><td>81.7</td><td>2015</td></tr>
+      <tr><td>Hungary</td><td> 591.16</td><td>1862.71</td><td>75.7</td><td>2015</td></tr>
+      <tr><td>Latvia</td><td> 566.50</td><td>1300.68</td><td>74.6</td><td>2015</td></tr>
+      <tr><td>Poland</td><td> 503.35</td><td>1622.18</td><td>77.6</td><td>2015</td></tr>
+      <tr><td>Mexico</td><td> 469.90</td><td> 972.01</td><td>75.0</td><td>2016</td></tr>
+      <tr><td>Estonia</td><td> 421.99</td><td>1763.20</td><td>77.7</td><td>2015</td></tr>
+      <tr><td>Slovak Republic</td><td> 403.68</td><td>1995.98</td><td>76.7</td><td>2015</td></tr>
+      <tr><td>Czech Republic</td><td> 362.89</td><td>2181.93</td><td>78.7</td><td>2015</td></tr>
+      <tr><td>Turkey</td><td> 207.44</td><td>1006.50</td><td>78.0</td><td>2015</td></tr>
+    </tbody>
+    </table>
+  </p>
+</section>
+<section class="S1" id="s4">
+  <h1 id="h4">The Visualization</h1>
+  <p>
+    The chart in the article is not a typical chart, so let's start off by rendering a more conventional XY scatterplot, showing both private and total expenditures. Because we are going to try several visualizations, we will first factor out the data loading logic into a tiny python module (I actually did this after some amount of experimentation, for the sake of deduplicating code and clear presentation).
+  </p>
+  <p>
+    <div class="embed-label">chart_data.py</div>
+<div class="code-block">
+    <code class="line"><span class="kn">from</span> <span class="nn">muck</span> <span class="kn">import</span> <span class="o">*</span>
+</code>
+    <code class="line"><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">NamedTuple</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="n">header</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'</span><span class="s1">Country</span><span class="s1">'</span><span class="p">,</span> <span class="s1">'</span><span class="s1">Private Cost</span><span class="s1">'</span><span class="p">,</span> <span class="s1">'</span><span class="s1">Total Cost</span><span class="s1">'</span><span class="p">,</span> <span class="s1">'</span><span class="s1">Life Expectancy</span><span class="s1">'</span><span class="p">,</span> <span class="s1">'</span><span class="s1">LE Year</span><span class="s1">'</span><span class="p">)</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="k">class</span> <span class="nc">Row</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">)</span><span class="p">:</span>
+</code>
+    <code class="line">  <span class="n">country</span><span class="p">:</span> <span class="nb">str</span>
+</code>
+    <code class="line">  <span class="n">private_cost</span><span class="p">:</span> <span class="nb">float</span>
+</code>
+    <code class="line">  <span class="n">total_cost</span><span class="p">:</span> <span class="nb">float</span>
+</code>
+    <code class="line">  <span class="n">expectancy</span><span class="p">:</span> <span class="nb">float</span>
+</code>
+    <code class="line">  <span class="n">le_year</span><span class="p">:</span> <span class="nb">int</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="k">with</span> <span class="n">load</span><span class="p">(</span><span class="s1">'</span><span class="s1">table.csv</span><span class="s1">'</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="n">header</span><span class="p">)</span> <span class="k">as</span> <span class="n">reader</span><span class="p">:</span>
+</code>
+    <code class="line">  <span class="n">rows</span> <span class="o">=</span> <span class="p">[</span><span class="n">Row</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="n">p</span><span class="p">)</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="n">t</span><span class="p">)</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">y</span> <span class="ow">in</span> <span class="n">reader</span><span class="p">]</span>
+</code>
+    </div>
+  </p>
+  <p>
+    Let's build a scatterplot with <a href="https://github.com/wireservice/leather">leather</a>, a simple charting library for Python. We add a little hack to make the country names show up as tooltips when the reader mouses over the dots:
+  </p>
+  <p>
+    <div class="embed-label">scatterplot.svg.py</div>
+<div class="code-block">
+    <code class="line"><span class="kn">from</span> <span class="nn">xml.etree.ElementTree</span> <span class="kn">import</span> <span class="n">Element</span>
+</code>
+    <code class="line"><span class="kn">from</span> <span class="nn">muck</span> <span class="kn">import</span> <span class="o">*</span>
+</code>
+    <code class="line"><span class="kn">from</span> <span class="nn">leather</span> <span class="kn">import</span> <span class="n">Chart</span><span class="p">,</span> <span class="n">Series</span><span class="p">,</span> <span class="n">Dots</span>
+</code>
+    <code class="line"><span class="kn">from</span> <span class="nn">chart_data</span> <span class="kn">import</span> <span class="n">rows</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="k">class</span> <span class="nc">TitledDots</span><span class="p">(</span><span class="n">Dots</span><span class="p">)</span><span class="p">:</span>
+</code>
+    <code class="line">  <span class="s1">'</span><span class="s1">Hack to get tooltips (SVG title elements) into dot plots.</span><span class="s1">'</span>
+</code>
+    <code class="line">  <span class="k">def</span> <span class="nf">to_svg</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">,</span> <span class="n">x_scale</span><span class="p">,</span> <span class="n">y_scale</span><span class="p">,</span> <span class="n">series</span><span class="p">,</span> <span class="n">palette</span><span class="p">)</span><span class="p">:</span>
+</code>
+    <code class="line">    <span class="n">group</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="p">)</span><span class="o">.</span><span class="n">to_svg</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">,</span> <span class="n">x_scale</span><span class="p">,</span> <span class="n">y_scale</span><span class="p">,</span> <span class="n">series</span><span class="p">,</span> <span class="n">palette</span><span class="p">)</span>
+</code>
+    <code class="line">    <span class="k">for</span> <span class="n">datum</span><span class="p">,</span> <span class="n">circle</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">series</span><span class="o">.</span><span class="n">data</span><span class="p">(</span><span class="p">)</span><span class="p">,</span> <span class="n">group</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="s1">'</span><span class="s1">circle</span><span class="s1">'</span><span class="p">)</span><span class="p">)</span><span class="p">:</span>
+</code>
+    <code class="line">      <span class="n">title</span> <span class="o">=</span> <span class="n">Element</span><span class="p">(</span><span class="s1">'</span><span class="s1">title</span><span class="s1">'</span><span class="p">)</span>
+</code>
+    <code class="line">      <span class="n">title</span><span class="o">.</span><span class="n">text</span> <span class="o">=</span> <span class="n">datum</span><span class="o">.</span><span class="n">row</span><span class="p">[</span><span class="s1">'</span><span class="s1">title</span><span class="s1">'</span><span class="p">]</span>
+</code>
+    <code class="line">      <span class="n">circle</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">title</span><span class="p">)</span>
+</code>
+    <code class="line">    <span class="k">return</span> <span class="n">group</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="n">chart</span> <span class="o">=</span> <span class="n">Chart</span><span class="p">(</span><span class="s1">'</span><span class="s1">Private Health Care Expenditure vs Life Expectancy</span><span class="s1">'</span><span class="p">)</span>
+</code>
+    <code class="line"><span class="n">chart</span><span class="o">.</span><span class="n">add_series</span><span class="p">(</span>
+</code>
+    <code class="line">  <span class="n">Series</span><span class="p">(</span><span class="p">[</span><span class="p">{</span><span class="s1">'</span><span class="s1">x</span><span class="s1">'</span><span class="p">:</span> <span class="n">r</span><span class="o">.</span><span class="n">private_cost</span><span class="p">,</span> <span class="s1">'</span><span class="s1">y</span><span class="s1">'</span><span class="p">:</span> <span class="n">r</span><span class="o">.</span><span class="n">expectancy</span><span class="p">,</span> <span class="s1">'</span><span class="s1">title</span><span class="s1">'</span><span class="p">:</span> <span class="n">r</span><span class="o">.</span><span class="n">country</span><span class="p">}</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">]</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s1">'</span><span class="s1">x</span><span class="s1">'</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s1">'</span><span class="s1">y</span><span class="s1">'</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">'</span><span class="s1">Private Expenditure</span><span class="s1">'</span><span class="p">)</span><span class="p">,</span>
+</code>
+    <code class="line">  <span class="n">TitledDots</span><span class="p">(</span><span class="n">fill_color</span><span class="o">=</span><span class="s1">'</span><span class="s1">black</span><span class="s1">'</span><span class="p">,</span> <span class="n">radius</span><span class="o">=</span><span class="s1">'</span><span class="s1">4</span><span class="s1">'</span><span class="p">)</span><span class="p">)</span>
+</code>
+    <code class="line"><span class="n">chart</span><span class="o">.</span><span class="n">add_series</span><span class="p">(</span>
+</code>
+    <code class="line">  <span class="n">Series</span><span class="p">(</span><span class="p">[</span><span class="p">{</span><span class="s1">'</span><span class="s1">x</span><span class="s1">'</span><span class="p">:</span> <span class="n">r</span><span class="o">.</span><span class="n">total_cost</span><span class="p">,</span> <span class="s1">'</span><span class="s1">y</span><span class="s1">'</span><span class="p">:</span> <span class="n">r</span><span class="o">.</span><span class="n">expectancy</span><span class="p">,</span> <span class="s1">'</span><span class="s1">title</span><span class="s1">'</span><span class="p">:</span> <span class="n">r</span><span class="o">.</span><span class="n">country</span><span class="p">}</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">]</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="s1">'</span><span class="s1">x</span><span class="s1">'</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="s1">'</span><span class="s1">y</span><span class="s1">'</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">'</span><span class="s1">Total Expenditure</span><span class="s1">'</span><span class="p">)</span><span class="p">,</span>
+</code>
+    <code class="line">  <span class="n">TitledDots</span><span class="p">(</span><span class="n">fill_color</span><span class="o">=</span><span class="s1">'</span><span class="s1">#C00000</span><span class="s1">'</span><span class="p">,</span> <span class="n">radius</span><span class="o">=</span><span class="s1">'</span><span class="s1">4</span><span class="s1">'</span><span class="p">)</span><span class="p">)</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="k">print</span><span class="p">(</span><span class="s1">'</span><span class="s1">&lt;div&gt;</span><span class="s1">'</span><span class="p">,</span> <span class="n">chart</span><span class="o">.</span><span class="n">to_svg</span><span class="p">(</span><span class="p">)</span><span class="p">,</span> <span class="s1">'</span><span class="s1">&lt;/div&gt;</span><span class="s1">'</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s1">'</span><span class="se">\n</span><span class="s1">'</span><span class="p">)</span> <span class="c1"># div is necessary to get block layout.</span>
+</code>
+    </div>
+  <br />
+    <div class="embed-label">scatterplot.svg</div>
+<div>
+    <svg height="600" version="1.1" width="800" xmlns="http://www.w3.org/2000/svg"><g><rect fill="#f9f9f9" height="600" width="800" x="0" y="0" /><g transform="translate(40 40)"><g transform="translate(24 0)"><text fill="#333" font-family="Monaco" font-size="16" x="0" y="0">Private Health Care Expenditure vs Life Expectancy</text><g transform="translate(0 20)"><g transform="translate(0 0)"><rect fill="black" height="10" width="10" x="0" y="-10" /><text fill="#666" font-family="Monaco" font-size="14" x="14" y="0">Private Expenditure</text></g><g transform="translate(198 0)"><rect fill="#C00000" height="10" width="10" x="0" y="-10" /><text fill="#666" font-family="Monaco" font-size="14" x="14" y="0">Total Expenditure</text></g></g></g><g transform="translate(0 38)"><g transform="translate(24 0)"><g class="axis bottom"><g class="tick"><line stroke="#eee" stroke-width="1" x1="174.00" x2="174.00" y1="0" y2="464.0" /><text dy="1em" fill="#9c9c9c" font-family="Monaco" text-anchor="middle" x="174.00" y="468.0">2500</text></g><g class="tick"><line stroke="#eee" stroke-width="1" x1="348.0" x2="348.0" y1="0" y2="464.0" /><text dy="1em" fill="#9c9c9c" font-family="Monaco" text-anchor="middle" x="348.0" y="468.0">5000</text></g><g class="tick"><line stroke="#eee" stroke-width="1" x1="522.00" x2="522.00" y1="0" y2="464.0" /><text dy="1em" fill="#9c9c9c" font-family="Monaco" text-anchor="middle" x="522.00" y="468.0">7500</text></g><g class="tick"><line stroke="#eee" stroke-width="1" x1="696" x2="696" y1="0" y2="464.0" /><text dy="1em" fill="#9c9c9c" font-family="Monaco" text-anchor="middle" x="696" y="468.0">10000</text></g><g class="tick"><line stroke="#a8a8a8" stroke-width="1" x1="0" x2="0" y1="0" y2="464.0" /><text dy="1em" fill="#9c9c9c" font-family="Monaco" text-anchor="middle" x="0" y="468.0">0</text></g></g><g class="axis left"><g class="tick"><line stroke="#eee" stroke-width="1" x1="-4" x2="696.0" y1="460" y2="460" /><text dy="0.32em" fill="#9c9c9c" font-family="Monaco" text-anchor="end" x="-8" y="460">74</text></g><g class="tick"><line stroke="#eee" stroke-width="1" x1="-4" x2="696.0" y1="368.0" y2="368.0" /><text dy="0.32em" fill="#9c9c9c" font-family="Monaco" text-anchor="end" x="-8" y="368.0">76</text></g><g class="tick"><line stroke="#eee" stroke-width="1" x1="-4" x2="696.0" y1="276.0" y2="276.0" /><text dy="0.32em" fill="#9c9c9c" font-family="Monaco" text-anchor="end" x="-8" y="276.0">78</text></g><g class="tick"><line stroke="#eee" stroke-width="1" x1="-4" x2="696.0" y1="184.0" y2="184.0" /><text dy="0.32em" fill="#9c9c9c" font-family="Monaco" text-anchor="end" x="-8" y="184.0">80</text></g><g class="tick"><line stroke="#eee" stroke-width="1" x1="-4" x2="696.0" y1="92.0" y2="92.0" /><text dy="0.32em" fill="#9c9c9c" font-family="Monaco" text-anchor="end" x="-8" y="92.0">82</text></g><g class="tick"><line stroke="#eee" stroke-width="1" x1="-4" x2="696.0" y1="0" y2="0" /><text dy="0.32em" fill="#9c9c9c" font-family="Monaco" text-anchor="end" x="-8" y="0">84</text></g></g><g><g class="series dots"><circle cx="318.10680" cy="239.2000000000001307398633798" fill="black" r="4"><title>United States</title></circle><circle cx="170.0856960000000151921994984" cy="46.0" fill="black" r="4"><title>Switzerland</title></circle><circle cx="98.47564800000000759609974922" cy="69.00" fill="black" r="4"><title>Australia</title></circle><circle cx="97.54579199999999873398337516" cy="115.00" fill="black" r="4"><title>Ireland</title></circle><circle cx="91.53444000000000633008312432" cy="105.7999999999998692601366202" fill="black" r="4"><title>Canada</title></circle><circle cx="81.46610400000000063300831245" cy="87.4000000000002614797267597" fill="black" r="4"><title>Korea</title></circle><circle cx="75.60230400000000063300831245" cy="124.2000000000001307398633798" fill="black" r="4"><title>Austria</title></circle><circle cx="73.93329599999999936699168755" cy="73.5999999999997385202732403" fill="black" r="4"><title>Luxembourg</title></circle><circle cx="67.52592000000000316504156217" cy="133.4000000000002614797267597" fill="black" r="4"><title>Belgium</title></circle><circle cx="64.89643199999999715146259405" cy="110.4000000000002614797267597" fill="black" r="4"><title>Finland</title></circle><circle cx="64.77532799999999651845428161" cy="110.4000000000002614797267597" fill="black" r="4"><title>Netherlands</title></circle><circle cx="63.09796800000000284853740595" cy="87.4000000000002614797267597" fill="black" r="4"><title>Israel</title></circle><circle cx="60.61116000000000158252078108" cy="73.5999999999997385202732403" fill="black" r="4"><title>Norway</title></circle><circle cx="60.24227999999999683495843783" cy="73.5999999999997385202732403" fill="black" r="4"><title>France</title></circle><circle cx="60.16223999999999841747921892" cy="46.0" fill="black" r="4"><title>Spain</title></circle><circle cx="56.93419199999999873398337513" cy="128.7999999999998692601366202" fill="black" r="4"><title>Portugal</title></circle><circle cx="55.99459199999999873398337513" cy="78.2000000000001307398633798" fill="black" r="4"><title>Sweden</title></circle><circle cx="54.95824799999999968349584378" cy="133.4000000000002614797267597" fill="black" r="4"><title>Greece</title></circle><circle cx="54.43276800000000284853740595" cy="138.0" fill="black" r="4"><title>United Kingdom</title></circle><circle cx="52.06845600000000094951246865" cy="151.7999999999998692601366202" fill="black" r="4"><title>Germany</title></circle><circle cx="52.03852799999999651845428161" cy="64.4000000000002614797267597" fill="black" r="4"><title>Italy</title></circle><circle cx="51.45110400000000063300831243" cy="147.2000000000001307398633798" fill="black" r="4"><title>Denmark</title></circle><circle cx="48.51885600000000094951246865" cy="142.5999999999997385202732403" fill="black" r="4"><title>Slovenia</title></circle><circle cx="48.30170400000000063300831243" cy="69.00" fill="black" r="4"><title>Iceland</title></circle><circle cx="48.02191200000000189902493730" cy="220.7999999999998692601366202" fill="black" r="4"><title>Chile</title></circle><circle cx="44.95116000000000158252078108" cy="4.5999999999997385202732403" fill="black" r="4"><title>Japan</title></circle><circle cx="43.64894399999999905048753135" cy="105.7999999999998692601366202" fill="black" r="4"><title>New Zealand</title></circle><circle cx="41.14473599999999778447090648" cy="381.7999999999998692601366202" fill="black" r="4"><title>Hungary</title></circle><circle cx="39.42840" cy="432.4000000000002614797267597" fill="black" r="4"><title>Latvia</title></circle><circle cx="35.03316000000000158252078108" cy="294.4000000000002614797267597" fill="black" r="4"><title>Poland</title></circle><circle cx="32.70503999999999841747921892" cy="414.0" fill="black" r="4"><title>Mexico</title></circle><circle cx="29.37050400000000063300831243" cy="289.7999999999998692601366202" fill="black" r="4"><title>Estonia</title></circle><circle cx="28.09612800000000047475623433" cy="335.7999999999998692601366202" fill="black" r="4"><title>Slovak Republic</title></circle><circle cx="25.25714399999999905048753135" cy="243.7999999999998692601366202" fill="black" r="4"><title>Czech Republic</title></circle><circle cx="14.43782399999999984174792189" cy="276.0" fill="black" r="4"><title>Turkey</title></circle></g><g class="series dots"><circle cx="625.338600" cy="239.2000000000001307398633798" fill="#C00000" r="4"><title>United States</title></circle><circle cx="467.5825440000000227882992476" cy="46.0" fill="#C00000" r="4"><title>Switzerland</title></circle><circle cx="305.3825280000000202562659979" cy="69.00" fill="#C00000" r="4"><title>Australia</title></circle><circle cx="326.8750079999999696156010032" cy="115.00" fill="#C00000" r="4"><title>Ireland</title></circle><circle cx="304.7248079999999696156010032" cy="105.7999999999998692601366202" fill="#C00000" r="4"><title>Canada</title></circle><circle cx="186.7006080000000012660166248" cy="87.4000000000002614797267597" fill="#C00000" r="4"><title>Korea</title></circle><circle cx="311.1899519999999924039002508" cy="124.2000000000001307398633798" fill="#C00000" r="4"><title>Austria</title></circle><circle cx="434.7000239999999721476342529" cy="73.5999999999997385202732403" fill="#C00000" r="4"><title>Luxembourg</title></circle><circle cx="297.1537199999999873398337513" cy="133.4000000000002614797267597" fill="#C00000" r="4"><title>Belgium</title></circle><circle cx="251.8761359999999898718670010" cy="110.4000000000002614797267597" fill="#C00000" r="4"><title>Finland</title></circle><circle cx="338.0931359999999898718670010" cy="110.4000000000002614797267597" fill="#C00000" r="4"><title>Netherlands</title></circle><circle cx="163.1451839999999974679667503" cy="87.4000000000002614797267597" fill="#C00000" r="4"><title>Israel</title></circle><circle cx="409.7400719999999797437340021" cy="73.5999999999997385202732403" fill="#C00000" r="4"><title>Norway</title></circle><circle cx="284.5178400000000063300831243" cy="73.5999999999997385202732403" fill="#C00000" r="4"><title>France</title></circle><circle cx="204.6031199999999873398337513" cy="46.0" fill="#C00000" r="4"><title>Spain</title></circle><circle cx="168.6623759999999962019501254" cy="128.7999999999998692601366202" fill="#C00000" r="4"><title>Portugal</title></circle><circle cx="347.5107120000000177242327481" cy="78.2000000000001307398633798" fill="#C00000" r="4"><title>Sweden</title></circle><circle cx="134.8799280000000044310581870" cy="133.4000000000002614797267597" fill="#C00000" r="4"><title>Greece</title></circle><circle cx="261.609000" cy="138.0" fill="#C00000" r="4"><title>United Kingdom</title></circle><circle cx="337.6838879999999822757672519" cy="151.7999999999998692601366202" fill="#C00000" r="4"><title>Germany</title></circle><circle cx="208.4721839999999974679667503" cy="64.4000000000002614797267597" fill="#C00000" r="4"><title>Italy</title></circle><circle cx="324.0770879999999822757672519" cy="147.2000000000001307398633798" fill="#C00000" r="4"><title>Denmark</title></circle><circle cx="172.15560" cy="142.5999999999997385202732403" fill="#C00000" r="4"><title>Slovenia</title></circle><circle cx="269.7473279999999886058503762" cy="69.00" fill="#C00000" r="4"><title>Iceland</title></circle><circle cx="122.1939360000000056970748119" cy="220.7999999999998692601366202" fill="#C00000" r="4"><title>Chile</title></circle><circle cx="282.8446560000000088621163741" cy="4.5999999999997385202732403" fill="#C00000" r="4"><title>Japan</title></circle><circle cx="220.4865359999999898718670010" cy="105.7999999999998692601366202" fill="#C00000" r="4"><title>New Zealand</title></circle><circle cx="129.6446160000000025320332497" cy="381.7999999999998692601366202" fill="#C00000" r="4"><title>Hungary</title></circle><circle cx="90.52732800000000443105818703" cy="432.4000000000002614797267597" fill="#C00000" r="4"><title>Latvia</title></circle><circle cx="112.9037280000000044310581870" cy="294.4000000000002614797267597" fill="#C00000" r="4"><title>Poland</title></circle><circle cx="67.65189599999999936699168757" cy="414.0" fill="#C00000" r="4"><title>Mexico</title></circle><circle cx="122.7187200000000031650415622" cy="289.7999999999998692601366202" fill="#C00000" r="4"><title>Estonia</title></circle><circle cx="138.9202080000000012660166248" cy="335.7999999999998692601366202" fill="#C00000" r="4"><title>Slovak Republic</title></circle><circle cx="151.8623279999999886058503762" cy="243.7999999999998692601366202" fill="#C00000" r="4"><title>Czech Republic</title></circle><circle cx="70.05240" cy="276.0" fill="#C00000" r="4"><title>Turkey</title></circle></g></g></g></g></g></g></svg>
+    </div>
+  </p>
+  <p>
+    Now let's try to reproduce the original visualization. It is unusual because the lines do not represent data series; rather, each line represents a single <code class="inline">(expenditure,&nbsp;expectancy)</code> datapoint, and the slope of the line is what conveys magnitude visually. We could hunt around for a library to do this, but let's just draw it ourselves using raw SVG. To do this, we need to scale the values for each dimension and create a line with text at either endpoint.
+  </p>
+  <p>
+    <div class="embed-label">vis.svg.py</div>
+<div class="code-block">
+    <code class="line"><span class="kn">from</span> <span class="nn">muck</span> <span class="kn">import</span> <span class="o">*</span>
+</code>
+    <code class="line"><span class="kn">from</span> <span class="nn">xml.etree.ElementTree</span> <span class="kn">import</span> <span class="n">Element</span><span class="p">,</span> <span class="n">ElementTree</span>
+</code>
+    <code class="line"><span class="kn">from</span> <span class="nn">sys</span> <span class="kn">import</span> <span class="n">stdout</span><span class="p">,</span> <span class="n">stderr</span>
+</code>
+    <code class="line"><span class="kn">from</span> <span class="nn">chart_data</span> <span class="kn">import</span> <span class="n">rows</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="k">def</span> <span class="nf">add_el</span><span class="p">(</span><span class="n">parent</span><span class="p">,</span> <span class="n">tag</span><span class="p">,</span> <span class="o">*</span><span class="o">*</span><span class="n">kwargs</span><span class="p">)</span><span class="p">:</span>
+</code>
+    <code class="line">  <span class="k">try</span><span class="p">:</span> <span class="n">text</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">'</span><span class="s1">text</span><span class="s1">'</span><span class="p">)</span>
+</code>
+    <code class="line">  <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span> <span class="n">text</span> <span class="o">=</span> <span class="bp">None</span>
+</code>
+    <code class="line">  <span class="n">e</span> <span class="o">=</span> <span class="n">Element</span><span class="p">(</span><span class="n">tag</span><span class="p">,</span> <span class="o">*</span><span class="o">*</span><span class="nb">dict</span><span class="p">(</span><span class="p">(</span><span class="n">k</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">'</span><span class="s1">_</span><span class="s1">'</span><span class="p">,</span> <span class="s1">'</span><span class="s1">-</span><span class="s1">'</span><span class="p">)</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">(</span><span class="p">)</span><span class="p">)</span><span class="p">)</span>
+</code>
+    <code class="line">  <span class="k">if</span> <span class="n">text</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+</code>
+    <code class="line">    <span class="n">e</span><span class="o">.</span><span class="n">text</span> <span class="o">=</span> <span class="n">text</span>
+</code>
+    <code class="line">  <span class="k">if</span> <span class="n">parent</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">None</span><span class="p">:</span>
+</code>
+    <code class="line">    <span class="n">parent</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+</code>
+    <code class="line">  <span class="k">return</span> <span class="n">e</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="n">w</span> <span class="o">=</span> <span class="mi">600</span>
+</code>
+    <code class="line"><span class="n">h</span> <span class="o">=</span> <span class="mi">600</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="n">svg</span> <span class="o">=</span> <span class="n">add_el</span><span class="p">(</span><span class="bp">None</span><span class="p">,</span> <span class="s1">'</span><span class="s1">svg</span><span class="s1">'</span><span class="p">,</span> <span class="n">xmlns</span><span class="o">=</span><span class="s1">'</span><span class="s1">http://www.w3.org/2000/svg</span><span class="s1">'</span><span class="p">,</span> <span class="n">display</span><span class="o">=</span><span class="s1">'</span><span class="s1">block</span><span class="s1">'</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="n">f</span><span class="s1">'</span><span class="s1">100</span><span class="s1">%</span><span class="s1">'</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="n">f</span><span class="s1">'</span><span class="s1">auto</span><span class="s1">'</span><span class="p">,</span>
+</code>
+    <code class="line">  <span class="n">viewBox</span><span class="o">=</span><span class="n">f</span><span class="s1">'</span><span class="s1">0 0 {w} {h}</span><span class="s1">'</span><span class="p">)</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="n">add_el</span><span class="p">(</span><span class="n">svg</span><span class="p">,</span> <span class="s1">'</span><span class="s1">rect</span><span class="s1">'</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="n">w</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="n">h</span><span class="p">,</span> <span class="n">fill</span><span class="o">=</span><span class="s1">'</span><span class="s1">none</span><span class="s1">'</span><span class="p">,</span> <span class="n">stroke_width</span><span class="o">=</span><span class="s1">'</span><span class="s1">1px</span><span class="s1">'</span><span class="p">,</span> <span class="n">stroke</span><span class="o">=</span><span class="s1">'</span><span class="s1">#808080</span><span class="s1">'</span><span class="p">)</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="n">inset_l</span> <span class="o">=</span> <span class="mi">100</span>
+</code>
+    <code class="line"><span class="n">inset_r</span> <span class="o">=</span> <span class="mi">60</span>
+</code>
+    <code class="line"><span class="n">inset_y</span> <span class="o">=</span> <span class="mi">10</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="n">vis_w</span> <span class="o">=</span> <span class="n">w</span> <span class="o">-</span> <span class="p">(</span><span class="n">inset_l</span> <span class="o">+</span> <span class="n">inset_r</span><span class="p">)</span>
+</code>
+    <code class="line"><span class="n">vis_h</span> <span class="o">=</span> <span class="n">h</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">inset_y</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="n">max_private_cost</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">)</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="n">min_expectancy</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">)</span>
+</code>
+    <code class="line"><span class="n">max_expectancy</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">rows</span><span class="p">)</span>
+</code>
+    <code class="line"><span class="n">rng_expectancy</span> <span class="o">=</span> <span class="n">max_expectancy</span> <span class="o">-</span> <span class="n">min_expectancy</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="n">add_el</span><span class="p">(</span><span class="n">svg</span><span class="p">,</span> <span class="s1">'</span><span class="s1">text</span><span class="s1">'</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">h</span><span class="o">*</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">alignment_baseline</span><span class="o">=</span><span class="s1">'</span><span class="s1">middle</span><span class="s1">'</span><span class="p">,</span> <span class="n">font_size</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">text_anchor</span><span class="o">=</span><span class="s1">'</span><span class="s1">middle</span><span class="s1">'</span><span class="p">,</span>
+</code>
+    <code class="line">  <span class="n">text</span><span class="o">=</span><span class="s1">'</span><span class="s1">PRIVATE HEALTH SPENDING PER PERSON IN 2016 (US$)</span><span class="s1">'</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="n">f</span><span class="s1">'</span><span class="s1">rotate(-90 10 {h*0.5})</span><span class="s1">'</span><span class="p">)</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="n">add_el</span><span class="p">(</span><span class="n">svg</span><span class="p">,</span> <span class="s1">'</span><span class="s1">text</span><span class="s1">'</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">w</span><span class="o">-</span><span class="mi">10</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">h</span><span class="o">*</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">alignment_baseline</span><span class="o">=</span><span class="s1">'</span><span class="s1">middle</span><span class="s1">'</span><span class="p">,</span> <span class="n">font_size</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span> <span class="n">text_anchor</span><span class="o">=</span><span class="s1">'</span><span class="s1">middle</span><span class="s1">'</span><span class="p">,</span>
+</code>
+    <code class="line">  <span class="n">text</span><span class="o">=</span><span class="s1">'</span><span class="s1">AVERAGE LIFE EXPECTANCY AT BIRTH</span><span class="s1">'</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="n">f</span><span class="s1">'</span><span class="s1">rotate(90 {w-10} {h*0.5})</span><span class="s1">'</span><span class="p">)</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="n">g</span> <span class="o">=</span> <span class="n">add_el</span><span class="p">(</span><span class="n">svg</span><span class="p">,</span> <span class="s1">'</span><span class="s1">g</span><span class="s1">'</span><span class="p">,</span> <span class="n">transform</span><span class="o">=</span><span class="n">f</span><span class="s1">'</span><span class="s1">translate({inset_l}, {inset_y})</span><span class="s1">'</span><span class="p">)</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="n">labeled_countries</span> <span class="o">=</span> <span class="p">{</span>
+</code>
+    <code class="line">  <span class="s1">'</span><span class="s1">United States</span><span class="s1">'</span><span class="p">,</span>
+</code>
+    <code class="line">  <span class="s1">'</span><span class="s1">Switzerland</span><span class="s1">'</span><span class="p">,</span>
+</code>
+    <code class="line">  <span class="s1">'</span><span class="s1">Australia</span><span class="s1">'</span><span class="p">,</span>
+</code>
+    <code class="line">  <span class="s1">'</span><span class="s1">Canada</span><span class="s1">'</span><span class="p">,</span>
+</code>
+    <code class="line">  <span class="s1">'</span><span class="s1">Ireland</span><span class="s1">'</span><span class="p">,</span>
+</code>
+    <code class="line">  <span class="s1">'</span><span class="s1">United Kingdom</span><span class="s1">'</span><span class="p">,</span>
+</code>
+    <code class="line">  <span class="s1">'</span><span class="s1">Turkey</span><span class="s1">'</span><span class="p">,</span>
+</code>
+    <code class="line"><span class="p">}</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">r</span><span class="o">.</span><span class="n">private_cost</span><span class="p">)</span><span class="p">:</span>
+</code>
+    <code class="line">  <span class="n">y1</span> <span class="o">=</span> <span class="n">vis_h</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">r</span><span class="o">.</span><span class="n">private_cost</span> <span class="o">/</span> <span class="n">max_private_cost</span><span class="p">)</span>
+</code>
+    <code class="line">  <span class="n">y2</span> <span class="o">=</span> <span class="n">vis_h</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">expectancy</span> <span class="o">-</span> <span class="n">min_expectancy</span><span class="p">)</span> <span class="o">/</span> <span class="n">rng_expectancy</span><span class="p">)</span>
+</code>
+    <code class="line">  <span class="n">labeled</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">country</span> <span class="ow">in</span> <span class="n">labeled_countries</span>
+</code>
+    <code class="line">  <span class="n">color</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'</span><span class="s1">#FF6000</span><span class="s1">'</span> <span class="k">if</span> <span class="n">r</span><span class="o">.</span><span class="n">country</span> <span class="o">==</span> <span class="s1">'</span><span class="s1">United States</span><span class="s1">'</span> <span class="k">else</span> <span class="p">(</span><span class="s1">'</span><span class="s1">#4040E0</span><span class="s1">'</span> <span class="k">if</span> <span class="n">labeled</span> <span class="k">else</span> <span class="s1">'</span><span class="s1">#404040</span><span class="s1">'</span><span class="p">)</span><span class="p">)</span>
+</code>
+    <code class="line">  <span class="n">add_el</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="s1">'</span><span class="s1">line</span><span class="s1">'</span><span class="p">,</span> <span class="n">x1</span><span class="o">=</span><span class="s1">'</span><span class="s1">0</span><span class="s1">'</span><span class="p">,</span> <span class="n">y1</span><span class="o">=</span><span class="n">y1</span><span class="p">,</span> <span class="n">x2</span><span class="o">=</span><span class="n">vis_w</span><span class="p">,</span> <span class="n">y2</span><span class="o">=</span><span class="n">y2</span><span class="p">,</span> <span class="n">stroke</span><span class="o">=</span><span class="n">color</span><span class="p">,</span> <span class="n">stroke_width</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line">  <span class="k">if</span> <span class="n">labeled</span><span class="p">:</span>
+</code>
+    <code class="line">    <span class="n">add_el</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="s1">'</span><span class="s1">text</span><span class="s1">'</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">y1</span><span class="p">,</span> <span class="n">alignment_baseline</span><span class="o">=</span><span class="s1">'</span><span class="s1">middle</span><span class="s1">'</span><span class="p">,</span> <span class="n">font_size</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">text_anchor</span><span class="o">=</span><span class="s1">'</span><span class="s1">end</span><span class="s1">'</span><span class="p">,</span>
+</code>
+    <code class="line">      <span class="n">text</span><span class="o">=</span><span class="n">f</span><span class="s1">'</span><span class="s1">{r.country} ${round(r.private_cost)}</span><span class="s1">'</span><span class="p">,</span> <span class="n">fill</span><span class="o">=</span><span class="n">color</span><span class="p">)</span>
+</code>
+    <code class="line">    <span class="n">add_el</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="s1">'</span><span class="s1">text</span><span class="s1">'</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="n">vis_w</span><span class="o">+</span><span class="mi">2</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">y2</span><span class="p">,</span> <span class="n">alignment_baseline</span><span class="o">=</span><span class="s1">'</span><span class="s1">middle</span><span class="s1">'</span><span class="p">,</span> <span class="n">font_size</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">text_anchor</span><span class="o">=</span><span class="s1">'</span><span class="s1">start</span><span class="s1">'</span><span class="p">,</span>
+</code>
+    <code class="line">      <span class="n">text</span><span class="o">=</span><span class="n">f</span><span class="s1">'</span><span class="s1">{r.expectancy:0.1f} years</span><span class="s1">'</span><span class="p">,</span> <span class="n">fill</span><span class="o">=</span><span class="n">color</span><span class="p">)</span>
+</code>
+    <code class="line">
+</code>
+    <code class="line"><span class="n">ElementTree</span><span class="p">(</span><span class="n">svg</span><span class="p">)</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">stdout</span><span class="o">.</span><span class="n">buffer</span><span class="p">)</span>
+</code>
+    </div>
+  <br />
+    <div class="embed-label">vis.svg</div>
+<svg display="block" height="auto" viewBox="0 0 600 600" width="100%" xmlns="http://www.w3.org/2000/svg"><rect fill="none" height="600" stroke="#808080" stroke-width="1px" width="600" x="0" y="0" /><text alignment-baseline="middle" font-size="12" text-anchor="middle" transform="rotate(-90 10 300.0)" x="10" y="300.0">PRIVATE HEALTH SPENDING PER PERSON IN 2016 (US$)</text><text alignment-baseline="middle" font-size="12" text-anchor="middle" transform="rotate(90 590 300.0)" x="590" y="300.0">AVERAGE LIFE EXPECTANCY AT BIRTH</text><g transform="translate(100, 10)"><line stroke="#4040E0" stroke-width="2" x1="0" x2="440" y1="553.6757028771469" y2="367.95698924731175" /><text alignment-baseline="middle" fill="#4040E0" font-size="8" text-anchor="end" x="-2" y="553.6757028771469">Turkey $207</text><text alignment-baseline="middle" fill="#4040E0" font-size="8" text-anchor="start" x="442" y="367.95698924731175">78.0 years</text><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="533.9489771359807" y2="324.301075268817" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="528.7726944535609" y2="449.03225806451576" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="526.4491412318126" y2="386.66666666666634" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="520.3693250191445" y2="555.0537634408599" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="516.1244940378514" y2="392.90322580645187" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="508.1107099879663" y2="580.0" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="504.98133683404444" y2="511.3978494623651" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="500.41544688764907" y2="137.20430107526883" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="498.04113335521276" y2="0.0" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="492.4422710863144" y2="293.11827956989225" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="491.93212996389894" y2="87.31182795698949" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="491.53619954053164" y2="187.09677419354816" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="486.18986981730666" y2="193.3333333333336" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="485.1188272617876" y2="81.07526881720494" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="485.0642599277978" y2="199.56989247311824" /><line stroke="#4040E0" stroke-width="2" x1="0" x2="440" y1="480.7534405426102" y2="180.8602150537636" /><text alignment-baseline="middle" fill="#4040E0" font-size="8" text-anchor="end" x="-2" y="480.7534405426102">United Kingdom $782</text><text alignment-baseline="middle" fill="#4040E0" font-size="8" text-anchor="start" x="442" y="180.8602150537636">81.0 years</text><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="479.7953396783722" y2="174.62365591397898" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="477.9057871130073" y2="99.78494623655956" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="476.1926266272837" y2="168.38709677419354" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="470.3069686029975" y2="56.12903225806479" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="470.1610327097692" y2="93.5483870967741" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="469.48845859315173" y2="93.5483870967741" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="464.9542938409364" y2="112.25806451612958" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="461.89598512197796" y2="143.44086021505427" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="461.67517777048465" y2="143.44086021505427" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="456.8808664259928" y2="174.62365591397898" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="445.19838092112457" y2="93.5483870967741" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="442.15530029537246" y2="162.15053763440892" /><line stroke="#404040" stroke-width="2" x1="0" x2="440" y1="431.4639098566896" y2="112.25806451612958" /><line stroke="#4040E0" stroke-width="2" x1="0" x2="440" y1="413.1064434963352" y2="137.20430107526883" /><text alignment-baseline="middle" fill="#4040E0" font-size="8" text-anchor="end" x="-2" y="413.1064434963352">Canada $1315</text><text alignment-baseline="middle" fill="#4040E0" font-size="8" text-anchor="start" x="442" y="137.20430107526883">81.7 years</text><line stroke="#4040E0" stroke-width="2" x1="0" x2="440" y1="402.1460234110054" y2="149.6774193548389" /><text alignment-baseline="middle" fill="#4040E0" font-size="8" text-anchor="end" x="-2" y="402.1460234110054">Ireland $1402</text><text alignment-baseline="middle" fill="#4040E0" font-size="8" text-anchor="start" x="442" y="149.6774193548389">81.5 years</text><line stroke="#4040E0" stroke-width="2" x1="0" x2="440" y1="400.45062903402254" y2="87.31182795698949" /><text alignment-baseline="middle" fill="#4040E0" font-size="8" text-anchor="end" x="-2" y="400.45062903402254">Australia $1415</text><text alignment-baseline="middle" fill="#4040E0" font-size="8" text-anchor="start" x="442" y="87.31182795698949">82.5 years</text><line stroke="#4040E0" stroke-width="2" x1="0" x2="440" y1="269.8849578820698" y2="56.12903225806479" /><text alignment-baseline="middle" fill="#4040E0" font-size="8" text-anchor="end" x="-2" y="269.8849578820698">Switzerland $2444</text><text alignment-baseline="middle" fill="#4040E0" font-size="8" text-anchor="start" x="442" y="56.12903225806479">83.0 years</text><line stroke="#FF6000" stroke-width="2" x1="0" x2="440" y1="0.0" y2="318.06451612903237" /><text alignment-baseline="middle" fill="#FF6000" font-size="8" text-anchor="end" x="-2" y="0.0">United States $4570</text><text alignment-baseline="middle" fill="#FF6000" font-size="8" text-anchor="start" x="442" y="318.06451612903237">78.8 years</text></g></svg>
+  </p>
+  <p>
+    We could probably work on the styling a little more, but it's pretty close to the original.
+  </p>
+</section>
+<section class="S1" id="s5">
+  <h1 id="h5">Conclusion</h1>
+  <p>
+    This demo shows how a data journalist can use Muck to produce a complete article, including charts and tables. The entire reproduction was constructed with Muck, SQLite, and the csv-to-sqlite utility, plus a text editor, a terminal program (to run Muck), and a browser to inspect the results.
+  </p>
+  <p>
+    This work also shows that by using Muck data journalists can make their projects completely reproducible. To guarantee that everyone sees the same results, I checked the downloaded data into the repository. The OECD terms and conditions are <a href="http://www.oecd.org/termsandconditions/">here</a>. Note that while they grant permission to redistribute the data, they also state that they might not actually own portions of it, and claim that it is the user's responsibility to make such determinations. Doing so is really not so feasible for an individual like myself, and given the complexity of modern intellectual property law, republishing anything is something of a calculated risk.
+  </p>
+  <p>
+    Alternatively I could have left intrepid readers to download the OECD data themselves, but it could change in the future, undergo a change in format that might break our code, or even become unavailable entirely (the license makes disclaimers for each of these possibilities).
+  </p>
+  <p>
+    The fact that our numbers only partially match those in the original article suggests that the data has indeed changed in the intervening three months, although we cannot be sure. In any case, the demonstration suggests just how difficult reproducible data journalism really is. If the dataset were proprietary, we would not have the option of publishing a copy at all.
+  </p>
+  <p>
+    Finally, I would like to note that this project is neither a critique nor endorsement of the original article. While I wish the author had provided more specific information about which data was used, I suspect that the core problem has to do with an update to the dataset since the original publication date on 2017/07/07. The discrepancies around latest year of life expectancy data per country is slightly problematic; we could investigate further by looking at how much the life expectancies changed in prior years. Whether or not the comparison between private health expenditures and life expectancy truly summarizes the nature of the US health care problem is another question entirely.
+  </p>
+</section>
+<script type="text/javascript"> "use strict";
+section_ids = ['s0','s1','s2','s2.1','s2.1.1','s2.1.2','s2.1.3','s2.1.4','s2.2','s2.2.1','s2.2.2','s2.2.3','s3','s4','s5'];
+paging_ids = ['body', 's0','s1','s2','s2.1','s2.2','s3','s4','s5'];
+</script>
+<footer id="footer">
+© 2017 George King. All rights reserved.
+</footer>
+</body>
+</html>

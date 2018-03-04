@@ -92,6 +92,11 @@ The programmer can build the document by invoking `muck document.html` on the co
   * run `writeup document.html.wu`, which reads `_build/chartA.svg`, `_build/chartB.svg`, and writes `_build/document.html`.
 
 
+# Demos
+
+* <https://gwk.github.io/muck/demos/oecd-health OECD health data>: this tutorial shows a how to build a complete article in Muck, in notebook style that interleaves prose, code, and results.
+
+
 # Credits
 
 Muck is developed by <https://gwk.github.io George King>, and was initially sponsored by the <https://towcenter.org Tow Center for Digital Journalism>. Professor <https://journalism.columbia.edu/faculty/mark-hansen Mark Hansen> and the <https://brown.columbia.edu/about/ Brown Institute> have supported this research since it began in 2015. <https://massivesci.com/people/gabe-stein Gabe Stein> has collaborated on design and testing.
