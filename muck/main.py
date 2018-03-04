@@ -317,8 +317,7 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[Dependent], for
     return change_time
 
   ctx.change_times[target] = None # recursion sentinal is replaced before return by update_deps_and_record.
-
-  ctx.dbg(target, f'examining... (dependent={dependent})')
+  ctx.dbg(target, f'\x1b[32mupdate; {dependent or "<requested>"}\x1b[0m')
 
   status = file_status(target) # follows symlinks.
   if status is None and is_link(target):
