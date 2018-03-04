@@ -69,18 +69,29 @@ def main() -> None:
     parsers[cmd] = parser
     return parser
 
-  add_parser('clean-all',     muck_clean_all,     builds=False, takes_ctx=False,    description='clean the entire build directory, including the build database.')
-  add_parser('clean',         muck_clean,         builds=False, targets_dflt=False, description='clean the specified targets.')
-  add_parser('deps',          muck_deps,          builds=True,  targets_dflt=True,  description='print targets and their dependencies as a visual hierarchy.')
-  add_parser('deps-list',     muck_deps_list,     builds=True,  targets_dflt=True,  description='print targets and their dependencies as a list.')
-  add_parser('prod-list',     muck_prod_list,     builds=True,  targets_dflt=True,  description='print products as a list.')
+  add_parser('clean-all', muck_clean_all, builds=False, takes_ctx=False,
+    description='clean the entire build directory, including the build database.')
 
-  create_patch = add_parser('create-patch',  muck_create_patch,  builds=True, description="create a patch; creates a new '.pat' source.",
+  add_parser('clean', muck_clean, builds=False, targets_dflt=False,
+    description='clean the specified targets.')
+
+  add_parser('deps', muck_deps, builds=True, targets_dflt=True,
+    description='print targets and their dependencies as a visual hierarchy.')
+
+  add_parser('deps-list', muck_deps_list, builds=True, targets_dflt=True,
+    description='print targets and their dependencies as a list.')
+
+  add_parser('prod-list', muck_prod_list, builds=True, targets_dflt=True,
+    description='print products as a list.')
+
+  create_patch = add_parser('create-patch', muck_create_patch, builds=True,
+    description="create a patch; creates a new '.pat' source.",
     epilog='This command creates an empty patch called [modified].pat, and copies [original] to _build/[modified].')
   create_patch.add_argument('original', help='the target to be patched.')
   create_patch.add_argument('modified', help='the target to be produced by patching the original.')
 
-  update_patch = add_parser('update-patch',  muck_update_patch,  builds=True, description="update a '.pat' patch.",
+  update_patch = add_parser('update-patch', muck_update_patch, builds=True,
+    description="update a '.pat' patch.",
     epilog='The patch file will be updated with the diff between the original referenced by the patch, and _build/[modified].')
   update_patch.add_argument('patch', help='the patch to update.')
 
@@ -91,7 +102,8 @@ def main() -> None:
 
   # add build_parser last so that we can describe other commands in its epilog.
   cmds_str = ', '.join(parsers)
-  build_parser = add_parser('build', muck_build, builds=True, targets_dflt=True, description='build targets',
+  build_parser = add_parser('build', muck_build, builds=True, targets_dflt=True,
+    description='build the specified targets.',
     epilog=f'`build` is the default subcommand; other available commands are:\n{cmds_str}.`')
   build_parser.add_argument('-serve', nargs='?', const='index.html',
     help='serve contents of build directory via local HTTP, and open the specified target in the browser.')
