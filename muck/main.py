@@ -154,8 +154,8 @@ def main() -> None:
 def muck_build(ctx: Ctx) -> None:
   '`muck build` (default) command: update each specified target.'
 
-  def update_target(target: str) -> None: # closure to pass to serve_build.
-    update_dependency(ctx, target, dependent=None, force=ctx.args.force)
+  def update(target: str) -> None: # closure to pass to serve_build.
+    update_target(ctx, target, dependent=None, force=ctx.args.force)
 
   for target in ctx.targets:
     if path_exists(target):
@@ -165,10 +165,10 @@ def muck_build(ctx: Ctx) -> None:
         target = stem
       else:
         note(target, 'specified target is a source and not a product.')
-    update_target(target)
+    update(target)
   if ctx.args.serve:
-    update_target(ctx.args.serve)
-    serve_build(ctx, main_target=ctx.args.serve, update_target=update_target)
+    update(ctx.args.serve)
+    serve_build(ctx, main_target=ctx.args.serve, update_fn=update)
 
 
 def muck_clean_all(args: Namespace) -> None:
@@ -194,7 +194,7 @@ def muck_deps(ctx: Ctx) -> None:
   '`muck deps` command.'
   targets = ctx.targets
   for target in targets:
-    update_dependency(ctx, target, dependent=None)
+    update_target(ctx, target, dependent=None)
 
   roots = set(targets)
   roots.update(t for t, dpdts in ctx.dependents.items() if len(dpdts) > 1)
@@ -244,14 +244,14 @@ dependent_colors = {
 def muck_deps_list(ctx: Ctx) -> None:
   '`muck deps-list` command.'
   for target in ctx.targets:
-    update_dependency(ctx, target, dependent=None)
+    update_target(ctx, target, dependent=None)
   outLL(*sorted(ctx.change_times.keys()))
 
 
 def muck_prod_list(ctx: Ctx) -> None:
   '`muck prod-list` command.'
   for target in ctx.targets:
-    update_dependency(ctx, target, dependent=None)
+    update_target(ctx, target, dependent=None)
   outLL(*sorted(ctx.product_path_for_target(t) for t in ctx.change_times.keys()))
 
 
@@ -270,7 +270,7 @@ def muck_create_patch(ctx: Ctx) -> None:
     exit(f"muck create-patch error: 'modified' is an existing target: {modified}")
   if path_exists(patch) or ctx.db.contains_record(patch):
     exit(f"muck create-patch error: patch is an existing target: {patch}")
-  update_dependency(ctx, original, dependent=None)
+  update_target(ctx, original, dependent=None)
   cmd = ['pat', 'create', original, modified, '../' + patch]
   cmd_str = ' '.join(shlex.quote(w) for w in cmd)
   errL(f'muck create-patch note: creating patch: `{cmd_str}`')
@@ -287,7 +287,7 @@ def muck_update_patch(ctx: Ctx) -> None:
   deps = pat_dependencies(patch_path, open(patch_path), {})
   assert len(deps) == 1
   orig_path = deps[0]
-  update_dependency(ctx, orig_path, dependent=None)
+  update_target(ctx, orig_path, dependent=None)
   target = path_stem(patch_path)
   patch_path_tmp = patch_path + tmp_ext
   cmd = ['pat', 'diff', orig_path, target, '../' + patch_path_tmp]
@@ -322,7 +322,7 @@ def muck_publish(ctx: Ctx) -> None:
 
   copied_products: Set[str] = set()
   for target in ctx.targets:
-    update_dependency(ctx, target, dependent=None, force=ctx.args.force)
+    update_target(ctx, target, dependent=None, force=ctx.args.force)
     product = ctx.product_path_for_target(target)
     clone(src=product, dst=path_join(dst_root, target))
     copied_products.add(product)
@@ -339,7 +339,7 @@ def muck_publish(ctx: Ctx) -> None:
 # Core update algorithm.
 
 
-def update_dependency(ctx: Ctx, target: str, dependent: Optional[Dependent], force=False) -> int:
+def update_target(ctx: Ctx, target: str, dependent: Optional[Dependent], force=False) -> int:
   'returns transitive change_time.'
   validate_target_or_error(ctx, target)
 
@@ -367,7 +367,7 @@ def update_dependency(ctx: Ctx, target: str, dependent: Optional[Dependent], for
   if is_product:
     target_dir = path_dir(target)
     if target_dir and not path_exists(target_dir): # Not possible to find a source; must be the contents of a built directory.
-      update_dependency(ctx, target=target_dir, dependent=Dependent(kind='directory contents', target=target), force=force)
+      update_target(ctx, target=target_dir, dependent=Dependent(kind='directory contents', target=target), force=force)
       change_time = ctx.change_times[target]
       if change_time is None: # build of parent failed to create this product.
         raise error(target, f'target resides in a product directory but was not created by building that directory')
@@ -432,7 +432,7 @@ def update_product(ctx: Ctx, target: str, needs_update: bool, old: Optional[Targ
   # This design avoids dependency on file system time stamps and OS clocks.
   # For file systems with poor time resolution (e.g. HFS mtime is 1 sec resolution), this is important.
   last_update_time = 0 if old is None else old.update_time
-  src_change_time = update_dependency(ctx, src, dependent=Dependent(kind='source', target=target))
+  src_change_time = update_target(ctx, src, dependent=Dependent(kind='source', target=target))
   needs_update = needs_update or last_update_time < src_change_time
   update_time = max(last_update_time, src_change_time)
 
@@ -441,7 +441,7 @@ def update_product(ctx: Ctx, target: str, needs_update: bool, old: Optional[Targ
     # if they have not, then no rebuild is necessary.
     assert old is not None
     for dyn_dep in old.dyn_deps:
-      dep_change_time = update_dependency(ctx, dyn_dep, dependent=Dependent(kind='observed', target=target))
+      dep_change_time = update_target(ctx, dyn_dep, dependent=Dependent(kind='observed', target=target))
       update_time = max(update_time, dep_change_time)
   needs_update = needs_update or last_update_time < update_time
 
@@ -563,13 +563,13 @@ def update_deps_and_record(ctx, target: str, is_target_dir: bool, actual_path: s
     deps = old.deps
 
   for dep in deps:
-    dep_change_time = update_dependency(ctx, dep, dependent=Dependent(kind='inferred', target=target))
+    dep_change_time = update_target(ctx, dep, dependent=Dependent(kind='inferred', target=target))
     change_time = max(change_time, dep_change_time)
   update_time = max(update_time, change_time)
 
   assert ctx.change_times.get(target) is None
   #^ use get (which defaults to None) because when a script generates multiple outputs,
-  # this function gets called without a preceding call to update_dependency.
+  # this function gets called without a preceding call to update_target.
   # note: it is possible that two different scripts could generate the same named file, causing this assertion to fail.
   # TODO: change this from an assertion to an informative error.
   ctx.change_times[target] = change_time # replace sentinal with final value.
@@ -726,7 +726,7 @@ def process_dep_line(ctx: Ctx, depCtx: DepCtx, target: str, dep_line: str, dyn_t
   if mode in 'RS':
     if mode == 'S' and dep == target: return dyn_time # sqlite stats the db before opening. Imperfect, but better than nothing.
     if dep in depCtx.restricted_deps_rd: raise error(target, f'attempted to open restricted file for reading: {dep!r}')
-    dep_time = update_dependency(ctx, dep, dependent=Dependent(kind='observed', target=target))
+    dep_time = update_target(ctx, dep, dependent=Dependent(kind='observed', target=target))
     dyn_time = max(dyn_time, dep_time)
     depCtx.dyn_deps.append(dep)
   elif mode in 'AMUW':
