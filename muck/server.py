@@ -8,7 +8,10 @@ from .pithy.io import *
 from .ctx import Ctx
 
 
-def serve_build(ctx: Ctx, main_target: str, update_fn: Callable[[str], None]) -> None:
+def serve_build(ctx: Ctx, main_target: str, update_top: Callable[[Ctx, str], int]) -> None:
+  '''
+  Note: update_top is passed in to prevent `muck.main` and `muck.server` modules from being circularly dependent.
+  '''
   address = ('localhost', 8000)
   host, port = address
   addr_str = f'http://{host}:{port}/{main_target}'
@@ -46,7 +49,7 @@ def serve_build(ctx: Ctx, main_target: str, update_fn: Callable[[str], None]) ->
           if should_rebuild: ctx.reset()
           should_rebuild = True
         ctx.dbg(f'local request: {self.path}; target: {target}')
-        update_fn(target)
+        update_top(ctx, target)
 
       return super().send_head() # type: ignore # this is technically a private method.
 

@@ -154,9 +154,6 @@ def main() -> None:
 def muck_build(ctx: Ctx) -> None:
   '`muck build` (default) command: update each specified target.'
 
-  def update(target: str) -> None: # closure to pass to serve_build.
-    update_target(ctx, target, dependent=None, force=ctx.args.force)
-
   for target in ctx.targets:
     if path_exists(target):
       stem, ext = split_stem_ext(target)
@@ -165,10 +162,10 @@ def muck_build(ctx: Ctx) -> None:
         target = stem
       else:
         note(target, 'specified target is a source and not a product.')
-    update(target)
+    update_top(ctx, target)
   if ctx.args.serve:
-    update(ctx.args.serve)
-    serve_build(ctx, main_target=ctx.args.serve, update_fn=update)
+    update_top(ctx, target=ctx.args.serve)
+    serve_build(ctx, main_target=ctx.args.serve, update_top=update_top)
 
 
 def muck_clean_all(args: Namespace) -> None:
@@ -194,7 +191,7 @@ def muck_deps(ctx: Ctx) -> None:
   '`muck deps` command.'
   targets = ctx.targets
   for target in targets:
-    update_target(ctx, target, dependent=None)
+    update_top(ctx, target)
 
   roots = set(targets)
   roots.update(t for t, dpdts in ctx.dependents.items() if len(dpdts) > 1)
@@ -244,14 +241,14 @@ dependent_colors = {
 def muck_deps_list(ctx: Ctx) -> None:
   '`muck deps-list` command.'
   for target in ctx.targets:
-    update_target(ctx, target, dependent=None)
+    update_top(ctx, target)
   outLL(*sorted(ctx.statuses.keys()))
 
 
 def muck_prod_list(ctx: Ctx) -> None:
   '`muck prod-list` command.'
   for target in ctx.targets:
-    update_target(ctx, target, dependent=None)
+    update_top(ctx, target)
   outLL(*sorted(ctx.product_path_for_target(t) for t in ctx.statuses.keys()))
 
 
@@ -270,7 +267,7 @@ def muck_create_patch(ctx: Ctx) -> None:
     exit(f"muck create-patch error: 'modified' is an existing target: {modified}")
   if path_exists(patch) or ctx.db.contains_record(patch):
     exit(f"muck create-patch error: patch is an existing target: {patch}")
-  update_target(ctx, original, dependent=None)
+  update_top(ctx, original)
   cmd = ['pat', 'create', original, modified, '../' + patch]
   cmd_str = ' '.join(shlex.quote(w) for w in cmd)
   errL(f'muck create-patch note: creating patch: `{cmd_str}`')
@@ -287,7 +284,7 @@ def muck_update_patch(ctx: Ctx) -> None:
   deps = pat_dependencies(patch_path, open(patch_path), {})
   assert len(deps) == 1
   orig_path = deps[0]
-  update_target(ctx, orig_path, dependent=None)
+  update_top(ctx, orig_path)
   target = path_stem(patch_path)
   patch_path_tmp = patch_path + tmp_ext
   cmd = ['pat', 'diff', orig_path, target, '../' + patch_path_tmp]
@@ -322,7 +319,7 @@ def muck_publish(ctx: Ctx) -> None:
 
   copied_products: Set[str] = set()
   for target in ctx.targets:
-    update_target(ctx, target, dependent=None, force=ctx.args.force)
+    update_top(ctx, target)
     product = ctx.product_path_for_target(target)
     clone(src=product, dst=path_join(dst_root, target))
     copied_products.add(product)
@@ -336,7 +333,11 @@ def muck_publish(ctx: Ctx) -> None:
       copied_products.add(product)
 
 
-# Core update algorithm.
+# Core algorithm.
+
+def update_top(ctx: Ctx, target: str) -> int:
+  try: return update_target(ctx, target, dependent=None, force=ctx.args.force)
+  except TargetNotFound as e: raise error(*e.args) from e
 
 
 def update_target(ctx: Ctx, target: str, dependent: Optional[Dependent], force=False) -> int:
@@ -353,6 +354,8 @@ def update_target(ctx: Ctx, target: str, dependent: Optional[Dependent], force=F
     if not target_status.is_updated: # recursion check.
       involved_paths = sorted(path for path, s in ctx.statuses.items() if not s.is_updated)
       raise error(target, 'target has circular dependency; involved paths:', *('\n  ' + p for p in involved_paths))
+    elif target_status.error is not None: # Previously encountered TargetNotFound exception; reraise.
+      raise TargetNotFound(*target_status.error)
     return target_status.change_time
 
   target_status = ctx.statuses[target] = TargetStatus() # Update_deps_and_record updates the status upon completion.
@@ -382,7 +385,11 @@ def update_target(ctx: Ctx, target: str, dependent: Optional[Dependent], force=F
       needs_update = True
 
   if is_product:
-    return update_product(ctx, target, needs_update=needs_update, old=old)
+    try:
+      return update_product(ctx, target, needs_update=needs_update, old=old)
+    except TargetNotFound as e:
+      target_status.error = e.args
+      raise
   else:
     assert status
     return update_non_product(ctx, target, status, needs_update=needs_update, old=old)
@@ -595,6 +602,9 @@ class DepCtx(NamedTuple):
   all_outs: Set[str]
 
 
+class TargetNotFound(Exception): pass
+
+
 def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple[int, Tuple[str, ...], Set[str]]:
   '''
   Run a source file, producing zero or more products.
@@ -667,16 +677,22 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
     cmd, proc, _ = launch(cmd, cwd=ctx.build_dir, env=env, stdin=task_stdin, out=out_file, files=pipe.right_fds)
     if task_stdin: task_stdin.close()
     pipe.close_right()
+    possible_causes: List[Tuple[str, ...]] = []
     try:
       while True:
         dep_line = deps_recv.readline()
         if not dep_line: break # no more data; child is done.
-        dyn_time = process_dep_line(ctx, depCtx=depCtx, target=target, dep_line=dep_line, dyn_time=dyn_time)
+        try:
+          dyn_time = process_dep_line(ctx, depCtx=depCtx, target=target, dep_line=dep_line, dyn_time=dyn_time)
+        except TargetNotFound as e:
+          possible_causes.append(e.args)
         print('\x06', end='', file=deps_send, flush=True) # Ascii ACK.
     except (Exception, KeyboardInterrupt, SystemExit):
       proc.kill()
       #^ Killing the script avoids a confusing exception message from the child script when muck fails,
       #^ and/or zombie child processes (e.g. sqlite3).
+      for cause in possible_causes:
+        errL(error_msg(*cause))
       raise
     code = proc.wait()
     time_elapsed = time.time() - time_start
@@ -943,9 +959,9 @@ def source_candidate(ctx: Ctx, target: str, src_dir: str, prod_name: str) -> str
   dpdts = ctx.dependents[target]
   dpdt_name = first_el(dpdts).target if dpdts else target
   if len(candidates) == 0:
-    raise error(dpdt_name, f'no source candidates matching `{target}` in `{src_dir}`')
+    raise TargetNotFound(dpdt_name, f'no source candidates matching `{target}` in `{src_dir}`')
   else:
-    raise error(dpdt_name, f'multiple source candidates matching `{target}`: {candidates}')
+    raise TargetNotFound(dpdt_name, f'multiple source candidates matching `{target}`: {candidates}')
 
 
 def list_dir_filtered(ctx: Ctx, src_dir: str) -> List[str]:
@@ -989,8 +1005,11 @@ def note(path: str, *items: Any) -> None:
 def warn(path: str, *items: Any) -> None:
   errL(TXT_Y_ERR, f'muck WARNING: {path}: ', *items, RST_ERR)
 
+def error_msg(path: str, *items: Any) -> str:
+  return ''.join((f'muck error: {path}: ',) + items)
+
 def error(path: str, *items: Any) -> SystemExit:
-  return SystemExit(''.join((f'muck error: {path}: ',) + items))
+  return SystemExit(error_msg(path, *items))
 
 
 def disp_mtime(mtime: Optional[float]) -> str:
