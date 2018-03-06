@@ -557,7 +557,7 @@ def update_deps_and_record(ctx, target: str, is_target_dir: bool, actual_path: s
     for dep in deps:
       try: validate_target(ctx, dep)
       except InvalidTarget as e:
-        exit(f'muck error: {target}: invalid dependency: {e.target!r}: {e.msg}')
+        raise error(target, f'invalid dependency: {e.target!r}: {e.msg}')
   else:
     assert old is not None
     deps = old.deps
