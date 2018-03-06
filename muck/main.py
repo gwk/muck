@@ -35,7 +35,7 @@ from .pithy.pipe import DuplexPipe
 from .pithy.string import format_byte_count
 from .pithy.task import launch, runC
 
-from .ctx import Ctx, Dependent, InvalidTarget, validate_target
+from .ctx import Ctx, Dependent, InvalidTarget, TargetStatus, validate_target
 from .db import TargetRecord, DB, DBError
 from .constants import *
 from .py_deps import py_dependencies
@@ -245,14 +245,14 @@ def muck_deps_list(ctx: Ctx) -> None:
   '`muck deps-list` command.'
   for target in ctx.targets:
     update_target(ctx, target, dependent=None)
-  outLL(*sorted(ctx.change_times.keys()))
+  outLL(*sorted(ctx.statuses.keys()))
 
 
 def muck_prod_list(ctx: Ctx) -> None:
   '`muck prod-list` command.'
   for target in ctx.targets:
     update_target(ctx, target, dependent=None)
-  outLL(*sorted(ctx.product_path_for_target(t) for t in ctx.change_times.keys()))
+  outLL(*sorted(ctx.product_path_for_target(t) for t in ctx.statuses.keys()))
 
 
 def muck_create_patch(ctx: Ctx) -> None:
@@ -347,15 +347,15 @@ def update_target(ctx: Ctx, target: str, dependent: Optional[Dependent], force=F
     ctx.dependents[target].add(dependent)
 
   # Recursion check.
-  try: change_time = ctx.change_times[target]
+  try: target_status = ctx.statuses[target]
   except KeyError: pass
-  else: # if in ctx.change_times, this path has already been visited during this build process run.
-    if change_time is None: # recursion sentinal.
-      involved_paths = sorted(path for path, t in ctx.change_times.items() if t is None)
+  else: # if in ctx.statuses, this path has already been visited during this build process run.
+    if not target_status.is_updated: # recursion check.
+      involved_paths = sorted(path for path, s in ctx.statuses.items() if not s.is_updated)
       raise error(target, 'target has circular dependency; involved paths:', *('\n  ' + p for p in involved_paths))
-    return change_time
+    return target_status.change_time
 
-  ctx.change_times[target] = None # recursion sentinal is replaced before return by update_deps_and_record.
+  target_status = ctx.statuses[target] = TargetStatus() # Update_deps_and_record updates the status upon completion.
   ctx.dbg(target, f'\x1b[32mupdate; {dependent or "<requested>"}\x1b[0m')
 
   status = file_status(target) # follows symlinks.
@@ -368,10 +368,9 @@ def update_target(ctx: Ctx, target: str, dependent: Optional[Dependent], force=F
     target_dir = path_dir(target)
     if target_dir and not path_exists(target_dir): # Not possible to find a source; must be the contents of a built directory.
       update_target(ctx, target=target_dir, dependent=Dependent(kind='directory contents', target=target), force=force)
-      change_time = ctx.change_times[target]
-      if change_time is None: # build of parent failed to create this product.
+      if not target_status.is_updated: # build of parent did not create this product.
         raise error(target, f'target resides in a product directory but was not created by building that directory')
-      return change_time # TODO: verify that we should be returning this change_time and not the result of target_dir update.
+      return target_status.change_time # TODO: verify that we should be returning this change_time and not the result of target_dir update.
 
   old = ctx.db.get_record(target=target)
   needs_update = force or (old is None)
@@ -567,12 +566,16 @@ def update_deps_and_record(ctx, target: str, is_target_dir: bool, actual_path: s
     change_time = max(change_time, dep_change_time)
   update_time = max(update_time, change_time)
 
-  assert ctx.change_times.get(target) is None
-  #^ use get (which defaults to None) because when a script generates multiple outputs,
-  # this function gets called without a preceding call to update_target.
-  # note: it is possible that two different scripts could generate the same named file, causing this assertion to fail.
-  # TODO: change this from an assertion to an informative error.
-  ctx.change_times[target] = change_time # replace sentinal with final value.
+  try: status = ctx.statuses[target]
+  except KeyError:
+    status = TargetStatus()
+    ctx.statuses[target] = status
+  else:
+    if status.is_updated:
+      raise error(target, f'target was updated by both a script and a dependency') # TODO: track updater in TargetStatus.
+
+  status.is_updated = True
+  status.change_time = change_time
   # always update record, because even if is_changed=False, mtime may have changed.
   record = TargetRecord(path=target, is_dir=is_target_dir, size=size, mtime=mtime,
     change_time=change_time, update_time=update_time, hash=file_hash, src=src, deps=deps, dyn_deps=dyn_deps)

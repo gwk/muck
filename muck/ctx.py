@@ -5,6 +5,7 @@ import re
 from typing import *
 from .pithy.format import FormatError, parse_formatters
 
+from .pithy.dataclasses import dataclass
 from .pithy.fs import norm_path, path_ext, path_join, path_name_stem
 from .constants import *
 from .db import DB
@@ -13,6 +14,13 @@ from .db import DB
 class Dependent(NamedTuple):
   kind: str # 'source', 'inferred', or 'observed'.
   target: str
+
+
+@dataclass
+class TargetStatus:
+  change_time: int = 0 # Logical (monotonic) time.
+  error: Optional[Tuple[str, ...]] = None
+  is_updated: bool = False
 
 
 class Ctx(NamedTuple):
@@ -24,7 +32,7 @@ class Ctx(NamedTuple):
   reserved_names: FrozenSet
   dbg: Callable[..., None]
   dbg_libmuck: bool
-  change_times: Dict[str, Optional[int]] = {}
+  statuses: Dict[str, TargetStatus] = {}
   dir_names: Dict[str, List[str]] = {}
   dependents: DefaultDict[str, Set[Dependent]] = DefaultDict(set)
 
@@ -35,7 +43,7 @@ class Ctx(NamedTuple):
     return path_join(self.build_dir, target)
 
   def reset(self) -> None:
-    self.change_times.clear()
+    self.statuses.clear()
     self.dir_names.clear()
     self.dependents.clear()
 
