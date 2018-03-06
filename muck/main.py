@@ -673,8 +673,10 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
         if not dep_line: break # no more data; child is done.
         dyn_time = process_dep_line(ctx, depCtx=depCtx, target=target, dep_line=dep_line, dyn_time=dyn_time)
         print('\x06', end='', file=deps_send, flush=True) # Ascii ACK.
-    except (Exception, SystemExit):
-      proc.kill() # this avoids a confusing exception message from the child script when muck fails.
+    except (Exception, KeyboardInterrupt, SystemExit):
+      proc.kill()
+      #^ Killing the script avoids a confusing exception message from the child script when muck fails,
+      #^ and/or zombie child processes (e.g. sqlite3).
       raise
     code = proc.wait()
     time_elapsed = time.time() - time_start
