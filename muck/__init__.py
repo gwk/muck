@@ -45,14 +45,26 @@ __all__ = [
 ]
 
 
+src = argv[0]
+args = tuple(argv[1:])
+
+# Normally, target is provided by the environment.
+# However we want to allow scripts to run standalone if possible.
+# For safety, check that the calculated target is identical to the provided one;
+# in the future we could speed this up slightly by assuming as much.
+target = path_stem(src)
+if '{' in target: # Contains either formatter or escaped brace; expand.
+  target = target.format(**bindings_from_args(src=src, args=args))
+try: assert target == os.environ['MUCK_TARGET']
+except KeyError: pass # running standalone (or the Muck parent process).
+
+
 _dst_vars_opened: Set[Tuple[Tuple[str, str], ...]] = set()
 
 def dst_file(encoding='UTF-8', **kwargs: str) -> IO:
   '''
   Open an output file for writing, expanding target path formatters with `kwargs`.
   '''
-  src = argv[0]
-  args = tuple(argv[1:])
   kwargs_tuple = tuple(sorted(kwargs.items())) # need kwargs as a hash key.
   if kwargs_tuple in _dst_vars_opened:
     raise Exception(f'file already opened for `dst_file` arguments: {kwargs_tuple}')
@@ -77,7 +89,7 @@ def load(file_or_path: Union[PathOrFd, IO], ext:str=None, **kwargs) -> Any:
   to communicate dependencies to the parent build process.
   '''
   if isinstance(file_or_path, str) and '{' in file_or_path: # might have format; expand.
-      file_or_path = file_or_path.format(**bindings_from_args(src=argv[0], args=tuple(argv[1:])))
+      file_or_path = file_or_path.format(**bindings_from_args(src=src, args=args))
   return _load(file_or_path, ext=ext, **kwargs)
 
 
@@ -86,7 +98,7 @@ def open(path: PathOrFd, **kwargs) -> IO:
   Wrapper around the standard system open that formats arguments into the file name appropriately.
   '''
   if isinstance(path, str) and '{' in path: # might have format; expand.
-    path = path.format(**bindings_from_args(src=argv[0], args=tuple(argv[1:])))
+    path = path.format(**bindings_from_args(src=src, args=args))
   return _std_open(path, **kwargs)
 
 
@@ -174,5 +186,5 @@ def transform(target_path: str, ext: str=None, **kwargs: Any) -> Transformer:
   see muck.load for details.
   '''
   seq = load(target_path, ext=ext, **kwargs)
-  product = dflt_prod_path_for_source(argv[0]) # TODO: needs to process wildcards.
+  product = dflt_prod_path_for_source(src) # TODO: needs to process wildcards.
   return Transformer(seq, log_stem=path_stem(product) + '.')
