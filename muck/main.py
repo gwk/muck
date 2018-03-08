@@ -321,7 +321,9 @@ def muck_publish(ctx: Ctx) -> None:
   for target in ctx.targets:
     update_top(ctx, target)
     product = ctx.product_path_for_target(target)
-    clone(src=product, dst=path_join(dst_root, target))
+    dst = path_join(dst_root, target)
+    make_dirs(path_dir(dst))
+    clone(src=product, dst=dst)
     copied_products.add(product)
 
   for pattern in ctx.args.files:
