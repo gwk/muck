@@ -59,6 +59,7 @@ def main() -> None:
     parser = ArgumentParser(prog='muck ' + cmd, **kwargs)
     parser.set_defaults(fn=fn, builds=builds, targets_dflt=targets_dflt, takes_ctx=takes_ctx)
     parser.add_argument('-build-dir', default='_build', help="specify build directory; defaults to '_build'.")
+    parser.add_argument('-cd', help='change to this working directory before taking any further action.')
     parser.add_argument('-dbg', action='store_true', help='log lots of details to stderr.')
     parser.add_argument('-dbg-libmuck', action='store_true', help='log lots of details to stderr.')
     if builds:
@@ -135,6 +136,9 @@ def main() -> None:
       errL('muck dbg: ', path, ': ', *items)
   else:
     def dbg(path: str, *items: Any) -> None: pass
+
+  # Handle directory change first.
+  if args.cd: change_dir(args.cd)
 
   make_dirs(args.build_dir) # required to create new DB.
 

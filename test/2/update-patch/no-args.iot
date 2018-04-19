@@ -2,8 +2,8 @@
   'cmd': '$MUCK update-patch',
   'code': 2,
   'err-val': '''\
-usage: muck update-patch [-h] [-build-dir BUILD_DIR] [-dbg] [-dbg-libmuck]
-                         [-no-times] [-force]
+usage: muck update-patch [-h] [-build-dir BUILD_DIR] [-cd CD] [-dbg]
+                         [-dbg-libmuck] [-no-times] [-force]
                          patch
 muck update-patch: error: the following arguments are required: patch
 '''

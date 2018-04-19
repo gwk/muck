@@ -2,8 +2,8 @@
   'cmd': '$MUCK create-patch',
   'code': 2,
   'err-val': '''\
-usage: muck create-patch [-h] [-build-dir BUILD_DIR] [-dbg] [-dbg-libmuck]
-                         [-no-times] [-force]
+usage: muck create-patch [-h] [-build-dir BUILD_DIR] [-cd CD] [-dbg]
+                         [-dbg-libmuck] [-no-times] [-force]
                          original modified
 muck create-patch: error: the following arguments are required: original, modified
 '''
