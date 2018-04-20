@@ -529,7 +529,7 @@ def update_non_product(ctx: Ctx, target: str, status: FileStatus, needs_update: 
       for entry in scan_dir(target):
         entry_prod_path = ctx.product_path_for_target(entry.path)
         prod_entry = prod_entries.get(entry_prod_path)
-        if entry.is_dir:
+        if entry.is_dir():
           if not prod_entry:
             make_dir(entry_prod_path)
           elif not prod_entry.is_dir(follow_symlinks=False): # Child already exists, but not a directory.
@@ -622,6 +622,8 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   prod_path_out = prod_path + out_ext
 
   tool: Tool
+  if is_dir(src_prod_path):
+    raise error(target, f'source path is a directory: {src_prod_path!r}')
   if is_file_executable_by_owner(src_prod_path):
     tool = Tool(cmd=(), deps_fn=None, env_fn=None)
   else:
