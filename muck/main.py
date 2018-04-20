@@ -654,6 +654,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   if tool.env_fn is not None:
     env.update(tool.env_fn())
   env['DYLD_INSERT_LIBRARIES'] = libmuck_path
+  #env['DYLD_FORCE_FLAT_NAMESPACE'] = 'TRUE'
   #env['DYLD_PRINT_LIBRARIES'] = 'TRUE'
   if ctx.dbg_libmuck:
     env['MUCK_DEPS_DBG'] = 'TRUE'
