@@ -621,7 +621,6 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   prod_dir = path_dir(prod_path)
   prod_path_out = prod_path + out_ext
 
-  tool: Tool
   if is_dir(src_prod_path):
     raise error(target, f'source path is a directory: {src_prod_path!r}')
   if is_file_executable_by_owner(src_prod_path):
