@@ -10,10 +10,10 @@ b-through-{i}.txt.py[0m (⇠ [32mb-through-0.txt[0m, [32mb-through-1.txt[0m
 c-many.txt[0m
 ┡╸[32mc-many.txt.py[0m
 ├╴[31ma-to-many-0.txt[0m ⇡
+├╴[31ma-to-many-1.txt[0m ⇡
 ├╴[31mb-through-0.txt[0m
 │ ┡╸[32mb-through-{i}.txt.py[0m ⇡
 │ └╴[31ma-to-many-0.txt[0m ⇡
-├╴[31ma-to-many-1.txt[0m ⇡
 └╴[31mb-through-1.txt[0m
   ┡╸[32mb-through-{i}.txt.py[0m ⇡
   └╴[31ma-to-many-1.txt[0m ⇡

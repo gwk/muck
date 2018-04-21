@@ -491,8 +491,9 @@ def update_product_with_output(ctx: Ctx, target: str, src: str, dyn_deps: Tuple[
     change_time = old.change_time
     change_verb = 'did not change'
   note(target, f"product {change_verb}; {format_byte_count(size)}.")
-  return update_deps_and_record(ctx, target=target, is_target_dir=is_target_dir, actual_path=path, is_changed=is_changed, size=size, mtime=mtime,
-    change_time=change_time, update_time=update_time, file_hash=file_hash, src=src, dyn_deps=dyn_deps, old=old)
+  return update_deps_and_record(ctx, target=target, is_target_dir=is_target_dir, actual_path=path, is_changed=is_changed,
+    size=size, mtime=mtime, change_time=change_time, update_time=update_time, file_hash=file_hash, src=src, dyn_deps=dyn_deps,
+    old=old)
 
 
 def update_non_product(ctx: Ctx, target: str, status: FileStatus, needs_update: bool, old: Optional[TargetRecord]) -> int:
@@ -605,7 +606,7 @@ class DepCtx(NamedTuple):
   ignored_deps: Set[str]
   restricted_deps_rd: Set[str]
   restricted_deps_wr: Set[str]
-  dyn_deps: List[str]
+  dyn_deps: Set[str]
   all_outs: Set[str]
 
 
@@ -674,7 +675,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
       prod_path_out, # muck process opens this for the child.
       src_path,
     },
-    dyn_deps=[],
+    dyn_deps=set(),
     all_outs=set())
 
   dyn_time = 0
@@ -722,7 +723,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   depCtx.all_outs.add(target)
   time_msg = '' if ctx.args.no_times else f'{time_elapsed:0.2f} seconds '
   note(target, f'finished: {time_msg}(via {via}).')
-  return dyn_time, tuple(depCtx.dyn_deps), depCtx.all_outs
+  return dyn_time, tuple(sorted(depCtx.dyn_deps)), depCtx.all_outs
 
 
 def process_dep_line(ctx: Ctx, depCtx: DepCtx, target: str, dep_line: str, dyn_time: int) -> int:
@@ -758,7 +759,7 @@ def process_dep_line(ctx: Ctx, depCtx: DepCtx, target: str, dep_line: str, dyn_t
     if dep in depCtx.restricted_deps_rd: raise error(target, f'attempted to open restricted file for reading: {dep!r}')
     dep_time = update_target(ctx, dep, dependent=Dependent(kind='observed', target=target))
     dyn_time = max(dyn_time, dep_time)
-    depCtx.dyn_deps.append(dep)
+    depCtx.dyn_deps.add(dep)
   elif mode in 'AMUW':
     if dep in depCtx.restricted_deps_wr: raise error(target, f'attempted to open restricted file for writing: {dep!r}')
     validate_target_or_error(ctx, dep)
