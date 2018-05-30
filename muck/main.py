@@ -316,7 +316,7 @@ def muck_move_to_fetched_url(args: Namespace) -> None:
 
 
 def muck_publish(ctx: Ctx) -> None:
-  '`muck build` (default) command: update each specified target.'
+  '`muck publish` command: update each specified target.'
   dst_root = ctx.args.to
   make_dirs(dst_root)
   remove_dir_contents(dst_root)
@@ -326,6 +326,7 @@ def muck_publish(ctx: Ctx) -> None:
     update_top(ctx, target)
     product = ctx.product_path_for_target(target)
     dst = path_join(dst_root, target)
+    errL(f'publish product: {product} -> {dst}')
     make_dirs(path_dir(dst))
     clone(src=product, dst=dst)
     copied_products.add(product)
