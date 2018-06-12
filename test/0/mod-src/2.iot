@@ -1,3 +1,0 @@
-{
-  'cmd': '$MUCK -no-times b.txt',
-}

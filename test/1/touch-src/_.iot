@@ -1,0 +1,24 @@
+[
+{ 'desc': '0: build.',
+  'cmd': '$MUCK -no-times c.txt',
+  'code': 0,
+  'links': {
+    'test/1/touch-src/a.txt.py',
+    'test/1/touch-src/b.txt.py',
+    'test/1/touch-src/c.txt.py',
+  }
+},
+
+{ 'desc': '1: touch a.txt.py and rebuild.',
+  'compile': [
+    # for file systems with poor timestamp resolution, e.g. HFS+, a `sleep 1` is necessary for consistent testing.
+    'touch a.txt.py',
+  ],
+  'cmd': '$MUCK -no-times c.txt',
+  'code': 0,
+},
+
+{ 'desc': '2: rebuild.',
+  'cmd': '$MUCK -no-times c.txt',
+}
+]

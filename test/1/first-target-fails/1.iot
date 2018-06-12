@@ -1,9 +1,0 @@
-{
-  'desc': 'subsequent run succeeds due to environment variable; both targets should be updated.',
-  'cmd': '$MUCK -no-times a.txt b.txt',
-  'code': 0,
-  'env': {
-    'MUCK': '$PROJ/muck/__main__.py',
-    'EXIT': '0',
-  },
-}

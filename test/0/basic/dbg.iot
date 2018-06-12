@@ -1,5 +1,0 @@
-{
-  'cmd': '$MUCK -dbg index.html',
-  'code': 0,
-  'err-mode': 'ignore', # just make sure it does not crash.
-}

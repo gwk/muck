@@ -1,7 +1,0 @@
-{
-  'compile': [
-    'cp a-mod.txt.py a.txt.py',
-  ],
-  'cmd': '$MUCK -no-times b.txt',
-  'code': 0,
-}

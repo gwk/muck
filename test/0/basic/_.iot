@@ -1,0 +1,48 @@
+[
+{ 'desc': '0: initial.',
+  'cmd': '$MUCK -no-times',
+  'code': 0,
+  'files': {
+    '_build/index.html' : {
+      'path': 'test/0/basic/index-exp.html'
+    },
+  },
+  'links': {
+    'test/0/basic/a.txt',
+    'test/0/basic/b.txt.py',
+    'test/0/basic/basic_lib.py',
+    'test/0/basic/c.txt.py.py',
+    'test/0/basic/d.txt.py',
+    'test/0/basic/index.html.wu',
+    'test/0/basic/linked-src.html',
+    'test/0/basic/module-import.txt.py',
+  }
+},
+
+{ 'desc': '1: rebuild; no-op.',
+  'cmd': '$MUCK -no-times',
+},
+
+{ 'desc': '2: rebuild again; no-op.',
+  'cmd': '$MUCK -no-times',
+},
+
+{ 'desc': '3: clean b.txt.',
+  'cmd': '$MUCK clean b.txt',
+},
+
+{ 'desc': '4: rebuild previously cleaned b.txt.',
+  'cmd': '$MUCK -no-times',
+  'code': 0,
+},
+
+{ 'desc': '5: deps.',
+  'cmd': '$MUCK deps index.html',
+},
+
+{ 'desc': '6: invoke in debug mode to make sure it does not fail in obvious ways.',
+  'cmd': '$MUCK -dbg',
+  'code': 0,
+  'err-mode': 'ignore', # just make sure it does not crash.
+},
+]

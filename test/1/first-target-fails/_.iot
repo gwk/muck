@@ -1,0 +1,29 @@
+[
+{ 'desc': '0: first run after modifying source fails while building first target due to environment variable. This is contrived but emulates a flaky build step, or the user killing the build step before it completes.',
+  'compile': [
+    'cp orig.txt.py {name}.txt.py',
+    '$MUCK -no-times a.txt b.txt',
+    'cp mod.txt.py {name}.txt.py'
+  ],
+  'cmd': '$MUCK -no-times a.txt b.txt',
+  'code': 1,
+  'env': {
+    'MUCK': '$PROJ/muck/__main__.py',
+    'EXIT': '1',
+  },
+  'links': {
+    'test/1/first-target-fails/orig.txt.py',
+    'test/1/first-target-fails/mod.txt.py',
+  }
+},
+
+{ 'desc': '1: subsequent run succeeds due to environment variable; both targets should be updated.',
+  'cmd': '$MUCK -no-times a.txt b.txt',
+  'code': 0,
+  'env': {
+    'MUCK': '$PROJ/muck/__main__.py',
+    'EXIT': '0',
+  },
+}
+
+]

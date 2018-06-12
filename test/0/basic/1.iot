@@ -1,4 +1,0 @@
-{
-  'desc': 'rebuild 1; no-op.',
-  'cmd': '$MUCK -no-times',
-}

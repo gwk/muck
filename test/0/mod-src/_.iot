@@ -1,3 +1,4 @@
+[
 {
   'compile': [
     'cp a-orig.txt.py a.txt.py',
@@ -9,4 +10,17 @@
     'test/0/mod-src/a-mod.txt.py',
     'test/0/mod-src/b.txt.py',
   }
-}
+},
+
+{
+  'compile': [
+    'cp a-mod.txt.py a.txt.py',
+  ],
+  'cmd': '$MUCK -no-times b.txt',
+  'code': 0,
+},
+
+{
+  'cmd': '$MUCK -no-times b.txt',
+},
+]

@@ -1,0 +1,60 @@
+[
+{
+  'desc': '0: create patch.',
+  'cmd': '$MUCK create-patch orig.txt patched.txt',
+  'code': 0,
+  'links': {
+    'test/0/patch/orig.txt',
+  }
+},
+
+{
+  'desc': '1: rebuild after creating patch. This currently runs the patch step because muck_create_patch does not create a record for the modified target; this is not incorrect, but in the future it should be a no-op.',
+  'cmd': '$MUCK -no-times patched.txt',
+  'code': 0,
+  'files': {
+    '_build/patched.txt' : {
+      'val': 'original text.\n'
+    },
+  },
+},
+
+{
+  'desc': '2: modify file.',
+  'compile': [
+    # for file systems with poor timestamp resolution, e.g. HFS+, a `sleep 1` is necessary for consistent testing.
+    "sh -c 'echo modified text. > _build/patched.txt'",
+    ],
+  'cmd': '$MUCK patched.txt',
+},
+
+{
+  'desc': '3: update patch.',
+  'cmd': '$MUCK update-patch patched.txt.pat',
+  'code': 0,
+  'files': {
+    'patched.txt.pat': {
+      'val': '''\
+pat v0
+orig.txt
+
+|^
+- original text.
++ modified text.
+'''
+    }
+  }
+},
+
+{
+  'desc': '4: rebuild.',
+  'compile': ['$MUCK clean patched.txt'],
+  'cmd': '$MUCK -no-times patched.txt',
+  'code': 0,
+  'files': {
+    '_build/patched.txt': {
+      'val': 'modified text.\n'
+    }
+  }
+},
+]
