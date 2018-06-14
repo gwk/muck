@@ -336,7 +336,9 @@ def muck_publish(ctx: Ctx) -> None:
     if pattern.startswith('/'): raise error(f'invalid glob pattern: leading slash: {pattern!r}')
     for product in walk_glob(ctx.product_path_for_target(pattern)):
       if product in copied_products: continue
-      clone(src=product, dst=path_join(dst_root, target_for_product(ctx, product)))
+      dst = path_join(dst_root, target_for_product(ctx, product))
+      make_dirs(path_dir(dst))
+      clone(src=product, dst=dst)
       copied_products.add(product)
 
 
