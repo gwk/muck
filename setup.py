@@ -57,15 +57,7 @@ class BuildExtLibmuck(build_ext):
 
 
 setup(
-  name='muck',
-  version='0.0.3',
-  license='CC0',
-  author='George King',
-  author_email='george.w.king@gmail.com',
-  url='https://github.com/gwk/muck',
-  description='Muck is a build tool for data projects that automatically calculates dependencies.',
   python_requires='>=3.6',
-  packages=['muck', 'muck.pithy'],
   ext_modules=[Extension('muck._libmuck', sources=['muck/libmuck.c'])],
   cmdclass={
     'build_ext': BuildExtLibmuck,
@@ -74,27 +66,4 @@ setup(
     'muck=muck.main:main',
     'csv-to-html=muck.csv_to_html:main',
   ]},
-  keywords=[
-    'build tool', 'data science',
-  ],
-  classifiers=[ # See https://pypi.python.org/pypi?%3Aaction=list_classifiers.
-    'Development Status :: 3 - Alpha',
-    'Environment :: Console',
-    'Intended Audience :: Developers',
-    'Intended Audience :: Education',
-    'Intended Audience :: Information Technology',
-    'Intended Audience :: Science/Research',
-    'License :: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication',
-    'Programming Language :: Python :: 3 :: Only',
-    'Topic :: Documentation',
-    'Topic :: Education',
-    'Topic :: Internet',
-    'Topic :: Multimedia',
-    'Topic :: Software Development',
-    'Topic :: Software Development :: Build Tools',
-    'Topic :: Software Development :: Documentation',
-    'Topic :: Text Processing',
-    'Topic :: Text Processing :: Markup',
-    'Topic :: Text Processing :: Markup :: HTML',
-  ],
 )

@@ -18,7 +18,7 @@ def src_error(path: str, line1: int, col1: int, msg: str, text: str=None) -> Sys
 
 
 def node_error(path: str, node: ast.AST, msg: str) -> SystemExit:
-  return src_error(path, node.lineno, node.col_offset + 1, msg) # type: ignore
+  return src_error(path, node.lineno, node.col_offset + 1, msg)
 
 
 def py_dependencies(src_path: str, src_file: TextIO, dir_names: Any) -> Iterable[str]:

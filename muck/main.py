@@ -800,16 +800,16 @@ def sqlite3_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, T
 
 
 def pat_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
-  try: import pat
-  except ImportError: raise error(src_path, '`pat` is not installed; run `pip install pat-tool`.')
+  try: import pithy.pat as pat
+  except ImportError: error(src_path, '`pat` is not installed; run `pip install pithy`.')
   dep = pat.pat_dependency(src_path=src_path, src_file=src_file)
   return [dep]
 
 
 def writeup_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
-  try: import writeup.v0 # type: ignore
-  except ImportError: raise error(src_path, '`writeup` is not installed; run `pip install writeup-tool`.')
-  return writeup.v0.writeup_dependencies(src_path=src_path, text_lines=src_file) # type: ignore
+  try: import writeup
+  except ImportError: raise error(src_path, '`writeup` is not installed; run `pip install pithy`.')
+  return writeup.writeup_dependencies(src_path=src_path, text_lines=src_file)
 
 
 # Tools.
@@ -829,7 +829,6 @@ class Tool(NamedTuple):
 
 
 ext_tools: Dict[str, Tool] = {
-  # The boolean inicates that the tool expects the source as stdin.
   '.bash' : Tool(('bash',), None, None),
   '.csv'  : Tool(('csv-to-html',), None, None),
   '.dash' : Tool(('dash',), None, None),
@@ -854,8 +853,11 @@ ignored_dep_exts = {
 
 # Currently libmuck is installed as a Python C extension,
 # which allows us to easily determine the path to the shared library.
-libmuck_path = cast(str, find_module_spec('muck._libmuck').origin)
-assert libmuck_path is not None
+_libmuck_modspec = find_module_spec('muck._libmuck')
+if _libmuck_modspec is None: exit('error: muck._libmuck is not installed.')
+_libmuck_path = _libmuck_modspec.origin
+if _libmuck_path is None: exit('error: muck._libmuck path could not be determined.')
+libmuck_path = _libmuck_path
 
 
 # Targets and paths.
