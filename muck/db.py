@@ -10,7 +10,7 @@ from sqlite3 import Cursor, DatabaseError, IntegrityError, OperationalError, con
 from typing import *
 from .pithy.fs import path_join
 from .pithy.io import errL, errSL
-from .pithy.string import le32
+from .pithy.encodings import enc_lep62
 
 
 class TargetRecord(NamedTuple):
@@ -33,7 +33,7 @@ class TargetRecord(NamedTuple):
     return (
       f'TargetRecord(path={self.path} is_dir={self.is_dir} size={self.size} mtime={self.mtime} '
       f'change_time={self.change_time} update_time={self.update_time} '
-      f'hash={le32(self.hash)}{" " if opts else ""}{" ".join(opts)})')
+      f'hash={enc_lep62(self.hash)}{" " if opts else ""}{" ".join(opts)})')
 
 
 idx_id, idx_path, idx_is_dir, idx_size, idx_mtime, idx_change_time, idx_update_time, idx_hash, \
