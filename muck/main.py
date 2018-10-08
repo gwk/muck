@@ -508,31 +508,30 @@ def update_non_product(ctx: Ctx, target: str, status: FileStatus, needs_update: 
   prod_path = ctx.product_path_for_target(target)
   prod_status = file_status(prod_path)
 
-  if needs_update:
+  if needs_update or (is_target_dir != prod_status.is_dir):
     is_changed = True
     target_hash = hash_for_path(target)
-  else: # all we know so far is that the asset exists and status as an asset has not changed.
-    if (old is None or size != old.size or mtime != old.mtime): # appears changed; check if contents actually changed.
-      target_hash = hash_for_path(target)
-      is_changed = (old is None or old.hash != target_hash)
-    else: # assume not changed based on size/mtime; otherwise we constantly recalculate hashes for large sources.
-      is_changed = False
-      target_hash = old.hash
+  elif (old is None or is_target_dir or size != old.size or mtime != old.mtime):
+    # All we know so far is that the asset exists, dir/file is not changed, and product/non-product is not changed.
+    # Note that if the target is a directory, then we must recalculate the hash, because mtime will not reflect changes.
+    target_hash = hash_for_path(target)
+    is_changed = (old is None or old.hash != target_hash)
+  else: # assume not changed based on size/mtime; otherwise we constantly recalculate hashes for large sources.
+    is_changed = False
+    target_hash = old.hash
 
   if is_changed:
 
     if is_target_dir:
-      if prod_status and prod_status.is_dir: # true dir, not link.
-        # TODO: clean up zombie products.
-        pass
-      else: # old product is not a directory.
-        if prod_status: remove_file(prod_path)
+      if prod_status and not prod_status.is_dir: # Old product is not a true directory.
+        remove_file(prod_path)
+      if not (prod_status and prod_status.is_dir):
         make_dirs(prod_path)
       # Link contents of source dir into prod dir.
       prod_entries = {e.path : e for e in scan_dir(prod_path)}
       for entry in scan_dir(target):
         entry_prod_path = ctx.product_path_for_target(entry.path)
-        prod_entry = prod_entries.get(entry_prod_path)
+        prod_entry = prod_entries.pop(entry_prod_path, None)
         if entry.is_dir():
           if not prod_entry:
             make_dir(entry_prod_path)
@@ -540,9 +539,14 @@ def update_non_product(ctx: Ctx, target: str, status: FileStatus, needs_update: 
             remove_file(entry_prod_path)
             make_dir(entry_prod_path)
         else: # asset is a file.
-          # For now just always rewrite the links. Could try to optimize this but need to read_link and compare which is tricky.
+          # For now just always rewrite the links.
+          # Could try to optimize this, but would need to read_link and compare which is tricky.
           if prod_entry: remove_path(entry_prod_path)
           make_link(entry.path, link=entry_prod_path)
+      # Remove remaining prod_entries, which did not match entries in source and are therefore stale.
+      for entry in prod_entries.values():
+        assert entry.is_symlink()
+        remove_file(entry.path)
 
     else: # target is regular file.
       if prod_status: remove_path(prod_path)
