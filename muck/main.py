@@ -112,7 +112,7 @@ def main() -> None:
   build_parser = add_parser('build', muck_build, builds=True, targets_dflt=True,
     description='build the specified targets.',
     epilog=f'`build` is the default subcommand; other available commands are:\n{cmds_str}.`')
-  build_parser.add_argument('-serve', nargs='?', const='index.html',
+  build_parser.add_argument('-serve', action='store_true',
     help='serve contents of build directory via local HTTP, and open the specified target in the browser.')
 
 
@@ -168,8 +168,7 @@ def muck_build(ctx: Ctx) -> None:
         note(target, 'specified target is a source and not a product.')
     update_top(ctx, target)
   if ctx.args.serve:
-    update_top(ctx, target=ctx.args.serve)
-    serve_build(ctx, main_target=ctx.args.serve, update_top=update_top)
+    serve_build(ctx, main_target=ctx.targets[0], update_top=update_top)
 
 
 def muck_clean_all(args: Namespace) -> None:
