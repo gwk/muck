@@ -21,7 +21,7 @@ from typing import IO, TextIO, BinaryIO
 from urllib.parse import urlencode, urlparse
 
 from .pithy.format import has_formatter
-from .pithy.loader import add_loader, load as _load
+from .pithy.loader import add_loader, load as _load, FileOrPath
 from .pithy.fs import make_dirs, move_file, path_dir, path_exists, path_ext, path_join, path_stem, split_stem_ext, Path, PathOrFd
 from .pithy.io import stderr, errL, errSL
 from .pithy.path_encode import path_for_url
@@ -80,7 +80,7 @@ def dst_file(encoding='UTF-8', **kwargs: str) -> IO:
     return _std_open(path, mode='w', encoding=encoding)
 
 
-def load(file_or_path: Union[PathOrFd, IO], ext:str=None, **kwargs) -> Any:
+def load(file_or_path:FileOrPath, ext:str=None, **kwargs) -> Any:
   '''
   Select an appropriate loader based on the file extension, or `ext` if specified.
   This function is a wrapper around pithy.loader.load; see that function's documentation for details.
