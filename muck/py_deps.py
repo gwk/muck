@@ -1,13 +1,11 @@
 # Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
 
-import ast
-import re
-
-from typing import *
-from typing import TextIO
-
 from .pithy.fs import is_file, path_dir, path_join
 from .pithy.io import read_line_from_path
+from typing import *
+from typing import TextIO
+import ast
+import re
 
 
 def src_error(path: str, line1: int, col1: int, msg: str, text: str=None) -> SystemExit:
