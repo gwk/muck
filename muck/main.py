@@ -67,7 +67,8 @@ def main() -> None:
       parser.add_argument('-force', action='store_true', help='rebuild specified targets even if they are up to date.')
     if targets_dflt is not None:
       default = ['index.html'] if targets_dflt else None
-      parser.add_argument('targets', nargs='*', default=default, help="target file names; defaults to 'index.html'.")
+      help_msg = f'target file names' + ("; defaults to 'index.html'." if targets_dflt else '.')
+      parser.add_argument('targets', nargs='*', default=default, help=help_msg)
     parsers[cmd] = parser
     return parser
 
