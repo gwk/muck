@@ -12,7 +12,7 @@ from .pithy.string import pluralize
 from typing import Dict, Tuple
 
 
-def dflt_prod_path_for_source(source_path: str) -> str: # TODO: rename? this is confusing compared to ctx.product_path
+def dflt_prod_path_for_source(source_path:str) -> str: # TODO: rename? this is confusing compared to ctx.product_path
   '''
   Return the default product path for `source_path` (which may itself be a product),
   as implied by the source stem.
@@ -20,7 +20,7 @@ def dflt_prod_path_for_source(source_path: str) -> str: # TODO: rename? this is 
   return path_stem(source_path) # strip off source ext.
 
 
-def bindings_from_args(src: str, args: Tuple[str, ...]) -> Dict[str, str]:
+def bindings_from_args(src:str, args:Tuple[str, ...]) -> Dict[str, str]:
   '''
   Return a dictionary pairing formatter names in `src` to argument values in `args`.'
   Requires that each formatter is named.
@@ -33,7 +33,7 @@ def bindings_from_args(src: str, args: Tuple[str, ...]) -> Dict[str, str]:
   return { name : type_(val) for (name, _, _, type_), val in zip(formatters, args) }
 
 
-def dst_path(src: str, args: Tuple[str, ...], override_bindings: Dict[str, str]) -> str:
+def dst_path(src:str, args:Tuple[str, ...], override_bindings:Dict[str, str]) -> str:
   base_bindings = bindings_from_args(src, args)
   bindings = base_bindings.copy()
   for k, v in override_bindings.items():

@@ -59,9 +59,9 @@ try: assert target == os.environ['MUCK_TARGET']
 except KeyError: pass # running standalone (or the Muck parent process).
 
 
-_dst_vars_opened: Set[Tuple[Tuple[str, str], ...]] = set()
+_dst_vars_opened:Set[Tuple[Tuple[str, str], ...]] = set()
 
-def dst_file(encoding='UTF-8', **kwargs: str) -> IO:
+def dst_file(encoding='UTF-8', **kwargs:str) -> IO:
   '''
   Open an output file for writing, expanding target path formatters with `kwargs`.
   '''
@@ -93,7 +93,7 @@ def load(file_or_path:FileOrPath, ext:str=None, **kwargs) -> Any:
   return _load(file_or_path, ext=ext, **kwargs)
 
 
-def open(path: PathOrFd, **kwargs) -> IO:
+def open(path:PathOrFd, **kwargs) -> IO:
   '''
   Wrapper around the standard system open that formats arguments into the file name appropriately.
   '''
@@ -103,13 +103,13 @@ def open(path: PathOrFd, **kwargs) -> IO:
 
 
 class HTTPError(Exception):
-  def __init__(self, msg: str, curl_code: int=0, status_code: int=-1) -> None:
+  def __init__(self, msg:str, curl_code:int=0, status_code:int=-1) -> None:
     super().__init__(msg)
     self.curl_code = curl_code
     self.status_code = status_code
 
 
-def fetch(url: str, cache_path: str=None, params: Dict[str, str]={}, headers: Dict[str, str]={}, expected_status_code=200, timeout=30, delay=0, delay_range=0, spoof_ua=False) -> str:
+def fetch(url:str, cache_path:str=None, params:Dict[str, str]={}, headers:Dict[str, str]={}, expected_status_code=200, timeout=30, delay=0, delay_range=0, spoof_ua=False) -> str:
   "Fetch the data at `url` and save it to a path in the '_fetch' directory derived from the URL."
   if params:
     if '?' in url: raise ValueError("params specified but url already contains '?'")
@@ -150,7 +150,7 @@ def fetch(url: str, cache_path: str=None, params: Dict[str, str]={}, headers: Di
   return path
 
 
-def load_url(url: str, ext: str=None, cache_path: str=None, params: Dict[str, str]={}, headers: Dict[str, str]={}, expected_status_code=200, timeout=30, delay=0, delay_range=0, spoof_ua=False, **kwargs: Any) -> Any:
+def load_url(url:str, ext:str=None, cache_path:str=None, params:Dict[str, str]={}, headers:Dict[str, str]={}, expected_status_code=200, timeout=30, delay=0, delay_range=0, spoof_ua=False, **kwargs:Any) -> Any:
   'Fetch the data at `url` and then load using `muck.load`.'
   if ext is None:
     if cache_path:
@@ -178,7 +178,7 @@ def spoofing_headers() -> Dict[str, str]:
   }
 
 
-def transform(target_path: str, ext: str=None, **kwargs: Any) -> Transformer:
+def transform(target_path:str, ext:str=None, **kwargs:Any) -> Transformer:
   '''
   Open a dependency using muck.load and then transform it using pithy.Transformer.
 

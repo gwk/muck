@@ -52,9 +52,9 @@ def main() -> None:
   # thus we build an argument parser for each command, as well as the main one,
   # and dispatch manually based on the first argument.
 
-  parsers: Dict[str, ArgumentParser] = {}
+  parsers:Dict[str, ArgumentParser] = {}
 
-  def add_parser(cmd: str, fn: Callable[..., None], builds: bool, targets_dflt:Optional[bool]=None, takes_ctx:bool=True, **kwargs) -> ArgumentParser:
+  def add_parser(cmd:str, fn:Callable[..., None], builds:bool, targets_dflt:Optional[bool]=None, takes_ctx:bool=True, **kwargs) -> ArgumentParser:
     reserved_names.add(cmd)
     parser = ArgumentParser(prog='muck ' + cmd, **kwargs)
     parser.set_defaults(fn=fn, builds=builds, targets_dflt=targets_dflt, takes_ctx=takes_ctx)
@@ -132,10 +132,10 @@ def main() -> None:
   db_path = path_join(args.build_dir, db_name)
 
   if args.dbg:
-    def dbg(path: str, *items: Any) -> None:
+    def dbg(path:str, *items:Any) -> None:
       errL('muck dbg: ', path, ': ', *items)
   else:
-    def dbg(path: str, *items: Any) -> None: pass
+    def dbg(path:str, *items:Any) -> None: pass
 
   # Handle directory change first.
   if args.cd: change_dir(args.cd)
@@ -155,7 +155,7 @@ def main() -> None:
 # Commands.
 
 
-def muck_build(ctx: Ctx) -> None:
+def muck_build(ctx:Ctx) -> None:
   '`muck build` (default) command: update each specified target.'
 
   for target in ctx.targets:
@@ -171,12 +171,12 @@ def muck_build(ctx: Ctx) -> None:
     serve_build(ctx, main_target=ctx.targets[0], update_top=update_top)
 
 
-def muck_clean_all(args: Namespace) -> None:
+def muck_clean_all(args:Namespace) -> None:
   '`muck clean-all` command.'
   remove_dir_contents(args.build_dir)
 
 
-def muck_clean(ctx: Ctx) -> None:
+def muck_clean(ctx:Ctx) -> None:
   '`muck clean` command.'
   targets = ctx.targets
   if not targets:
@@ -190,7 +190,7 @@ def muck_clean(ctx: Ctx) -> None:
     ctx.db.delete_record(target=target)
 
 
-def muck_deps(ctx: Ctx) -> None:
+def muck_deps(ctx:Ctx) -> None:
   '`muck deps` command.'
   targets = ctx.targets
   for target in targets:
@@ -201,7 +201,7 @@ def muck_deps(ctx: Ctx) -> None:
 
   visited_roots: Set[str] = set()
 
-  def visit(target: str, *indents: str, sub:str='  ', color='') -> None:
+  def visit(target:str, *indents:str, sub:str='  ', color='') -> None:
     record = ctx.db.get_record(target)
     assert record is not None
     dependents = ctx.dependents[target]
@@ -241,21 +241,21 @@ dependent_colors = {
 }
 
 
-def muck_deps_list(ctx: Ctx) -> None:
+def muck_deps_list(ctx:Ctx) -> None:
   '`muck deps-list` command.'
   for target in ctx.targets:
     update_top(ctx, target)
   outLL(*sorted(ctx.statuses.keys()))
 
 
-def muck_prod_list(ctx: Ctx) -> None:
+def muck_prod_list(ctx:Ctx) -> None:
   '`muck prod-list` command.'
   for target in ctx.targets:
     update_top(ctx, target)
   outLL(*sorted(ctx.product_path_for_target(t) for t in ctx.statuses.keys()))
 
 
-def muck_create_patch(ctx: Ctx) -> None:
+def muck_create_patch(ctx:Ctx) -> None:
   '`muck create-patch` command.'
   original = norm_path(ctx.args.original)
   modified = norm_path(ctx.args.modified)
@@ -302,7 +302,7 @@ def muck_update_patch(ctx: Ctx) -> None:
   #^ TODO: update target instead.
 
 
-def muck_move_to_fetched_url(args: Namespace) -> None:
+def muck_move_to_fetched_url(args:Namespace) -> None:
   '`muck move-to-fetched-url` command.'
   path = args.path
   fetch_path = path_join('_fetch', path_for_url(args.url))
@@ -314,7 +314,7 @@ def muck_move_to_fetched_url(args: Namespace) -> None:
   except OSError as e: exit(e)
 
 
-def muck_publish(ctx: Ctx) -> None:
+def muck_publish(ctx:Ctx) -> None:
   '`muck publish` command: update each specified target.'
   dst_root = ctx.args.to
   make_dirs(dst_root)
@@ -343,12 +343,12 @@ def muck_publish(ctx: Ctx) -> None:
 
 # Core algorithm.
 
-def update_top(ctx: Ctx, target: str) -> int:
+def update_top(ctx:Ctx, target:str) -> int:
   try: return update_target(ctx, target, dependent=None, force=ctx.args.force)
   except TargetNotFound as e: raise error(*e.args) from e
 
 
-def update_target(ctx: Ctx, target: str, dependent: Optional[Dependent], force=False) -> int:
+def update_target(ctx:Ctx, target:str, dependent:Optional[Dependent], force=False) -> int:
   'returns transitive change_time.'
   validate_target_or_error(ctx, target)
 
@@ -403,7 +403,7 @@ def update_target(ctx: Ctx, target: str, dependent: Optional[Dependent], force=F
     return update_non_product(ctx, target, status, needs_update=needs_update, old=old)
 
 
-def check_product_not_modified(ctx: Ctx, target: str, prod_path: str, is_prod_dir: int, size: int, mtime: float, old: TargetRecord) -> None:
+def check_product_not_modified(ctx:Ctx, target:str, prod_path:str, is_prod_dir:int, size:int, mtime:float, old:TargetRecord) -> None:
   # Existing product should not have been modified since record was stored.
   # If is_dir or size changed then it was definitely modified.
   if is_prod_dir == old.is_dir and size == old.size:
@@ -419,7 +419,7 @@ def check_product_not_modified(ctx: Ctx, target: str, prod_path: str, is_prod_di
     f'  Otherwise, save your changes if necessary and then `muck clean {target}`.')
 
 
-def update_product(ctx: Ctx, target: str, needs_update: bool, old: Optional[TargetRecord]) -> int:
+def update_product(ctx:Ctx, target:str, needs_update:bool, old:Optional[TargetRecord]) -> int:
   '''
   Returns transitive change_time.
   Note: we must pass the just-retrieved mtime, in case it has changed but product contents have not.
@@ -477,7 +477,7 @@ def update_product(ctx: Ctx, target: str, needs_update: bool, old: Optional[Targ
       mtime=mtime, change_time=old.change_time, update_time=update_time, file_hash=old.hash, src=src, dyn_deps=old.dyn_deps, old=old)
 
 
-def update_product_with_output(ctx: Ctx, target: str, src: str, dyn_deps: Tuple[str, ...], update_time: int) -> int:
+def update_product_with_output(ctx:Ctx, target:str, src:str, dyn_deps:Tuple[str, ...], update_time:int) -> int:
   'Returns (target, change_time).'
   old = ctx.db.get_record(target=target)
   path = ctx.product_path_for_target(target)
@@ -497,7 +497,7 @@ def update_product_with_output(ctx: Ctx, target: str, src: str, dyn_deps: Tuple[
     old=old)
 
 
-def update_non_product(ctx: Ctx, target: str, status: FileStatus, needs_update: bool, old: Optional[TargetRecord]) -> int:
+def update_non_product(ctx:Ctx, target:str, status:FileStatus, needs_update:bool, old:Optional[TargetRecord]) -> int:
   'returns transitive change_time.'
   ctx.dbg(target, 'update_non_product')
 
@@ -566,8 +566,8 @@ def update_non_product(ctx: Ctx, target: str, status: FileStatus, needs_update: 
   # TODO: non_product update_time is meaningless? mark as -1?
 
 
-def update_deps_and_record(ctx, target: str, is_target_dir: bool, actual_path: str, is_changed: bool, size: int, mtime: float,
- change_time: int, update_time: int, file_hash: bytes, src: Optional[str], dyn_deps: Tuple[str, ...], old: Optional[TargetRecord]) -> int:
+def update_deps_and_record(ctx, target:str, is_target_dir:bool, actual_path:str, is_changed:bool, size:int, mtime:float,
+ change_time:int, update_time:int, file_hash:bytes, src:Optional[str], dyn_deps:Tuple[str, ...], old:Optional[TargetRecord]) -> int:
   'returns transitive change_time.'
 
   ctx.dbg(target, 'update_deps_and_record')
@@ -618,7 +618,7 @@ class DepCtx(NamedTuple):
 class TargetNotFound(Exception): pass
 
 
-def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple[int, Tuple[str, ...], Set[str]]:
+def build_product(ctx:Ctx, target:str, src_path:str, prod_path:str) -> Tuple[int, Tuple[str, ...], Set[str]]:
   '''
   Run a source file, producing zero or more products.
   Return a list of produced product paths.
@@ -731,7 +731,7 @@ def build_product(ctx: Ctx, target: str, src_path: str, prod_path: str) -> Tuple
   return dyn_time, tuple(sorted(depCtx.dyn_deps)), depCtx.all_outs
 
 
-def process_dep_line(ctx: Ctx, depCtx: DepCtx, target: str, dep_line: str, dyn_time: int) -> int:
+def process_dep_line(ctx:Ctx, depCtx:DepCtx, target:str, dep_line:str, dyn_time:int) -> int:
   '''
   Parse a dependency line sent from a child build process.
   Since the parent and child processes have different current working directories,
@@ -775,7 +775,7 @@ def process_dep_line(ctx: Ctx, depCtx: DepCtx, target: str, dep_line: str, dyn_t
 
 # Dependency inference.
 
-def calc_dependencies(path: str, dir_names: Dict[str, Tuple[str, ...]]) -> Tuple[str, ...]:
+def calc_dependencies(path:str, dir_names:Dict[str, Tuple[str, ...]]) -> Tuple[str, ...]:
   '''
   Infer the dependencies for the file at `path`.
   '''
@@ -787,13 +787,13 @@ def calc_dependencies(path: str, dir_names: Dict[str, Tuple[str, ...]]) -> Tuple
     return tuple(deps_fn(path, f, dir_names))
 
 
-def list_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
+def list_dependencies(src_path:str, src_file:TextIO, dir_names:Dict[str, Tuple[str, ...]]) -> List[str]:
   'Calculate dependencies for .list files.'
   lines = (line.strip() for line in src_file)
   return [l for l in lines if l and not l.startswith('#')]
 
 
-def sqlite3_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> Iterable[str]:
+def sqlite3_dependencies(src_path:str, src_file:TextIO, dir_names:Dict[str, Tuple[str, ...]]) -> Iterable[str]:
   'Calculate dependencies for .sql files (assumed to be sqlite3 commands).'
   for i, line in enumerate(src_file, 1):
     tokens = shlex.split(line)
@@ -802,14 +802,14 @@ def sqlite3_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, T
         yield tokens[j+1]
 
 
-def pat_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
+def pat_dependencies(src_path:str, src_file:TextIO, dir_names:Dict[str, Tuple[str, ...]]) -> List[str]:
   try: import pithy.pat as pat
   except ImportError: error(src_path, '`pat` is not installed; run `pip install pithy`.')
   dep = pat.pat_dependency(src_path=src_path, src_file=src_file)
   return [dep]
 
 
-def writeup_dependencies(src_path: str, src_file: TextIO, dir_names: Dict[str, Tuple[str, ...]]) -> List[str]:
+def writeup_dependencies(src_path:str, src_file:TextIO, dir_names:Dict[str, Tuple[str, ...]]) -> List[str]:
   try: import writeup
   except ImportError: raise error(src_path, '`writeup` is not installed; run `pip install pithy`.')
   return writeup.writeup_dependencies(src_path=src_path, text_lines=src_file)
@@ -866,20 +866,20 @@ libmuck_path = _libmuck_path
 # Targets and paths.
 
 
-def validate_target_or_error(ctx: Ctx, target: str) -> None:
+def validate_target_or_error(ctx:Ctx, target:str) -> None:
   try: validate_target(ctx, target)
   except InvalidTarget as e:
     exit(f'muck error: invalid target: {e.target!r}; {e.msg}')
 
 
 
-def target_for_product(ctx: Ctx, product_path: str) -> str:
+def target_for_product(ctx:Ctx, product_path:str) -> str:
   'Return the target path for `product_path`.'
   assert ctx.is_product_path(product_path)
   return product_path[len(ctx.build_dir_slash):]
 
 
-def target_path_for_source(ctx: Ctx, source_path: str) -> str:
+def target_path_for_source(ctx:Ctx, source_path:str) -> str:
   'Return the target path for `source_path` (which may itself be a product).'
   path = path_stem(source_path) # strip off source ext.
   if ctx.is_product_path(path): # source might be a product.
@@ -890,7 +890,7 @@ def target_path_for_source(ctx: Ctx, source_path: str) -> str:
 
 _wildcard_re = re.compile(r'(%+)')
 
-def match_wilds(wildcard_path: str, string: str) -> Optional[Match[str]]:
+def match_wilds(wildcard_path:str, string:str) -> Optional[Match[str]]:
   '''
   Match a string against a wildcard/format path.
   '''
@@ -901,7 +901,7 @@ def match_wilds(wildcard_path: str, string: str) -> Optional[Match[str]]:
 # Utilities.
 
 
-def hash_for_path(path: str) -> bytes:
+def hash_for_path(path:str) -> bytes:
   '''
   Return a hash string for the contents of the file at `path`.
   '''
@@ -912,7 +912,7 @@ def hash_for_path(path: str) -> bytes:
   raise error(path, f'path is a {s.type_desc}')
 
 
-def hash_for_file_contents(path: str) -> bytes:
+def hash_for_file_contents(path:str) -> bytes:
   '''
   Return a hash string for the contents of the file at `path`.
   '''
@@ -928,7 +928,7 @@ def hash_for_file_contents(path: str) -> bytes:
   return h.digest()
 
 
-def hash_for_dir_listing(path: str) -> bytes:
+def hash_for_dir_listing(path:str) -> bytes:
   '''
   Return a hash string for the directory tree at `path`.
   We define the hash of a directory to include the name and file type of the immediate children.
@@ -945,14 +945,14 @@ def hash_for_dir_listing(path: str) -> bytes:
   return h.digest()
 
 
-def file_stats(path: str) -> Tuple[bool, int, float]:
+def file_stats(path:str) -> Tuple[bool, int, float]:
   'Returns (is_dir, size, mtime). Negative size indicates file does not exist.'
   s = file_status(path)
   if s is None: return (False, -1, -1)
   return (s.is_dir, s.size, s.mtime)
 
 
-def source_for_target(ctx: Ctx, target: str) -> str:
+def source_for_target(ctx:Ctx, target:str) -> str:
   '''
   Find the unique source path whose name matches `target`, or else error.
   '''
@@ -963,7 +963,7 @@ def source_for_target(ctx: Ctx, target: str) -> str:
   return src
 
 
-def source_candidate(ctx: Ctx, target: str, src_dir: str, prod_name: str) -> str:
+def source_candidate(ctx:Ctx, target:str, src_dir:str, prod_name:str) -> str:
   src_dir = src_dir or '.'
   try: src_dir_names = list_dir_filtered(ctx, src_dir)
   except FileNotFoundError: raise error(target, f'no such source directory: `{src_dir}`')
@@ -981,7 +981,7 @@ def source_candidate(ctx: Ctx, target: str, src_dir: str, prod_name: str) -> str
     raise TargetNotFound(dpdt_name, f'multiple source candidates matching `{target}`: {candidates}')
 
 
-def list_dir_filtered(ctx: Ctx, src_dir: str) -> List[str]:
+def list_dir_filtered(ctx:Ctx, src_dir:str) -> List[str]:
   '''
   Given src_dir, cache and return the list of names that might be source files.
   TODO: eventually this should be replaced by using os.scandir.
@@ -994,7 +994,7 @@ def list_dir_filtered(ctx: Ctx, src_dir: str) -> List[str]:
   return names
 
 
-def filter_source_names(names: Iterable[str], prod_name: str) -> Iterable[str]:
+def filter_source_names(names:Iterable[str], prod_name:str) -> Iterable[str]:
   '''
   Given `prod_name`, find all matching source names.
   There are several concerns that make this matching complex.
@@ -1016,18 +1016,18 @@ def filter_source_names(names: Iterable[str], prod_name: str) -> Iterable[str]:
       yield '.'.join(src[:len(prod)+1]) # the immediate source name has just one extension added.
 
 
-def note(path: str, *items: Any) -> None:
+def note(path:str, *items:Any) -> None:
   errL(TXT_L_ERR, f'muck note: {path}: ', *items, RST_ERR)
 
-def warn(path: str, *items: Any) -> None:
+def warn(path:str, *items:Any) -> None:
   errL(TXT_Y_ERR, f'muck WARNING: {path}: ', *items, RST_ERR)
 
-def error_msg(path: str, *items: Any) -> str:
+def error_msg(path:str, *items:Any) -> str:
   return ''.join((f'muck error: {path}: ',) + items)
 
-def error(path: str, *items: Any) -> SystemExit:
+def error(path:str, *items:Any) -> SystemExit:
   return SystemExit(error_msg(path, *items))
 
 
-def disp_mtime(mtime: Optional[float]) -> str:
+def disp_mtime(mtime:Optional[float]) -> str:
   return str(datetime.fromtimestamp(mtime)) if mtime else '0'

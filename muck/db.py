@@ -14,16 +14,16 @@ from .pithy.encodings import enc_lep62
 
 
 class TargetRecord(NamedTuple):
-  path: str # target path (not product paths prefixed with build dir).
-  is_dir: bool
-  size: int
-  mtime: float
-  change_time: int
-  update_time: int
-  hash: bytes
-  src: Optional[str] # None for non-product sources.
-  deps: Tuple[str, ...] # sorted tuple of target path strings.
-  dyn_deps: Tuple[str, ...]
+  path:str # target path (not product paths prefixed with build dir).
+  is_dir:bool
+  size:int
+  mtime:float
+  change_time:int
+  update_time:int
+  hash:bytes
+  src:Optional[str] # None for non-product sources.
+  deps:Tuple[str, ...] # sorted tuple of target path strings.
+  dyn_deps:Tuple[str, ...]
 
   def __str__(self) -> str:
     opts = []
@@ -45,7 +45,7 @@ class DBError(Exception): pass
 
 class DB:
 
-  def __init__(self, path: str) -> None:
+  def __init__(self, path:str) -> None:
     self.path = path
     self.conn = connect(path)
     self.conn.isolation_level = None # autocommit mode.
@@ -83,15 +83,15 @@ class DB:
 
 
 
-  def run(self, query: str, **args: Any) -> Cursor:
+  def run(self, query:str, **args:Any) -> Cursor:
     return self.conn.execute(query, args)
 
 
-  def fetch_opt(self, query: str, **args: Any) -> Optional[List[Any]]:
+  def fetch_opt(self, query:str, **args:Any) -> Optional[List[Any]]:
     return self.run(query, **args).fetchone() # type: ignore
 
 
-  def create(self, type: str, name: str, *words: str) -> None:
+  def create(self, type:str, name:str, *words:str) -> None:
     'Run a create query, and check that any existing schema matches the current one.'
     row = self.fetch_opt('SELECT sql FROM sqlite_master WHERE name=:name', name=name)
     sql = ' '.join(('CREATE', type, name) + words)
@@ -103,11 +103,11 @@ class DB:
     elif sql != row[0]: exit('muck error: build database is outdated; run `muck clean-all`.')
 
 
-  def create_table(self, name: str, *columns: str) -> None:
+  def create_table(self, name:str, *columns:str) -> None:
     self.create('TABLE', name, f"({', '.join(columns)})")
 
 
-  def dbg_query(self, *stmts: str) -> None:
+  def dbg_query(self, *stmts:str) -> None:
     for stmt in stmts: #!cov-ignore.
       errL(f'\nDBG: {stmt}')
       c = self.run(stmt)
@@ -116,12 +116,12 @@ class DB:
         errSL('  ', *['{k}:{v!r}' for k, v in zip(row.keys(), row)])
 
 
-  def contains_record(self, target: str) -> bool:
+  def contains_record(self, target:str) -> bool:
     row = self.run('SELECT COUNT(*) FROM targets WHERE path=:path', path=target).fetchone()
     return bool(row[0])
 
 
-  def get_record(self, target: str) -> Optional[TargetRecord]:
+  def get_record(self, target:str) -> Optional[TargetRecord]:
     c = self.run('SELECT * FROM targets WHERE path=:path', path=target)
     rows = c.fetchall()
     if len(rows) > 1:
@@ -135,7 +135,7 @@ class DB:
       return None
 
 
-  def insert_or_replace_record(self, record: TargetRecord) -> None:
+  def insert_or_replace_record(self, record:TargetRecord) -> None:
     try:
       self.run(
         'INSERT OR REPLACE INTO targets (path, is_dir, size, mtime, change_time, update_time, hash, src, deps, dyn_deps) '
@@ -148,7 +148,7 @@ class DB:
       raise DBError(f'insert_record: target path is not unique: {record.path}') from e
 
 
-  def delete_record(self, target: str) -> None:
+  def delete_record(self, target:str) -> None:
     self.run('DELETE FROM targets WHERE path=:path', path=target)
 
 
@@ -162,7 +162,7 @@ class DB:
     return val
 
 
-  def get_inferred_deps(self, target: str) -> Tuple[str, ...]:
+  def get_inferred_deps(self, target:str) -> Tuple[str, ...]:
     record = self.get_record(target)
     assert record is not None
     return record.deps

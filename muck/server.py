@@ -8,7 +8,7 @@ from .pithy.io import *
 from .ctx import Ctx
 
 
-def serve_build(ctx: Ctx, main_target: str, update_top: Callable[[Ctx, str], int]) -> None:
+def serve_build(ctx:Ctx, main_target:str, update_top:Callable[[Ctx, str], int]) -> None:
   '''
   Note: update_top is passed in to prevent `muck.main` and `muck.server` modules from being circularly dependent.
   '''

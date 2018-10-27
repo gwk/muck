@@ -36,10 +36,10 @@ class Ctx(NamedTuple):
   dir_names: Dict[str, List[str]] = {}
   dependents: DefaultDict[str, Set[Dependent]] = DefaultDict(set)
 
-  def is_product_path(self, path: str) -> bool:
+  def is_product_path(self, path:str) -> bool:
     return path.startswith(self.build_dir_slash)
 
-  def product_path_for_target(self, target: str) -> str:
+  def product_path_for_target(self, target:str) -> str:
     return path_join(self.build_dir, target)
 
   def reset(self) -> None:
@@ -53,7 +53,7 @@ class Ctx(NamedTuple):
 
 
 class InvalidTarget(Exception):
-  def __init__(self, target: str, msg: str) -> None:
+  def __init__(self, target:str, msg:str) -> None:
     super().__init__(target, msg)
     self.target = target
     self.msg = msg
@@ -61,7 +61,7 @@ class InvalidTarget(Exception):
 
 target_invalids_re = re.compile(r'[\s]|\.\.|\./|//')
 
-def validate_target(ctx: Ctx, target: str) -> None:
+def validate_target(ctx:Ctx, target:str) -> None:
   if not target:
     raise InvalidTarget(target, 'empty string.')
   inv_m = target_invalids_re.search(target)
