@@ -507,7 +507,7 @@ def update_non_product(ctx: Ctx, target: str, status: FileStatus, needs_update: 
   prod_path = ctx.product_path_for_target(target)
   prod_status = file_status(prod_path)
 
-  if needs_update or (is_target_dir != prod_status.is_dir):
+  if needs_update or prod_status is None or (is_target_dir != prod_status.is_dir):
     is_changed = True
     target_hash = hash_for_path(target)
   elif (old is None or is_target_dir or size != old.size or mtime != old.mtime):
