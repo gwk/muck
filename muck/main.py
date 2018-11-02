@@ -336,12 +336,13 @@ def muck_publish(ctx:Ctx) -> None:
   for pattern in ctx.args.files:
     if not is_glob_pattern(pattern): raise error(f'not a glob pattern: {pattern!r}')
     if pattern.startswith('/'): raise error(f'invalid glob pattern: leading slash: {pattern!r}')
-    for product in walk_files(*walk_glob(ctx.product_path_for_target(pattern))):
-      if product in copied_products: continue
-      dst = path_join(dst_root, target_for_product(ctx, product))
-      make_dirs(path_dir(dst))
-      clone(src=product, dst=dst)
-      copied_products.add(product)
+    for glob_path in walk_glob(ctx.product_path_for_target(pattern)):
+      for product in walk_files(glob_path):
+        if product in copied_products: continue
+        dst = path_join(dst_root, target_for_product(ctx, product))
+        make_dirs(path_dir(dst))
+        clone(src=product, dst=dst)
+        copied_products.add(product)
 
 
 # Core algorithm.
@@ -547,7 +548,7 @@ def update_non_product(ctx:Ctx, target:str, status:FileStatus, needs_update:bool
           make_link(entry.path, link=entry_prod_path)
       # Remove remaining prod_entries, which did not match entries in source and are therefore stale.
       for entry in prod_entries.values():
-        assert entry.is_symlink()
+        assert entry.is_symlink(), entry
         remove_file(entry.path)
 
     else: # target is regular file.
