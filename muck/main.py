@@ -183,6 +183,8 @@ def muck_clean(ctx:Ctx) -> None:
   if not targets:
     exit('muck clean: no targets specified; did you mean `muck clean-all`?')
   for target in targets:
+    if target.startswith(ctx.build_dir_slash):
+      target = target[len(ctx.build_dir_slash):]
     if not ctx.db.contains_record(target=target):
       errL(f'muck clean note: {target}: skipping unknown target.')
       continue
