@@ -1,14 +1,13 @@
 # Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
 
-import argparse
-import re
-from typing import *
-from .pithy.format import FormatError, parse_formatters
-
-from .pithy.dataclasses import dataclass
-from .pithy.fs import norm_path, path_ext, path_join, path_name_stem
 from .constants import *
 from .db import DB
+from .pithy.dataclasses import dataclass
+from .pithy.format import FormatError, parse_formatters
+from .pithy.fs import norm_path, path_ext, path_join, path_name_stem
+from typing import *
+import argparse
+import re
 
 
 class Dependent(NamedTuple):
