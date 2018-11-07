@@ -323,26 +323,40 @@ def muck_publish(ctx:Ctx) -> None:
   make_dirs(dst_root)
   remove_dir_contents(dst_root)
 
-  copied_products: Set[str] = set()
   for target in ctx.targets:
-    update_top(ctx, target)
-    product = ctx.product_path_for_target(target)
-    dst = path_join(dst_root, target)
-    errL(f'publish product: {product} -> {dst}')
-    make_dirs(path_dir(dst))
-    clone(src=product, dst=dst)
-    copied_products.add(product)
+    if is_dir(target): # Non-product directory needs to be recursed. TODO: rethink how built directories work and the usage of symlinks.
+      for d in walk_dirs(target):
+        errSL('D', d)
+        update_top(ctx, d)
+    else:
+      update_top(ctx, target)
+
+  copied_products: Set[str] = set()
+
+  # Need to copy product tree manually, or else published dir ends up with symlinks.
+  def clone_to_pub(product:str) -> None:
+    for p in walk_paths(product):
+      if p in copied_products: return
+      target = target_for_product(ctx, p)
+      dst = path_join(dst_root, target)
+      errL(f'publish: {p} -> {dst}')
+      if is_dir(p):
+        make_dirs(dst)
+      else:
+        make_dirs(path_dir(dst))
+        clone(src=p, dst=dst)
+      copied_products.add(p)
+
+  for target in ctx.targets:
+    clone_to_pub(ctx.product_path_for_target(target))
 
   for pattern in ctx.args.files:
     if not is_glob_pattern(pattern): raise error(f'not a glob pattern: {pattern!r}')
     if pattern.startswith('/'): raise error(f'invalid glob pattern: leading slash: {pattern!r}')
-    for glob_path in walk_glob(ctx.product_path_for_target(pattern)):
-      for product in walk_files(glob_path):
-        if product in copied_products: continue
-        dst = path_join(dst_root, target_for_product(ctx, product))
-        make_dirs(path_dir(dst))
-        clone(src=product, dst=dst)
-        copied_products.add(product)
+    errSL(f'publish glob: {pattern}')
+    # Walk over products, not targets, so that glob applies to products (which are not always globbable by user's shell).
+    for product in walk_glob(ctx.product_path_for_target(pattern)):
+      clone_to_pub(product)
 
 
 # Core algorithm.
