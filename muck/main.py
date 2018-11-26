@@ -388,7 +388,7 @@ def update_target(ctx:Ctx, target:str, dependent:Optional[Dependent], force=Fals
     return target_status.change_time
 
   target_status = ctx.statuses[target] = TargetStatus() # Update_deps_and_record updates the status upon completion.
-  ctx.dbg(target, f'\x1b[32mupdate; {dependent or "<requested>"}\x1b[0m')
+  ctx.dbg(target, f'{TXT_G}update; {dependent or "<requested>"}{RST}')
 
   status = file_status(target) # follows symlinks.
   if status is None and is_link(target):
