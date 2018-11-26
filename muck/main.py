@@ -367,7 +367,10 @@ def update_top(ctx:Ctx, target:str) -> int:
 
 
 def update_target(ctx:Ctx, target:str, dependent:Optional[Dependent], force=False) -> int:
-  'returns transitive change_time.'
+  '''
+  The central function of the Muck.
+  returns transitive change_time.
+  '''
   validate_target_or_error(ctx, target)
 
   if dependent is not None:
