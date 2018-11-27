@@ -2,8 +2,7 @@
 
 from .pithy.fs import is_file, path_dir, path_join
 from .pithy.io import read_line_from_path
-from typing import *
-from typing import TextIO
+from typing import Any, Iterable, Optional, TextIO
 import ast
 import re
 

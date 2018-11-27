@@ -5,7 +5,7 @@ from .db import DB
 from .pithy.format import FormatError, parse_formatters
 from .pithy.fs import norm_path, path_ext, path_join, path_name_stem
 from dataclasses import dataclass
-from typing import *
+from typing import Callable, Dict, DefaultDict, FrozenSet, List, NamedTuple, Optional, Set, Tuple
 import argparse
 import re
 

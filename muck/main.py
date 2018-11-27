@@ -21,8 +21,7 @@ from glob import iglob as walk_glob, has_magic as is_glob_pattern # type: ignore
 from hashlib import sha256
 from importlib.util import find_spec as find_module_spec
 from os import O_CREAT, O_EXCL, O_RDONLY, O_RDWR, O_WRONLY
-from typing import *
-from typing import BinaryIO, IO, Match, TextIO
+from typing import BinaryIO, Callable, Dict, IO, List, Match, Set, TextIO, cast
 
 from .pithy.ansi import *
 from .pithy.format import format_to_re
