@@ -52,4 +52,4 @@ test:
 	iotest -fail-fast
 
 typecheck:
-	craft-py-check muck -deps pithy
+	craft-py-check muck pithy/pithy
