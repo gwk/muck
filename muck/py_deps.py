@@ -24,7 +24,7 @@ def py_dependencies(src_path: str, src_file: TextIO, dir_names: Any) -> Iterable
   src_text = src_file.read()
   try: tree = ast.parse(src_text, filename=src_path)
   except SyntaxError as e:
-    raise src_error(src_path, e.lineno, e.offset, 'syntax error', e.text.rstrip('\n')) from e
+    raise src_error(src_path, e.lineno, e.offset or 0, 'syntax error', e.text.rstrip('\n')) from e
 
   def walk_import(module_name: Optional[str], dir_names: Any) -> Iterable[str]:
     if module_name is None: raise ValueError
