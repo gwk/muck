@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
- <title>index.html</title>
- <meta name="description" content="" />
- <meta name="author" content="" />
-  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgo=" />
-  <style type="text/css">
+<meta charset="utf-8" />
+<title></title>
+<meta name="description" content="" />
+<meta name="author" content="" />
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgo=" />
+<style type="text/css">
 a { background-color: transparent; }
 a:active { outline: 0; }
 a:hover { outline: 0; }
@@ -55,51 +55,45 @@ table tr:hover td { background: #F0F0F0; }
 ul { line-height: 1.333rem; list-style-position: outside; list-style-type: disc; margin-left: 1rem; padding-left: 0.1rem; }
 @media print { @page { margin: 2cm; }
 }
-  </style>
-  <script type="text/javascript"> "use strict";
+</style>
+<script type="text/javascript"> "use strict";
 function scrollToElementId(id) {
-  window.scrollTo(0, document.getElementById(id).offsetTop);
+window.scrollTo(0, document.getElementById(id).offsetTop);
 }
-
 var in_pres_mode = false;
 function togglePresentationMode() {
-  in_pres_mode = !in_pres_mode;
-  for (var sid of paging_ids) {
-    var section = document.getElementById(sid);
-    if (section.id == 'body') {
-      // skip; not actually a section.
-    } else {
-      section.style['margin'] = in_pres_mode ? '100vh 0 0 0' : '0';
-    }
-  }
-  var footer = document.getElementById('footer');
-  footer.style['margin'] = in_pres_mode ? '100vh 0 0 0' : '0';
+in_pres_mode = !in_pres_mode;
+for (var sid of paging_ids) {
+var section = document.getElementById(sid);
+if (section.id == 'body') {
+} else {
+section.style['margin'] = in_pres_mode ? '100vh 0 0 0' : '0';
 }
-
+}
+var footer = document.getElementById('footer');
+footer.style['margin'] = in_pres_mode ? '100vh 0 0 0' : '0';
+}
 var section_ids = null;
 var paging_ids = null;
 var paging_idx = 0;
-
 window.onkeydown = function(e) {
-  if (e.keyCode === 37) { // left.
-    if (paging_idx > 0) {
-      paging_idx -= 1;
-    }
-    scrollToElementId(paging_ids[paging_idx]);
-  } else if (e.keyCode === 39) { // right.
-    if (paging_idx < paging_ids.length - 1) {
-      paging_idx += 1;
-    }
-    scrollToElementId(paging_ids[paging_idx]);
-  }
+if (e.keyCode === 37) {
+if (paging_idx > 0) {
+paging_idx -= 1;
+}
+scrollToElementId(paging_ids[paging_idx]);
+} else if (e.keyCode === 39) {
+if (paging_idx < paging_ids.length - 1) {
+paging_idx += 1;
+}
+scrollToElementId(paging_ids[paging_idx]);
+}
 };
-
 window.onkeypress = function(e) {
-  if (e.charCode === 112) { // 'p'.
-    togglePresentationMode();
-  }
-};
-</script>
+if (e.charCode === 112) {
+togglePresentationMode();
+}
+};</script>
 </head>
 <body id="body">
 <section class="S1" id="s0">
