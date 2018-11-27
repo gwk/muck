@@ -2,9 +2,9 @@
 
 from .constants import *
 from .db import DB
-from .pithy.dataclasses import dataclass
 from .pithy.format import FormatError, parse_formatters
 from .pithy.fs import norm_path, path_ext, path_join, path_name_stem
+from dataclasses import dataclass
 from typing import *
 import argparse
 import re
