@@ -1,19 +1,19 @@
 
-a-to-many-0.txt[0m (⇠ [31mb-through-0.txt[0m, [31mc-many.txt[0m)
-┗╸[32ma-to-many-{i}.txt.py[0m
+a-to-many-0.txt[m (⇠ [31mb-through-0.txt[m, [31mc-many.txt[m)
+┗╸[32ma-to-many-{i}.txt.py[m
 
-a-to-many-1.txt[0m (⇠ [31mb-through-1.txt[0m, [31mc-many.txt[0m)
-┗╸[32ma-to-many-{i}.txt.py[0m
+a-to-many-1.txt[m (⇠ [31mb-through-1.txt[m, [31mc-many.txt[m)
+┗╸[32ma-to-many-{i}.txt.py[m
 
-b-through-{i}.txt.py[0m (⇠ [32mb-through-0.txt[0m, [32mb-through-1.txt[0m)
+b-through-{i}.txt.py[m (⇠ [32mb-through-0.txt[m, [32mb-through-1.txt[m)
 
-c-many.txt[0m
-┡╸[32mc-many.txt.py[0m
-├╴[31ma-to-many-0.txt[0m ⇡
-├╴[31ma-to-many-1.txt[0m ⇡
-├╴[31mb-through-0.txt[0m
-│ ┡╸[32mb-through-{i}.txt.py[0m ⇡
-│ └╴[31ma-to-many-0.txt[0m ⇡
-└╴[31mb-through-1.txt[0m
-  ┡╸[32mb-through-{i}.txt.py[0m ⇡
-  └╴[31ma-to-many-1.txt[0m ⇡
+c-many.txt[m
+┡╸[32mc-many.txt.py[m
+├╴[31ma-to-many-0.txt[m ⇡
+├╴[31ma-to-many-1.txt[m ⇡
+├╴[31mb-through-0.txt[m
+│ ┡╸[32mb-through-{i}.txt.py[m ⇡
+│ └╴[31ma-to-many-0.txt[m ⇡
+└╴[31mb-through-1.txt[m
+  ┡╸[32mb-through-{i}.txt.py[m ⇡
+  └╴[31ma-to-many-1.txt[m ⇡

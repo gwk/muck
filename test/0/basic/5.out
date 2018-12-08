@@ -1,21 +1,21 @@
 
-a.txt[0m (⇠ [34mindex.html.wu[0m, [31mmodule-import.txt[0m)
+a.txt[m (⇠ [34mindex.html.wu[m, [31mmodule-import.txt[m)
 
-d.txt[0m (⇠ [31mb.txt[0m, [31mc.txt[0m)
-┗╸[32md.txt.py[0m
-  ╰╴[34mbasic_lib.py[0m
+d.txt[m (⇠ [31mb.txt[m, [31mc.txt[m)
+┗╸[32md.txt.py[m
+  ╰╴[34mbasic_lib.py[m
 
-index.html[0m
-┗╸[32mindex.html.wu[0m
-  ╰╴[34ma.txt[0m ⇡
-  ╰╴[34mb.txt[0m
-  │ ┡╸[32mb.txt.py[0m
-  │ └╴[31md.txt[0m ⇡
-  ╰╴[34mc.txt[0m
-  │ ┡╸[32mc.txt.py[0m
-  │ │ ┗╸[32mc.txt.py.py[0m
-  │ └╴[31md.txt[0m ⇡
-  ╰╴[34mlinked-src.html[0m
-  ╰╴[34mmodule-import.txt[0m
-    ┡╸[32mmodule-import.txt.py[0m
-    └╴[31ma.txt[0m ⇡
+index.html[m
+┗╸[32mindex.html.wu[m
+  ╰╴[34ma.txt[m ⇡
+  ╰╴[34mb.txt[m
+  │ ┡╸[32mb.txt.py[m
+  │ └╴[31md.txt[m ⇡
+  ╰╴[34mc.txt[m
+  │ ┡╸[32mc.txt.py[m
+  │ │ ┗╸[32mc.txt.py.py[m
+  │ └╴[31md.txt[m ⇡
+  ╰╴[34mlinked-src.html[m
+  ╰╴[34mmodule-import.txt[m
+    ┡╸[32mmodule-import.txt.py[m
+    └╴[31ma.txt[m ⇡
