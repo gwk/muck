@@ -28,8 +28,8 @@
 // Currently, libmuck is installed as a Python C extension dynamic library.
 // This is something of a hack, because it is not a legitimate Python extension.
 // If you try to import it you will get: `ImportError: dynamic module does not define module export function (PyInit_libmuck)`.
-// We could behave like a real python module, but there is no real benefit.
-// Downside would be that a real module might require extra dynamic linking whenever this library is loaded for every client process.
+// We could make it behave like a real python module, but there is no real benefit.
+// The downside would be that a real module might cause extra dynamic linking whenever this library is loaded for every client process.
 //PyMODINIT_FUNC PyInit_libmuck(void) { return PyModule_Create(&libmuck); }
 
 
@@ -148,6 +148,8 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
     program_name = getprogname();
     #elif defined(_GNU_SOURCE)
     program_name = program_invocation_name;
+    #else
+    #error "unsupported platform."
     #endif
     char* fd_send_str = getenv("MUCK_DEPS_SEND");
     char* fd_recv_str = getenv("MUCK_DEPS_RECV");
@@ -180,8 +182,8 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
     // Read the confirmation byte from the receive channel;
     // the read blocks this process until the parent build process is done updating dependencies.
     unsigned char ack = 0;
-    check(read(fd_recv, &ack, 1) == 1, "MUCK_DEPS_RECV read failed: %s.\n", strerror(errno));
-    check(ack == 0x6, "MUCK_DEP_RECV expected ACK (0x6) byte confirmation; received: 0x%02x.\n", (int)ack);
+    check(read(fd_recv, &ack, 1) == 1, "MUCK_DEPS_RECV read failed: %s.", strerror(errno));
+    check(ack == 0x6, "MUCK_DEP_RECV expected ACK (0x6) byte confirmation; received: 0x%02x.", (int)ack);
   }
   if (dbg) { // show that the client is no longer blocked.
     str_truncate_by(&msg, 1);
