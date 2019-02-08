@@ -260,7 +260,7 @@ def update_deps_and_record(ctx, target:str, is_target_dir:bool, actual_path:str,
 
   ctx.dbg(target, 'update_deps_and_record')
   if is_changed:
-    deps = calc_dependencies(actual_path, ctx.dir_names)
+    deps = calculate_dependencies(actual_path, ctx.dir_names)
     for dep in deps:
       try: ctx.validate_target(dep)
       except InvalidTarget as e:
@@ -461,7 +461,7 @@ def process_dep_line(ctx:Ctx, depCtx:DepCtx, target:str, dep_line:str, dyn_time:
 
 # Dependency inference.
 
-def calc_dependencies(path:str, dir_names:Dict[str, Tuple[str, ...]]) -> Tuple[str, ...]:
+def calculate_dependencies(path:str, dir_names:Dict[str, Tuple[str, ...]]) -> Tuple[str, ...]:
   '''
   Infer the dependencies for the file at `path`.
   '''
@@ -472,6 +472,8 @@ def calc_dependencies(path:str, dir_names:Dict[str, Tuple[str, ...]]) -> Tuple[s
   with open(path) as f:
     return tuple(deps_fn(path, f, dir_names))
 
+
+# Type-specific dependency functions.
 
 def list_dependencies(src_path:str, src_file:TextIO, dir_names:Dict[str, Tuple[str, ...]]) -> List[str]:
   'Calculate dependencies for .list files.'
