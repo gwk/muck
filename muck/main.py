@@ -8,11 +8,7 @@ This file was separated from __main__.py to make stack traces more consistent du
 import sys
 assert sys.version_info >= (3, 6, 0)
 
-import base64
-import json
-import os
 import shlex
-import re
 import time
 
 from argparse import ArgumentParser, Namespace
@@ -20,25 +16,23 @@ from datetime import datetime
 from glob import iglob as walk_glob, has_magic as is_glob_pattern # type: ignore # has_magic is private.
 from hashlib import sha256
 from importlib.util import find_spec as find_module_spec
-from os import O_CREAT, O_EXCL, O_RDONLY, O_RDWR, O_WRONLY
+from os import O_CREAT, O_EXCL, O_RDONLY, O_RDWR, O_WRONLY, environ
 from typing import BinaryIO, Callable, Dict, IO, List, Match, Set, TextIO, cast
 
 from .pithy.ansi import *
-from .pithy.format import format_to_re
 from .pithy.fs import *
 from .pithy.io import *
-from .pithy.iterable import fan_by_pred, first_el
-from .pithy.json import load_json, write_json
 from .pithy.path_encode import path_for_url
 from .pithy.pipe import DuplexPipe
 from .pithy.string import format_byte_count
 from .pithy.task import launch, runC
 
-from .ctx import Ctx, Dependent, InvalidTarget, TargetStatus, validate_target
+from .ctx import Ctx, Dependent, InvalidTarget, TargetStatus, TargetNotFound, match_wilds
 from .db import TargetRecord, DB, DBError
 from .constants import *
 from .py_deps import py_dependencies
 from .server import serve_build
+from .logging import note, warn, error, error_msg
 
 
 def main() -> None:
@@ -261,8 +255,8 @@ def muck_create_patch(ctx:Ctx) -> None:
   '`muck create-patch` command.'
   original = norm_path(ctx.args.original)
   modified = norm_path(ctx.args.modified)
-  validate_target_or_error(ctx, original)
-  validate_target_or_error(ctx, modified)
+  ctx.validate_target_or_error(original)
+  ctx.validate_target_or_error(modified)
   patch = modified + '.pat'
   if original.endswith('.pat'):
     exit(f"muck create-patch error: 'original' should not be a patch file: {original}")
@@ -282,7 +276,7 @@ def muck_create_patch(ctx:Ctx) -> None:
 def muck_update_patch(ctx: Ctx) -> None:
   '`muck update-patch` command.'
   patch_path = norm_path(ctx.args.patch)
-  validate_target_or_error(ctx, patch_path)
+  ctx.validate_target_or_error(patch_path)
   if path_ext(patch_path) != '.pat':
     exit(f'muck update-patch error: argument does not specify a .pat file: {patch_path!r}')
 
@@ -336,7 +330,7 @@ def muck_publish(ctx:Ctx) -> None:
   def clone_to_pub(product:str) -> None:
     for p in walk_paths(product):
       if p in copied_products: return
-      target = target_for_product(ctx, p)
+      target = ctx.target_for_product(p)
       dst = path_join(dst_root, target)
       errL(f'publish: {p} -> {dst}')
       if is_dir(p):
@@ -370,7 +364,7 @@ def update_target(ctx:Ctx, target:str, dependent:Optional[Dependent], force=Fals
   The central function of the Muck.
   returns transitive change_time.
   '''
-  validate_target_or_error(ctx, target)
+  ctx.validate_target_or_error(target)
 
   if dependent is not None:
     ctx.dependents[target].add(dependent)
@@ -455,8 +449,8 @@ def update_product(ctx:Ctx, target:str, needs_update:bool, old:Optional[TargetRe
     else:
       check_product_not_modified(ctx, target, prod_path=prod_path, is_prod_dir=is_prod_dir, size=size, mtime=mtime, old=old)
 
-  src = source_for_target(ctx, target)
-  validate_target_or_error(ctx, src)
+  src = ctx.source_for_target(target)
+  ctx.validate_target_or_error(src)
   ctx.dbg(target, f'src: ', src)
   if old is not None and old.src != src:
     needs_update = True
@@ -594,7 +588,7 @@ def update_deps_and_record(ctx, target:str, is_target_dir:bool, actual_path:str,
   if is_changed:
     deps = calc_dependencies(actual_path, ctx.dir_names)
     for dep in deps:
-      try: validate_target(ctx, dep)
+      try: ctx.validate_target(dep)
       except InvalidTarget as e:
         raise error(target, f'invalid dependency: {e.target!r}: {e.msg}')
   else:
@@ -635,8 +629,6 @@ class DepCtx(NamedTuple):
   all_outs: Set[str]
 
 
-class TargetNotFound(Exception): pass
-
 
 def build_product(ctx:Ctx, target:str, src_path:str, prod_path:str) -> Tuple[int, Tuple[str, ...], Set[str]]:
   '''
@@ -661,7 +653,7 @@ def build_product(ctx:Ctx, target:str, src_path:str, prod_path:str) -> Tuple[int
       return 0, (), set() # no product.
 
   # Extract args from the combination of wilds in the source and the matching target.
-  m = match_wilds(target_path_for_source(ctx, src_path), target)
+  m = match_wilds(ctx.target_for_source(src_path), target)
   if m is None:
     raise error(target, f'internal error: match failed; src_path: {src_path!r}')
   args = tuple(m.groups())
@@ -675,7 +667,7 @@ def build_product(ctx:Ctx, target:str, src_path:str, prod_path:str) -> Tuple[int
   remove_path_if_exists(prod_path_out)
   remove_path_if_exists(prod_path)
 
-  env = os.environ.copy()
+  env = environ.copy()
   env['MUCK_TARGET'] = target
   if tool.env_fn is not None:
     env.update(tool.env_fn())
@@ -787,7 +779,7 @@ def process_dep_line(ctx:Ctx, depCtx:DepCtx, target:str, dep_line:str, dyn_time:
     depCtx.dyn_deps.add(dep)
   elif mode in 'AMUW':
     if dep in depCtx.restricted_deps_wr: raise error(target, f'attempted to open restricted file for writing: {dep!r}')
-    validate_target_or_error(ctx, dep)
+    ctx.validate_target_or_error(dep)
     depCtx.all_outs.add(dep)
   else: raise ValueError(f'invalid mode received from libmuck: {mode}')
   return dyn_time
@@ -883,41 +875,6 @@ if _libmuck_path is None: exit('error: muck._libmuck path could not be determine
 libmuck_path = _libmuck_path
 
 
-# Targets and paths.
-
-
-def validate_target_or_error(ctx:Ctx, target:str) -> None:
-  try: validate_target(ctx, target)
-  except InvalidTarget as e:
-    exit(f'muck error: invalid target: {e.target!r}; {e.msg}')
-
-
-
-def target_for_product(ctx:Ctx, product_path:str) -> str:
-  'Return the target path for `product_path`.'
-  assert ctx.is_product_path(product_path)
-  return product_path[len(ctx.build_dir_slash):]
-
-
-def target_path_for_source(ctx:Ctx, source_path:str) -> str:
-  'Return the target path for `source_path` (which may itself be a product).'
-  path = path_stem(source_path) # strip off source ext.
-  if ctx.is_product_path(path): # source might be a product.
-    return path[len(ctx.build_dir_slash):]
-  else:
-    return path
-
-
-_wildcard_re = re.compile(r'(%+)')
-
-def match_wilds(wildcard_path:str, string:str) -> Optional[Match[str]]:
-  '''
-  Match a string against a wildcard/format path.
-  '''
-  r = format_to_re(wildcard_path)
-  return r.fullmatch(string)
-
-
 # Utilities.
 
 
@@ -970,83 +927,6 @@ def file_stats(path:str) -> Tuple[bool, int, float]:
   s = file_status(path)
   if s is None: return (False, -1, -1)
   return (s.is_dir, s.size, s.mtime)
-
-
-def source_for_target(ctx:Ctx, target:str) -> str:
-  '''
-  Find the unique source path whose name matches `target`, or else error.
-  '''
-  src_dir, prod_name = split_dir_name(target)
-  src_name = source_candidate(ctx, target, src_dir, prod_name)
-  src = path_join(src_dir, src_name)
-  assert src != target
-  return src
-
-
-def source_candidate(ctx:Ctx, target:str, src_dir:str, prod_name:str) -> str:
-  src_dir = src_dir or '.'
-  try: src_dir_names = list_dir_filtered(ctx, src_dir)
-  except FileNotFoundError: raise error(target, f'no such source directory: `{src_dir}`')
-  candidates = list(filter_source_names(src_dir_names, prod_name))
-  if len(candidates) == 1:
-    return candidates[0]
-  # error.
-  # Use dependent to describe error if possible; often the dependent code is naming something that does not exist.
-  # TODO: use source locations wherever possible.
-  dpdts = ctx.dependents[target]
-  dpdt_name = first_el(dpdts).target if dpdts else target
-  if len(candidates) == 0:
-    raise TargetNotFound(dpdt_name, f'no source candidates matching `{target}` in `{src_dir}`')
-  else:
-    raise TargetNotFound(dpdt_name, f'multiple source candidates matching `{target}`: {candidates}')
-
-
-def list_dir_filtered(ctx:Ctx, src_dir:str) -> List[str]:
-  '''
-  Given src_dir, cache and return the list of names that might be source files.
-  TODO: eventually this should be replaced by using os.scandir.
-  '''
-  try: return ctx.dir_names[src_dir]
-  except KeyError: pass
-  names = [n for n in list_dir(src_dir, hidden=False)
-    if n not in ctx.reserved_names and path_ext(n) not in reserved_or_ignored_exts]
-  ctx.dir_names[src_dir] = names
-  return names
-
-
-def filter_source_names(names:Iterable[str], prod_name:str) -> Iterable[str]:
-  '''
-  Given `prod_name`, find all matching source names.
-  There are several concerns that make this matching complex.
-  * Muck allows named formatters (e.g. '{x}') in script names.
-    This allows a single script to produce many targets for corresponding arguments.
-  * A source might itself be the product of another source.
-
-  So, given product name "x.txt", match all of the following:
-  * x.txt.py
-  * {}.txt.py
-  * x.txt.py.py
-  * {}.txt.py.py
-  '''
-  prod = prod_name.split('.')
-  for src_name in names:
-    src = src_name.split('.')
-    if len(src) <= len(prod): continue
-    if all(match_wilds(*p) for p in zip(src, prod)): # zip stops when prod is exhausted.
-      yield '.'.join(src[:len(prod)+1]) # the immediate source name has just one extension added.
-
-
-def note(path:str, *items:Any) -> None:
-  errL(TXT_L_ERR, f'muck note: {path}: ', *items, RST_ERR)
-
-def warn(path:str, *items:Any) -> None:
-  errL(TXT_Y_ERR, f'muck WARNING: {path}: ', *items, RST_ERR)
-
-def error_msg(path:str, *items:Any) -> str:
-  return ''.join((f'muck error: {path}: ',) + items)
-
-def error(path:str, *items:Any) -> SystemExit:
-  return SystemExit(error_msg(path, *items))
 
 
 def disp_mtime(mtime:Optional[float]) -> str:
