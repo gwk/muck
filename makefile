@@ -3,6 +3,7 @@
 # $@: The file name of the target of the rule.
 # $<: The name of the first prerequisite.
 # $^: The names of all the prerequisites, with spaces between them.
+# $*: The stem with which a pattern rule matches.
 
 
 .PHONY: _default clean cov docs lib pip-develop pip-uninstall pypi-dist pypi-upload test typecheck
@@ -52,4 +53,4 @@ test:
 	iotest -fail-fast
 
 typecheck:
-	craft-py-check muck pithy/pithy
+	craft-py-check muck pithy/pithy -deps pithy writeup

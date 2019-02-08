@@ -7,7 +7,7 @@
     {
       "label": "typecheck-current",
       "command": "craft-py-check",
-      "args": ["${relativeFile}", "-print-ok"],
+      "args": ["${relativeFile}", "-print-ok", "-deps", "pithy", "writeup"],
       "group": {"kind": "build", "isDefault": true},
       "problemMatcher": "$craft"
     },

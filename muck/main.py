@@ -569,7 +569,7 @@ def update_non_product(ctx:Ctx, target:str, status:FileStatus, needs_update:bool
 
     else: # target is regular file.
       if prod_status: remove_path(prod_path)
-      make_link(target, link=prod_path, make_dirs=True)
+      make_link(target, link=prod_path, create_dirs=True)
 
     if not needs_update: note(target, 'source changed.') # only want to report this on subsequent changes.
     change_time = ctx.db.inc_ptime()
