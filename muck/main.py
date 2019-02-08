@@ -153,7 +153,7 @@ def muck_build(ctx:Ctx) -> None:
         note(target, 'specified target is a source and not a product.')
     update_top(ctx, target)
   if ctx.args.serve:
-    serve_build(ctx, main_target=ctx.targets[0], update_top=update_top)
+    serve_build(ctx, main_target=ctx.targets[0])
 
 
 def muck_clean_all(args:Namespace) -> None:

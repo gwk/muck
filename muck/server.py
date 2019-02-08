@@ -6,12 +6,10 @@ from .pithy.task import run
 from .pithy.fs import *
 from .pithy.io import *
 from .ctx import Ctx
+from .update import update_top
 
 
-def serve_build(ctx:Ctx, main_target:str, update_top:Callable[[Ctx, str], int]) -> None:
-  '''
-  Note: update_top is passed in to prevent `muck.main` and `muck.server` modules from being circularly dependent.
-  '''
+def serve_build(ctx:Ctx, main_target:str) -> None:
   address = ('localhost', 8000)
   host, port = address
   addr_str = f'http://{host}:{port}/{main_target}'
