@@ -41,6 +41,7 @@ class Ctx(NamedTuple):
   build_dir: str
   build_dir_slash: str
   build_dir_abs: str
+  fifo_path: str
   reserved_names: FrozenSet
   dbg: Callable[..., None]
   dbg_libmuck: bool

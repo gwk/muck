@@ -29,7 +29,8 @@ from .update import ext_tools, pat_dependencies, update_top
 def main() -> None:
 
   db_name = '_muck'
-  reserved_names = { 'muck', '_fetch', '_fetch/tmp', db_name }
+  fifo_name = '_muck.fifo'
+  reserved_names = { 'muck', '_fetch', '_fetch/tmp', db_name, fifo_name }
 
   # argument parser setup.
   # argparse's subparser feature does not allow for a default command.
@@ -131,8 +132,14 @@ def main() -> None:
     args.fn(args)
     return
 
-  ctx = Ctx(args=args, db=DB(path=db_path), build_dir=args.build_dir, build_dir_slash=args.build_dir + '/',
-    build_dir_abs=abs_path(args.build_dir), reserved_names=frozenset(reserved_names), dbg=dbg, dbg_libmuck=args.dbg_libmuck)
+  build_dir_abs = abs_path(args.build_dir)
+  ctx = Ctx(
+    args=args,
+    db=DB(path=db_path),
+    build_dir=args.build_dir, build_dir_slash=args.build_dir + '/', build_dir_abs=build_dir_abs,
+    fifo_path=path_join(build_dir_abs, fifo_name),
+    reserved_names=frozenset(reserved_names),
+    dbg=dbg, dbg_libmuck=args.dbg_libmuck)
 
   args.fn(ctx)
 

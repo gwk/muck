@@ -6,11 +6,13 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <malloc/malloc.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <sys/param.h>
 
@@ -114,10 +116,10 @@ static void str_write(Str* str, int fd) {
 
 
 static bool is_setup = 0;
-static int fd_send = 0;
-static int fd_recv = 0;
+static int fd_fifo = 0;
 static int dbg = 0;
 static Str msg = {};
+static char pid[21] = "<UNKNOWN PID>";
 
 
 static char curr_dir[MAXPATHLEN] = {};
@@ -151,13 +153,14 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
     #else
     #error "unsupported platform."
     #endif
-    char* fd_send_str = getenv("MUCK_DEPS_SEND");
-    char* fd_recv_str = getenv("MUCK_DEPS_RECV");
-    if (fd_send_str && fd_recv_str) {
-      fd_send = atoi(fd_send_str);
-      fd_recv = atoi(fd_recv_str);
+    const int pid_cap = sizeof(pid);
+    int n_chars = snprintf(pid, pid_cap, "%lld", (int64_t)getpid());
+    check(n_chars > 0 && n_chars < pid_cap, "failed to print PID");
+    char* fifo_path = getenv("MUCK_FIFO");
+    if (fifo_path) {
+      fd_fifo = open(fifo_path, O_WRONLY);
     } else {
-      errFL("NOTE: build process env is not set; MUCK_DEPS_SEND: %s; MUCK_DEPS_RECV: %s.", fd_send_str, fd_recv_str);
+      errFL("NOTE: MUCK_FIFO build process env is not set.");
     }
     dbg = (getenv("MUCK_DEPS_DBG") != NULL);
   }
@@ -168,6 +171,8 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
   str_append_char(&msg, '\t');
   str_append_char(&msg, mode_char);
   str_append_char(&msg, '\t');
+  str_append_chars(&msg, pid);
+  str_append_char(&msg, '\t');
   if (file_path[0] != '/') { // not absolute path; must prefix with current working directory.
     update_curr_dir();
     str_append_chars(&msg, curr_dir);
@@ -177,13 +182,9 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
   if (dbg) { errFL("\x1b[36m%s\x1b[0m", msg.ptr); }
   str_append_char(&msg, '\n');
 
-  if (fd_send) { // communicate with the muck build process.
-    str_write(&msg, fd_send);
-    // Read the confirmation byte from the receive channel;
-    // the read blocks this process until the parent build process is done updating dependencies.
-    unsigned char ack = 0;
-    check(read(fd_recv, &ack, 1) == 1, "MUCK_DEPS_RECV read failed: %s.", strerror(errno));
-    check(ack == 0x6, "MUCK_DEP_RECV expected ACK (0x6) byte confirmation; received: 0x%02x.", (int)ack);
+  if (fd_fifo) { // Communicate with the muck build process.
+    str_write(&msg, fd_fifo);
+    raise(SIGSTOP); // Stop this process. The parent will cause it to resume with SIGCONT.
   }
   if (dbg) { // show that the client is no longer blocked.
     str_truncate_by(&msg, 1);

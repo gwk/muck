@@ -4,13 +4,15 @@
 Muck's core update algorithm.
 '''
 
+from contextlib import nullcontext
 from datetime import datetime as DateTime
 from hashlib import sha256
 from importlib.util import find_spec as find_module_spec
-from os import O_CREAT, O_EXCL, O_RDONLY, O_RDWR, O_WRONLY, environ
-from shlex import quote as sh_quote
-from shlex import split as sh_split
-from time import time as now
+from os import (O_RDONLY, O_NONBLOCK,
+  environ, kill, mkfifo, open as os_open, read as os_read, close as os_close, remove as os_remove)
+from shlex import quote as sh_quote, split as sh_split
+from signal import SIGCONT
+from time import sleep, time as now
 from typing import Callable, Dict, Iterable, List, NamedTuple, Optional, Set, TextIO, Tuple, cast
 
 from .constants import *
@@ -21,19 +23,38 @@ from .pithy.ansi import RST, TXT_G
 from .pithy.fs import (FileStatus, PathIsNotDescendantError, current_dir, dir_entry_type_char, file_size, file_status, is_dir,
   is_dir_not_link, is_file_executable_by_owner, is_link, is_path_abs, make_dir, make_dirs, make_link, move_file, path_dir,
   path_exists, path_ext, path_rel_to_ancestor, read_link, remove_file, remove_path, remove_path_if_exists, scan_dir)
-from .pithy.io import errL
-from .pithy.pipe import DuplexPipe
+from .pithy.io import AsyncLineReader, errL
 from .pithy.string import format_byte_count
 from .pithy.task import launch
 from .py_deps import py_dependencies
 
 
 def update_top(ctx:Ctx, target:str) -> int:
-  try: return update_target(ctx, target, dependent=None, force=ctx.args.force)
-  except TargetNotFound as e: raise error(*e.args) from e
+
+  # Create the FIFO.
+  try:
+    mkfifo(ctx.fifo_path, mode=0o600)
+  except OSError as e:
+    if path_exists(ctx.fifo_path):
+      raise error(ctx.fifo_path, 'FIFO path already exists; another `muck` process is either running or previously failed.') from e
+    raise
+
+  try:
+    try: fifo = AsyncLineReader(ctx.fifo_path)
+    except Exception as e: raise error(ctx.fifo_path, 'FIFO path could not be opened for reading.') from e
+
+    with fifo:
+      try: return update_target(ctx, fifo=fifo, target=target, dependent=None, force=ctx.args.force)
+      except TargetNotFound as e: raise error(*e.args) from e
+
+  finally: # Remove the FIFO.
+    try:
+      os_remove(ctx.fifo_path)
+    except Exception as e:
+      raise error(ctx.fifo_path, 'fifo could not be removed.')
 
 
-def update_target(ctx:Ctx, target:str, dependent:Optional[Dependent], force=False) -> int:
+def update_target(ctx:Ctx, fifo:AsyncLineReader, target:str, dependent:Optional[Dependent], force=False) -> int:
   '''
   The central function of the Muck.
   returns transitive change_time.
@@ -66,7 +87,7 @@ def update_target(ctx:Ctx, target:str, dependent:Optional[Dependent], force=Fals
   if is_product:
     target_dir = path_dir(target)
     if target_dir and not path_exists(target_dir): # Not possible to find a source; must be the contents of a built directory.
-      update_target(ctx, target=target_dir, dependent=Dependent(kind='directory contents', target=target), force=force)
+      update_target(ctx, fifo=fifo, target=target_dir, dependent=Dependent(kind='directory contents', target=target), force=force)
       if not target_status.is_updated: # build of parent did not create this product.
         raise error(target, f'target resides in a product directory but was not created by building that directory')
       return target_status.change_time # TODO: verify that we should be returning this change_time and not the result of target_dir update.
@@ -82,13 +103,13 @@ def update_target(ctx:Ctx, target:str, dependent:Optional[Dependent], force=Fals
 
   if is_product:
     try:
-      return update_product(ctx, target, needs_update=needs_update, old=old)
+      return update_product(ctx, fifo=fifo, target=target, needs_update=needs_update, old=old)
     except TargetNotFound as e:
       target_status.error = e.args
       raise
   else:
     assert status
-    return update_non_product(ctx, target, status, needs_update=needs_update, old=old)
+    return update_non_product(ctx, fifo=fifo, target=target, status=status, needs_update=needs_update, old=old)
 
 
 def check_product_not_modified(ctx:Ctx, target:str, prod_path:str, is_prod_dir:int, size:int, mtime:float, old:TargetRecord) -> None:
@@ -107,7 +128,7 @@ def check_product_not_modified(ctx:Ctx, target:str, prod_path:str, is_prod_dir:i
     f'  Otherwise, save your changes if necessary and then `muck clean {target}`.')
 
 
-def update_product(ctx:Ctx, target:str, needs_update:bool, old:Optional[TargetRecord]) -> int:
+def update_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:bool, old:Optional[TargetRecord]) -> int:
   '''
   Returns transitive change_time.
   Note: we must pass the just-retrieved mtime, in case it has changed but product contents have not.
@@ -134,7 +155,7 @@ def update_product(ctx:Ctx, target:str, needs_update:bool, old:Optional[TargetRe
   # This design avoids dependency on file system time stamps and OS clocks.
   # For file systems with poor time resolution (e.g. HFS mtime is 1 sec resolution), this is important.
   last_update_time = 0 if old is None else old.update_time
-  src_change_time = update_target(ctx, src, dependent=Dependent(kind='source', target=target))
+  src_change_time = update_target(ctx, fifo=fifo, target=src, dependent=Dependent(kind='source', target=target))
   needs_update = needs_update or last_update_time < src_change_time
   update_time = max(last_update_time, src_change_time)
 
@@ -143,29 +164,30 @@ def update_product(ctx:Ctx, target:str, needs_update:bool, old:Optional[TargetRe
     # if they have not, then no rebuild is necessary.
     assert old is not None
     for dyn_dep in old.dyn_deps:
-      dep_change_time = update_target(ctx, dyn_dep, dependent=Dependent(kind='observed', target=target))
+      dep_change_time = update_target(ctx, fifo=fifo, target=dyn_dep, dependent=Dependent(kind='observed', target=target))
       update_time = max(update_time, dep_change_time)
   needs_update = needs_update or last_update_time < update_time
 
   if needs_update: # must rebuild product.
-    dyn_change_time, dyn_deps, all_outs = build_product(ctx, target=target, src_path=src, prod_path=prod_path)
+    dyn_change_time, dyn_deps, all_outs = build_product(ctx, fifo=fifo, target=target, src_path=src, prod_path=prod_path)
     update_time = max(update_time, dyn_change_time)
     ctx.dbg(target, f'all_outs: {all_outs}')
     assert target in all_outs
     change_time = 0
     for product in sorted(all_outs):
-      product_change_time = update_product_with_output(ctx, target=product, src=src, dyn_deps=dyn_deps, update_time=update_time)
+      product_change_time = update_product_with_output(ctx, fifo=fifo, target=product, src=src, dyn_deps=dyn_deps, update_time=update_time)
       if product == target:
         change_time = product_change_time
     assert change_time > 0
     return change_time
   else: # not needs_update.
     assert old is not None
-    return update_deps_and_record(ctx, target=target, is_target_dir=False, actual_path=prod_path, is_changed=False, size=old.size,
-      mtime=mtime, change_time=old.change_time, update_time=update_time, file_hash=old.hash, src=src, dyn_deps=old.dyn_deps, old=old)
+    return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=False, actual_path=prod_path, is_changed=False,
+      size=old.size, mtime=mtime, change_time=old.change_time, update_time=update_time, file_hash=old.hash, src=src,
+      dyn_deps=old.dyn_deps, old=old)
 
 
-def update_product_with_output(ctx:Ctx, target:str, src:str, dyn_deps:Tuple[str, ...], update_time:int) -> int:
+def update_product_with_output(ctx:Ctx, fifo:AsyncLineReader, target:str, src:str, dyn_deps:Tuple[str, ...], update_time:int) -> int:
   'Returns (target, change_time).'
   old = ctx.db.get_record(target=target)
   path = ctx.product_path_for_target(target)
@@ -180,12 +202,12 @@ def update_product_with_output(ctx:Ctx, target:str, src:str, dyn_deps:Tuple[str,
     change_time = old.change_time
     change_verb = 'did not change'
   note(target, f"product {change_verb}; {format_byte_count(size)}.")
-  return update_deps_and_record(ctx, target=target, is_target_dir=is_target_dir, actual_path=path, is_changed=is_changed,
+  return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=is_target_dir, actual_path=path, is_changed=is_changed,
     size=size, mtime=mtime, change_time=change_time, update_time=update_time, file_hash=file_hash, src=src, dyn_deps=dyn_deps,
     old=old)
 
 
-def update_non_product(ctx:Ctx, target:str, status:FileStatus, needs_update:bool, old:Optional[TargetRecord]) -> int:
+def update_non_product(ctx:Ctx, fifo:AsyncLineReader, target:str, status:FileStatus, needs_update:bool, old:Optional[TargetRecord]) -> int:
   'returns transitive change_time.'
   ctx.dbg(target, 'update_non_product')
 
@@ -249,13 +271,14 @@ def update_non_product(ctx:Ctx, target:str, status:FileStatus, needs_update:bool
     if mtime != old.mtime:
       note(target, f'source modification time changed but contents did not.')
 
-  return update_deps_and_record(ctx, target, is_target_dir=False, actual_path=target, is_changed=is_changed,
+  return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=False, actual_path=target, is_changed=is_changed,
     size=size, mtime=mtime, change_time=change_time, update_time=change_time, file_hash=target_hash, src=None, dyn_deps=(), old=old)
   # TODO: non_product update_time is meaningless? mark as -1?
 
 
-def update_deps_and_record(ctx, target:str, is_target_dir:bool, actual_path:str, is_changed:bool, size:int, mtime:float,
- change_time:int, update_time:int, file_hash:bytes, src:Optional[str], dyn_deps:Tuple[str, ...], old:Optional[TargetRecord]) -> int:
+def update_deps_and_record(ctx, fifo:AsyncLineReader, target:str, is_target_dir:bool, actual_path:str, is_changed:bool,
+ size:int, mtime:float, change_time:int, update_time:int, file_hash:bytes, src:Optional[str], dyn_deps:Tuple[str, ...],
+ old:Optional[TargetRecord]) -> int:
   'returns transitive change_time.'
 
   ctx.dbg(target, 'update_deps_and_record')
@@ -270,7 +293,7 @@ def update_deps_and_record(ctx, target:str, is_target_dir:bool, actual_path:str,
     deps = old.deps
 
   for dep in deps:
-    dep_change_time = update_target(ctx, dep, dependent=Dependent(kind='inferred', target=target))
+    dep_change_time = update_target(ctx, fifo=fifo, target=dep, dependent=Dependent(kind='inferred', target=target))
     change_time = max(change_time, dep_change_time)
   update_time = max(update_time, change_time)
 
@@ -304,7 +327,7 @@ class DepCtx(NamedTuple):
 
 
 
-def build_product(ctx:Ctx, target:str, src_path:str, prod_path:str) -> Tuple[int, Tuple[str, ...], Set[str]]:
+def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_path:str) -> Tuple[int, Tuple[str, ...], Set[str]]:
   '''
   Run a source file, producing zero or more products.
   Return a list of produced product paths.
@@ -342,9 +365,11 @@ def build_product(ctx:Ctx, target:str, src_path:str, prod_path:str) -> Tuple[int
   remove_path_if_exists(prod_path)
 
   env = environ.copy()
+  # TODO: check that these variables are not already set.
   env['MUCK_TARGET'] = target
   if tool.env_fn is not None:
     env.update(tool.env_fn())
+  env['MUCK_FIFO'] = ctx.fifo_path
   env['DYLD_INSERT_LIBRARIES'] = libmuck_path
   #env['DYLD_FORCE_FLAT_NAMESPACE'] = 'TRUE'
   #env['DYLD_PRINT_LIBRARIES'] = 'TRUE'
@@ -359,10 +384,12 @@ def build_product(ctx:Ctx, target:str, src_path:str, prod_path:str) -> Tuple[int
     ignored_deps=ignored_deps,
     restricted_deps_rd={
       ctx.db.path,
+      ctx.fifo_path,
       prod_path_out,
     },
     restricted_deps_wr={
       ctx.db.path,
+      ctx.fifo_path,
       prod_path_out, # muck process opens this for the child.
       src_path,
     },
@@ -370,32 +397,33 @@ def build_product(ctx:Ctx, target:str, src_path:str, prod_path:str) -> Tuple[int
     all_outs=set())
 
   dyn_time = 0
-  with open(prod_path_out, 'wb') as out_file, DuplexPipe() as pipe:
-    deps_recv, deps_send = pipe.left_files()
-    env.update(zip(('MUCK_DEPS_RECV', 'MUCK_DEPS_SEND'), [str(fd) for fd in pipe.right_fds]))
-    task_stdin = open(src_prod_path, 'rb') if tool.src_to_stdin else None
+  in_cm = open(src_prod_path, 'rb') if tool.src_to_stdin else nullcontext(None)
+  with in_cm as in_file, open(prod_path_out, 'wb') as out_file: # type: ignore
     time_start = now()
-    cmd, proc, _ = launch(cmd, cwd=ctx.build_dir, env=env, stdin=task_stdin, out=out_file, files=pipe.right_fds)
-    if task_stdin: task_stdin.close()
-    pipe.close_right()
+    cmd, proc, _ = launch(cmd, cwd=ctx.build_dir, env=env, stdin=in_file, out=out_file)
+    if in_file: in_file.close()
+    out_file.close()
     possible_causes: List[Tuple[str, ...]] = []
+    # For now, the best we can do is poll the nonblocking FIFO reader for deplines and the task for completion.
     try:
-      while True:
-        dep_line = deps_recv.readline()
-        if not dep_line: break # no more data; child is done.
-        try:
-          dyn_time = process_dep_line(ctx, depCtx=depCtx, target=target, dep_line=dep_line, dyn_time=dyn_time)
-        except TargetNotFound as e:
-          possible_causes.append(e.args)
-        print('\x06', end='', file=deps_send, flush=True) # Ascii ACK.
-    except (Exception, KeyboardInterrupt, SystemExit):
+      while proc.poll() is None: # Child process has not terminated yet.
+        dep_line = fifo.readline()
+        if dep_line:
+          try:
+            dep_pid, dyn_time = handle_dep_line(ctx, depCtx=depCtx, fifo=fifo, target=target, dep_line=dep_line, dyn_time=dyn_time)
+          except TargetNotFound as e:
+            possible_causes.append(e.args)
+          kill(dep_pid, SIGCONT) # Tell whichever process sent the dep to continue.
+        else:
+          sleep(0.00001) # Sleep for a minimal duration.
+    except BaseException:
       proc.kill()
       #^ Killing the script avoids a confusing exception message from the child script when muck fails,
       #^ and/or zombie child processes (e.g. sqlite3).
       for cause in possible_causes:
         errL(error_msg(*cause))
       raise
-    code = proc.wait()
+    code = proc.returncode
     time_elapsed = now() - time_start
 
   if code != 0: raise error(target, f'build failed with code: {code}')
@@ -417,20 +445,27 @@ def build_product(ctx:Ctx, target:str, src_path:str, prod_path:str) -> Tuple[int
   return dyn_time, tuple(sorted(depCtx.dyn_deps)), depCtx.all_outs
 
 
-def process_dep_line(ctx:Ctx, depCtx:DepCtx, target:str, dep_line:str, dyn_time:int) -> int:
+def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, dep_line:str, dyn_time:int) -> Tuple[int, int]:
   '''
-  Parse a dependency line sent from a child build process.
+  Parse and handle a dependency line sent from a child build process.
   Since the parent and child processes have different current working directories,
   libmuck (executing in the child process) always sends absolute paths.
+
+  When a child process tries to open a file, the interposed libmuck `open` function is called.
+  This sends child process ID and the path to be opened to Muck, and then sends the SIGSTOP signal to itself.
+  Here, Muck attempts to update the dependency.
+  It then signals the child process to resume with SIGCONT.
   '''
   try:
     dep_line_parts = dep_line.split('\t')
-    call, mode, dep = dep_line_parts
+    call, mode, pid_str, dep = dep_line_parts
+    pid = int(pid_str)
     if not (dep and dep[-1] == '\n'): raise ValueError
     dep = dep[:-1] # remove final newline.
-  except ValueError as e: raise error(target, f'child process sent bad dependency line:\n{dep_line!r}') from e
+  except ValueError as e:
+    raise error(target, f'child process sent bad dependency line:\n{dep_line!r}') from e
 
-  assert is_path_abs(dep), dep # libmuck converts all paths to absolute; only the client knows its own current directory.
+  assert is_path_abs(dep), dep # libmuck converts all paths to absolute, because only the child knows its own current directory.
   try: dep = path_rel_to_ancestor(dep, ancestor=ctx.build_dir_abs, dot=True)
   except PathIsNotDescendantError:
     # We cannot differentiate between harmless and ill-advised accesses outside of the build directory.
@@ -438,17 +473,19 @@ def process_dep_line(ctx:Ctx, depCtx:DepCtx, target:str, dep_line:str, dyn_time:
     # we cannot sensibly prevent a script from accessing the project dir directly.
     # For example, Python accesses the parent directory during startup.
     # Therefore our only option is to ignore access to parent dirs.
-    return dyn_time
+    return pid, dyn_time
 
-  if (dep in depCtx.ignored_deps) or (path_ext(dep) in ignored_dep_exts): return dyn_time
+  if (dep in depCtx.ignored_deps) or (path_ext(dep) in ignored_dep_exts):
+    return pid, dyn_time
   # TODO: further verifications? source dir, etc.
 
   ctx.dbg(target, f'{mode} dep: {dep}')
   assert not is_path_abs(dep)
   if mode in 'RS':
-    if mode == 'S' and dep == target: return dyn_time # sqlite stats the db before opening. Imperfect, but better than nothing.
+    if mode == 'S' and dep == target:
+      return pid, dyn_time # sqlite stats the db before opening. Imperfect, but better than nothing.
     if dep in depCtx.restricted_deps_rd: raise error(target, f'attempted to open restricted file for reading: {dep!r}')
-    dep_time = update_target(ctx, dep, dependent=Dependent(kind='observed', target=target))
+    dep_time = update_target(ctx, fifo=fifo, target=dep, dependent=Dependent(kind='observed', target=target))
     dyn_time = max(dyn_time, dep_time)
     depCtx.dyn_deps.add(dep)
   elif mode in 'AMUW':
@@ -456,7 +493,7 @@ def process_dep_line(ctx:Ctx, depCtx:DepCtx, target:str, dep_line:str, dyn_time:
     ctx.validate_target_or_error(dep)
     depCtx.all_outs.add(dep)
   else: raise ValueError(f'invalid mode received from libmuck: {mode}')
-  return dyn_time
+  return pid, dyn_time
 
 
 # Dependency inference.
