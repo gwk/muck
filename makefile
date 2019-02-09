@@ -24,6 +24,9 @@ docs:
 	(cd demos/oecd-health && muck publish -to=../../docs/demos/oecd-health)
 	#writeup -bare -section 0 demos/oecd-health/{index.html.wu,readme.md}
 
+help: # Summarize the targets of this makefile.
+	@GREP_COLOR="1;32" egrep --color=always '^\w[^ :]+:' makefile | sort
+
 
 lib:
 	clang -fsyntax-only \
