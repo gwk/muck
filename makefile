@@ -28,7 +28,7 @@ help: # Summarize the targets of this makefile.
 	@GREP_COLOR="1;32" egrep --color=always '^\w[^ :]+:' makefile | sort
 
 
-lib:
+lib-check:
 	clang -fsyntax-only \
 	-Weverything \
 	-Wno-gnu-zero-variadic-macro-arguments \
@@ -37,7 +37,7 @@ lib:
 	muck/libmuck.c
 
 
-pip-develop: lib
+pip-dev: lib-check
 	pip3 install -e .
 
 pip-install:
