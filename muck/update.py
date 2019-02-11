@@ -6,7 +6,7 @@ Muck's core update algorithm.
 
 from contextlib import nullcontext
 from datetime import datetime as DateTime
-from hashlib import sha256
+from hashlib import blake2b
 from importlib.util import find_spec as find_module_spec
 from os import (O_RDONLY, O_NONBLOCK,
   environ, kill, mkfifo, open as os_open, read as os_read, close as os_close, remove as os_remove)
@@ -610,7 +610,7 @@ def hash_for_file_contents(path:str) -> bytes:
   #^ a quick timing experiment suggested that chunk sizes larger than this are not faster.
   try: f = open(path, 'rb')
   except IsADirectoryError: raise error(path, 'expected a file but found a directory')
-  h = sha256()
+  h = blake2b(digest_size=32)
   while True:
     chunk = f.read(hash_chunk_size)
     if not chunk: break
@@ -627,7 +627,7 @@ def hash_for_dir_listing(path:str) -> bytes:
   recursion into the deep tree by the process requires additional syscalls,
   and will thus trigger additional dependency analysis.
   '''
-  h = sha256()
+  h =  blake2b(digest_size=32)
   for entry in scan_dir(path, hidden=False): # Ignore hidden files.
     h.update(dir_entry_type_char(entry).encode())
     h.update(entry.name.encode())
