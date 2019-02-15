@@ -610,12 +610,18 @@ def hash_for_file_contents(path:str) -> bytes:
   #^ a quick timing experiment suggested that chunk sizes larger than this are not faster.
   try: f = open(path, 'rb')
   except IsADirectoryError: raise error(path, 'expected a file but found a directory')
-  h = blake2b(digest_size=32)
-  while True:
-    chunk = f.read(hash_chunk_size)
-    if not chunk: break
-    h.update(chunk)
-  return h.digest()
+
+  try:
+    h = blake2b(digest_size=32)
+    while True:
+      chunk = f.read(hash_chunk_size)
+      if not chunk: break
+      h.update(chunk)
+    return h.digest()
+  except KeyboardInterrupt:
+    errL()
+    warn(path, 'interrupted while hashing file.')
+    raise
 
 
 def hash_for_dir_listing(path:str) -> bytes:
