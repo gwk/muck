@@ -159,7 +159,13 @@ class Ctx(NamedTuple):
       exit(f'muck error: invalid target: {e.target!r}; {e.msg}')
 
 
-target_invalids_re = re.compile(r'[\s]|\.\.|\./|//')
+target_invalids_re = re.compile(r'''(?x)
+  [\x00-\x1f\x7f-\x9f] # Ascii and Latin-1 control characters.
+| \s
+| \.\./
+| \./
+| //
+''')
 
 
 def filter_source_names(names:Iterable[str], prod_name:str) -> Iterable[str]:
