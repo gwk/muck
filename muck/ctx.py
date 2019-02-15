@@ -38,6 +38,7 @@ class TargetStatus:
 class Ctx(NamedTuple):
   args: argparse.Namespace
   db: DB
+  proj_dir: str
   build_dir: str
   build_dir_slash: str
   build_dir_abs: str

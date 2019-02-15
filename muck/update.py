@@ -369,6 +369,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   env['MUCK_TARGET'] = target
   if tool.env_fn is not None:
     env.update(tool.env_fn())
+  env['MUCK_PROJ_DIR'] = ctx.proj_dir
   env['MUCK_FIFO'] = ctx.fifo_path
   env['DYLD_INSERT_LIBRARIES'] = libmuck_path
   #env['DYLD_FORCE_FLAT_NAMESPACE'] = 'TRUE'
@@ -465,7 +466,8 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
   except ValueError as e:
     raise error(target, f'child process sent bad dependency line:\n{dep_line!r}') from e
 
-  assert is_path_abs(dep), dep # libmuck converts all paths to absolute, because only the child knows its own current directory.
+  if not is_path_abs(dep): # libmuck converts all paths to absolute, because only the child knows its own current directory.
+    raise ValueError(f'libmuck sent relative path: {dep}')
   try: dep = path_rel_to_ancestor(dep, ancestor=ctx.build_dir_abs, dot=True)
   except PathIsNotDescendantError:
     # We cannot differentiate between harmless and ill-advised accesses outside of the build directory.
@@ -473,6 +475,8 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
     # we cannot sensibly prevent a script from accessing the project dir directly.
     # For example, Python accesses the parent directory during startup.
     # Therefore our only option is to ignore access to parent dirs.
+    # Libmuck will not send paths outside of the project directory as long as MUCK_PROJECT_DIR is set.
+    if dep != ctx.proj_dir: ctx.dbg(target, f'requested dependency outside of build_dir: {dep}')
     return pid, dyn_time
 
   if (dep in depCtx.ignored_deps) or (path_ext(dep) in ignored_dep_exts):

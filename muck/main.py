@@ -17,8 +17,8 @@ from .ctx import Ctx
 from .db import DB
 from .logging import error, error_msg, note, warn
 from .pithy.ansi import RST, TXT_B, TXT_G, TXT_R
-from .pithy.fs import (abs_path, change_dir, clone, is_dir, make_dirs, move_file, norm_path, path_dir, path_exists, path_ext,
-  path_join, path_stem, remove_dir_contents, remove_path_if_exists, split_stem_ext, walk_dirs, walk_paths)
+from .pithy.fs import (abs_path, change_dir, clone, current_dir, is_dir, make_dirs, move_file, norm_path, path_dir,
+  path_exists, path_ext, path_join, path_stem, remove_dir_contents, remove_path_if_exists, split_stem_ext, walk_dirs, walk_paths)
 from .pithy.io import errL, errSL, outL, outLL
 from .pithy.path_encode import path_for_url
 from .pithy.task import runC
@@ -136,7 +136,10 @@ def main() -> None:
   ctx = Ctx(
     args=args,
     db=DB(path=db_path),
-    build_dir=args.build_dir, build_dir_slash=args.build_dir + '/', build_dir_abs=build_dir_abs,
+    proj_dir=current_dir(),
+    build_dir=args.build_dir,
+    build_dir_slash=args.build_dir + '/',
+    build_dir_abs=build_dir_abs,
     fifo_path=path_join(build_dir_abs, fifo_name),
     reserved_names=frozenset(reserved_names),
     dbg=dbg, dbg_libmuck=args.dbg_libmuck)

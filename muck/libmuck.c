@@ -60,19 +60,48 @@ static const char* program_name = "?";
 #define check(cond, fmt, ...) { if (!(cond)) {fail(fmt, ## __VA_ARGS__);} }
 
 
+// Str.
+
 typedef struct {
   char* ptr;
   size_t len; // length, excluding null terminator.
   size_t cap; // capacity, excluding null terminator. Always 2**n - 1.
 } Str;
 
+
+static void str_validate(Str* str) {
+  if (str->len) {
+    check(str->ptr, "str_validate: positive length but null pointer.");
+    check(str->ptr[str->len] == 0, "str_validate: missing null terminator.");
+    for (size_t i = 0; i < str->len; i++) {
+      check(str->ptr[i] > 0, "str_validate: null byte at position %lu; length:%lu.", i, str->len);
+    }
+  } else {
+    check(!str->ptr, "str_validate: zero length but non-null pointer.");
+  }
+  check(str->cap >= str->len, "str_validate: len:%lu > cap:%lu.", str->len, str->cap);
+}
+
+
 static char* str_end(Str* str) { return str->ptr + str->len; }
+
+static char str_last_char(Str* str) { return str->ptr[str->len - 1]; }
 
 static void str_clear(Str* str) { str->len = 0; }
 
+static void str_terminate(Str* str) { str->ptr[str->len] = '\0'; }
+
 static void str_truncate_by(Str* str, size_t n) {
+  check(str->len >= n, "str_truncate_by: truncation length %lu is greater than string length %lu", n, str->len);
   str->len -= n;
   str->ptr[str->len] = '\0';
+}
+
+static void str_truncate_to_char(Str* str, char c) {
+  size_t l = str->len;
+  while (l > 0 && str->ptr[l-1] != c) l--;
+  str->len = l;
+  str->ptr[l] = '\0';
 }
 
 static void str_grow_to(Str* str, size_t cap) {
@@ -115,14 +144,17 @@ static void str_write(Str* str, int fd) {
 }
 
 
+// Muck.
+
 static bool is_setup = 0;
 static int fd_fifo = 0;
 static int dbg = 0;
 static Str msg = {};
+static Str canon_path = {};
 static char pid[21] = "<UNKNOWN PID>";
-
-
+static char proj_dir[MAXPATHLEN] = {};
 static char curr_dir[MAXPATHLEN] = {};
+
 
 static void update_curr_dir() {
   // Update the current working directory buffer.
@@ -141,28 +173,102 @@ static void update_curr_dir() {
 }
 
 
+static void muck_init() {
+  // Initialize.
+  is_setup = true;
+
+  // Get program name.
+  #if defined(__APPLE__) || defined(__FreeBSD__)
+  program_name = getprogname();
+  #elif defined(_GNU_SOURCE)
+  program_name = program_invocation_name;
+  #else
+  #error "unsupported platform."
+  #endif
+
+  // Get this process' identifier.
+  const int pid_cap = sizeof(pid);
+  int n_chars = snprintf(pid, pid_cap, "%lld", (int64_t)getpid());
+  check(n_chars > 0 && n_chars < pid_cap, "failed to print PID.");
+
+  // Get the project dir.
+  char* env_proj_dir = getenv("MUCK_PROJ_DIR");
+  if (env_proj_dir) {
+    size_t buf_len = strlen(env_proj_dir) + 1;
+    check(buf_len <= MAXPATHLEN, "MUCK_PROJ_DIR is greater than maximum path length.")
+    memcpy(proj_dir, env_proj_dir, buf_len);
+  }
+
+  // Get the FIFO path.
+  char* fifo_path = getenv("MUCK_FIFO");
+  if (fifo_path) {
+    fd_fifo = open(fifo_path, O_WRONLY);
+  } else {
+    errFL("NOTE: MUCK_FIFO build process env is not set.");
+  }
+
+  // Get the debug flag.
+  dbg = (getenv("MUCK_DEPS_DBG") != NULL);
+}
+
+
+static bool has_prefix(const char* str, const char* prefix) {
+  while (*prefix) {
+    if (!*str || *str != *prefix) return false;
+    str++;
+    prefix++;
+  }
+  return true;
+}
+
+
 #define COMMUNICATE(mode_char, file_path) muck_communicate(__func__+5, mode_char, file_path)
 
 static void muck_communicate(const char* call_name, char mode_char, const char* file_path) {
   if (!is_setup) {
-    is_setup = true;
-    #if defined(__APPLE__) || defined(__FreeBSD__)
-    program_name = getprogname();
-    #elif defined(_GNU_SOURCE)
-    program_name = program_invocation_name;
-    #else
-    #error "unsupported platform."
-    #endif
-    const int pid_cap = sizeof(pid);
-    int n_chars = snprintf(pid, pid_cap, "%lld", (int64_t)getpid());
-    check(n_chars > 0 && n_chars < pid_cap, "failed to print PID");
-    char* fifo_path = getenv("MUCK_FIFO");
-    if (fifo_path) {
-      fd_fifo = open(fifo_path, O_WRONLY);
-    } else {
-      errFL("NOTE: MUCK_FIFO build process env is not set.");
+    muck_init();
+  }
+
+  // Canonicalize the file path.
+  str_clear(&canon_path);
+
+  if (file_path[0] == '/') {
+    // Begin at root slash and advance to make file_path relative.
+    file_path += 1;
+  } else { // Not absolute path; prefix with current working directory.
+    update_curr_dir();
+    str_append_chars(&canon_path, curr_dir);
+  }
+  str_append_char(&canon_path, '/'); // Leading slash.
+
+  // Copy file_path to canon_path, one character at a time, canonicalizing as we go.
+  while (*file_path) { // Have remaining directory component.
+    assert(str_last_char(&canon_path) == '/');
+    if (*file_path == '/') { // Double slash; skip it.
+      file_path += 1;
+      continue;
     }
-    dbg = (getenv("MUCK_DEPS_DBG") != NULL);
+    if (has_prefix(file_path, "./")) { // Dot slash; skip it.
+      file_path += 2;
+      continue;
+    }
+    if (has_prefix(file_path, "../")) { // Drop back one level.
+      str_truncate_to_char(&canon_path, '/');
+      file_path += 3;
+      continue;
+    }
+    // Normal; copy chars to next path separator.
+    while (*file_path) {
+      char c = *file_path++;
+      str_append_char(&canon_path, c);
+      if (c == '/') break;
+    }
+  }
+  str_validate(&canon_path);
+
+  // If we have the project dir, check that the reouested path is in it before sending the message.
+  if (*proj_dir) {
+    if (!has_prefix(canon_path.ptr, proj_dir)) return;
   }
 
   // Write the path and mode to message buffer.
@@ -173,12 +279,7 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
   str_append_char(&msg, '\t');
   str_append_chars(&msg, pid);
   str_append_char(&msg, '\t');
-  if (file_path[0] != '/') { // not absolute path; must prefix with current working directory.
-    update_curr_dir();
-    str_append_chars(&msg, curr_dir);
-    str_append_char(&msg, '/');
-  }
-  str_append_chars(&msg, file_path);
+  str_append_str(&msg, canon_path);
   if (dbg) { errFL("\x1b[36m%s\x1b[0m", msg.ptr); }
   str_append_char(&msg, '\n');
 
@@ -187,7 +288,7 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
     raise(SIGSTOP); // Stop this process. The parent will cause it to resume with SIGCONT.
   }
   if (dbg) { // show that the client is no longer blocked.
-    str_truncate_by(&msg, 1);
+    str_truncate_by(&msg, 1); // Trim newline for debug printing.
     errFL("\x1b[30m%s -- done.\x1b[0m", msg.ptr)
   }
 }
