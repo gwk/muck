@@ -44,6 +44,12 @@ __attribute__ ((section ("__DATA,__interpose"))) = \
 #define INTERPOSE(name) DYLD_INTERPOSE(muck_##name, name)
 
 
+// Type aliases.
+
+typedef size_t Size;
+
+// Diagnostic macros.
+
 static const char* program_name = "?";
 
 #define errF(fmt, ...) { \
@@ -64,8 +70,8 @@ static const char* program_name = "?";
 
 typedef struct {
   char* ptr;
-  size_t len; // length, excluding null terminator.
-  size_t cap; // capacity, excluding null terminator. Always 2**n - 1.
+  Size len; // length, excluding null terminator.
+  Size cap; // capacity, excluding null terminator. Always 2**n - 1.
 } Str;
 
 
@@ -73,7 +79,7 @@ static void str_validate(Str* str) {
   if (str->len) {
     check(str->ptr, "str_validate: positive length but null pointer.");
     check(str->ptr[str->len] == 0, "str_validate: missing null terminator.");
-    for (size_t i = 0; i < str->len; i++) {
+    for (Size i = 0; i < str->len; i++) {
       check(str->ptr[i] > 0, "str_validate: null byte at position %lu; length:%lu.", i, str->len);
     }
   } else {
@@ -91,20 +97,20 @@ static void str_clear(Str* str) { str->len = 0; }
 
 static void str_terminate(Str* str) { str->ptr[str->len] = '\0'; }
 
-static void str_truncate_by(Str* str, size_t n) {
+static void str_truncate_by(Str* str, Size n) {
   check(str->len >= n, "str_truncate_by: truncation length %lu is greater than string length %lu", n, str->len);
   str->len -= n;
   str->ptr[str->len] = '\0';
 }
 
 static void str_truncate_to_char(Str* str, char c) {
-  size_t l = str->len;
+  Size l = str->len;
   while (l > 0 && str->ptr[l-1] != c) l--;
   str->len = l;
   str->ptr[l] = '\0';
 }
 
-static void str_grow_to(Str* str, size_t cap) {
+static void str_grow_to(Str* str, Size cap) {
   while (str->cap < cap) {
     str->cap += str->cap + 1; // Guarantees that cap is 2**n - 1.
   }
@@ -112,7 +118,7 @@ static void str_grow_to(Str* str, size_t cap) {
   check(str->ptr, "grow_str failed.");
 }
 
-static void str_grow_by(Str* str, size_t increase) {
+static void str_grow_by(Str* str, Size increase) {
   str_grow_to(str, str->len + increase);
 }
 
@@ -125,7 +131,7 @@ static void str_append_char(Str* str, char c) {
 }
 
 static void str_append_chars(Str* str, const char* chars) {
-  size_t chars_len = strlen(chars);
+  Size chars_len = strlen(chars);
   str_grow_by(str, chars_len);
   char* end = str_end(str);
   memcpy(end, chars, chars_len+1); // +1 includes null terminator.
@@ -140,7 +146,7 @@ static void str_append_str(Str* str, const Str s) {
 }
 
 static void str_write(Str* str, int fd) {
-  check((size_t)write(fd, str->ptr, str->len) == str->len, "write failed: %s.\n", strerror(errno));
+  check((Size)write(fd, str->ptr, str->len) == str->len, "write failed: %s.\n", strerror(errno));
 }
 
 
@@ -194,7 +200,7 @@ static void muck_init() {
   // Get the project dir.
   char* env_proj_dir = getenv("MUCK_PROJ_DIR");
   if (env_proj_dir) {
-    size_t buf_len = strlen(env_proj_dir) + 1;
+    Size buf_len = strlen(env_proj_dir) + 1;
     check(buf_len <= MAXPATHLEN, "MUCK_PROJ_DIR is greater than maximum path length.")
     memcpy(proj_dir, env_proj_dir, buf_len);
   }
