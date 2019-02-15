@@ -17,6 +17,9 @@ clean:
 cov:
 	iotest -fail-fast -coverage
 
+dev: lib-check
+	pip3 install -e .
+
 docs:
 	(cd doc && muck publish index.html dev-setup.html -to=../docs)
 	writeup -bare -section Muck doc/index.html.wu readme.md
@@ -35,10 +38,6 @@ lib-check:
 	-Wno-gnu-empty-initializer \
 	-Wno-unused-function \
 	muck/libmuck.c
-
-
-pip-dev: lib-check
-	pip3 install -e .
 
 pip-install:
 	pip3 install .
