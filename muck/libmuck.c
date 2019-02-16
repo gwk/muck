@@ -1,21 +1,5 @@
 // Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
 
-#include <assert.h>
-#include <dirent.h>
-#include <dlfcn.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <malloc/malloc.h>
-#include <signal.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <sys/param.h>
-
 // This dynamic library provides a replacement of several system calls, most notably the `open` function.
 // It is meant to be loaded by Muck client processes via DYLD_INSERT_LIBRARIES (macOS) or LD_PRELOAD (Linux).
 // The replacement functions wrap the originals, but first notify the Muck parent process of the file being opened,
@@ -35,6 +19,23 @@
 //PyMODINIT_FUNC PyInit_libmuck(void) { return PyModule_Create(&libmuck); }
 
 
+#include <assert.h>
+#include <dirent.h>
+#include <dlfcn.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <malloc/malloc.h>
+#include <signal.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/param.h>
+
+// macOS interposition macro.
 // source: https://opensource.apple.com/source/dyld/dyld-519.2.1/include/mach-o/dyld-interposing.h
 #define DYLD_INTERPOSE(_replacement, _replacee) \
 __attribute__((used)) static struct{ const void* replacement; const void* replacee; } _interpose_##_replacee \
