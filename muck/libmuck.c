@@ -18,6 +18,9 @@
 // The downside would be that a real module might cause extra dynamic linking whenever this library is loaded for every client process.
 //PyMODINIT_FUNC PyInit_libmuck(void) { return PyModule_Create(&libmuck); }
 
+// If we use secret initialization, then siphash becomes resistant to collision attacks
+// but hash table bugs become harder to reproduce.
+#define MUCK_USE_SECURE_HASH 0
 
 #include <assert.h>
 #include <dirent.h>
@@ -48,6 +51,9 @@ __attribute__ ((section ("__DATA,__interpose"))) = \
 // Type aliases.
 
 typedef size_t Size;
+typedef uint64_t Hash;
+typedef uint64_t Idx;
+typedef uint8_t U8;
 
 // Diagnostic macros.
 
@@ -65,6 +71,19 @@ static const char* program_name = "?";
 #define fail(fmt, ...) { errFL("error: " fmt, ## __VA_ARGS__); exit(1); }
 
 #define check(cond, fmt, ...) { if (!(cond)) {fail(fmt, ## __VA_ARGS__);} }
+
+
+// Allocation.
+
+static void* alloc(Size size) {
+  assert(size >= 0);
+  // malloc does not return null for zero size;
+  // we do so that a len/ptr pair with zero len always has a null ptr.
+  if (!size) return NULL;
+  void* p = malloc(size);
+  check(p, "malloc failed.")
+  return p;
+}
 
 
 // Str.
@@ -151,6 +170,112 @@ static void str_write(Str* str, int fd) {
 }
 
 
+// Global hash set implementation for strings.
+// The table uses prime table sizes and quadratic probing with maximum load factor of 0.5.
+// The use of prime sizes and load factor 0.5 guarantees that quadratic probing never fails:
+// https://en.wikipedia.org/wiki/Quadratic_probing#Limitations
+
+// We assume that table keys are char strings that we own.
+typedef char* Key;
+
+static Size prime_caps[49];
+static Size prime_caps_count = sizeof(prime_caps) / sizeof(Size);
+
+
+static Key* table = NULL; // The global hash set.
+static Size table_len = 0;
+static Size table_cap = 0;
+static Size table_cap_idx = 0; // Index into prime_caps.
+static U8 hash_secret[16] = {};
+static bool hash_secret_initialized = false;
+
+
+static void hash_init() {
+  assert(!hash_secret_initialized);
+  #if MUCK_USE_SECURE_HASH
+    arc4random_buf(hash_secret, sizeof(hash_secret));
+  #endif
+  hash_secret_initialized = true;
+}
+
+
+static Key key_for_chars(char* chars) {
+  Size len = strlen(chars);
+  Key key = alloc(len);
+  memcpy(key, chars, len);
+  return key;
+}
+
+
+static Hash siphash(const U8* in, const Size inlen, const U8* k);
+
+static Hash hash_for_chars(char* chars) {
+  assert(hash_secret_initialized);
+  return siphash((U8*)chars, strlen(chars), hash_secret);
+}
+
+
+static void set_resize() {
+  table_cap_idx += 1;
+  check(table_cap_idx < prime_caps_count, "set_resize: insane table_cap_idx.")
+  Size new_table_cap = prime_caps[table_cap_idx];
+  Key* new_table = alloc(new_table_cap * sizeof(Key));
+  memset(new_table, 0x00, new_table_cap * sizeof(Key)); // Set to invalid.
+  for (Idx idx = 0; idx < table_cap; idx++) {
+    Key key = table[idx];
+    if (!key) continue;
+    Hash hash = hash_for_chars(key);
+    hash %= new_table_cap;
+    for (Size jump = 0; jump < new_table_cap; jump++) {
+      Idx new_idx = (hash + jump * jump) % new_table_cap; // Quadratic probing.
+      if (!new_table[new_idx]) { // Found an open slot.
+        new_table[idx] = key;
+        goto next;
+      }
+    }
+    fail("set_resize failed to find an open slot.");
+    next: continue;
+  }
+  free(table);
+  table = new_table;
+  table_cap = new_table_cap;
+}
+
+
+static bool set_insert_chars(char* chars) {
+  // Returns true if the key is already present in the table.
+  if (!table) {
+    assert(!table_len);
+    assert(!table_cap);
+    assert(!table_cap_idx);
+    table_cap_idx = 1;
+    set_resize();
+  }
+  Hash hash = hash_for_chars(chars);
+  hash %= table_cap;
+  for (Size jump = 0; jump < table_cap; jump++) {
+    Idx idx = (hash + jump * jump) % table_cap; // Quadratic probing.
+    Key existing = table[idx];
+    if (existing) {
+      if (strcmp(existing, chars)) continue; // Different keys.
+      else return true; // Key is already present.
+    }
+    // Found an open slot.
+    table[idx] = key_for_chars(chars);
+    table_len++;
+    // Supposedly we are guaranteed to find an open slot even when we are already exactly half full.
+    // This means that we can check the load factor after insertion.
+    // Note that this fails for table_cap == 2, because the next cap is 3 and so the load remains too high.
+    // This is addressed at initialization by stepping up to table_cap == 3 immediately.
+    if (table_len * 2 > table_cap) { // Table has exceeded 0.5 load factor.
+      set_resize();
+    }
+    return false; // New key.
+  }
+  fail("set_insert_chars failed to find an open slot; hash:%llx", hash);
+}
+
+
 // Muck.
 
 static bool is_setup = 0;
@@ -182,6 +307,7 @@ static void update_curr_dir() {
 
 static void muck_init() {
   // Initialize.
+
   is_setup = true;
 
   // Get program name.
@@ -193,6 +319,8 @@ static void muck_init() {
   #error "unsupported platform."
   #endif
 
+  hash_init();
+
   // Get this process' identifier.
   const int pid_cap = sizeof(pid);
   int n_chars = snprintf(pid, pid_cap, "%lld", (int64_t)getpid());
@@ -200,7 +328,7 @@ static void muck_init() {
 
   // Get the project dir.
   char* env_proj_dir = getenv("MUCK_PROJ_DIR");
-  if (env_proj_dir) {
+  if (env_proj_dir && *env_proj_dir) {
     Size buf_len = strlen(env_proj_dir) + 1;
     check(buf_len <= MAXPATHLEN, "MUCK_PROJ_DIR is greater than maximum path length.")
     memcpy(proj_dir, env_proj_dir, buf_len);
@@ -208,14 +336,15 @@ static void muck_init() {
 
   // Get the FIFO path.
   char* fifo_path = getenv("MUCK_FIFO");
-  if (fifo_path) {
+  if (fifo_path && *fifo_path) {
     fd_fifo = open(fifo_path, O_WRONLY);
   } else {
     errFL("NOTE: MUCK_FIFO build process env is not set.");
   }
 
   // Get the debug flag.
-  dbg = (getenv("MUCK_DEPS_DBG") != NULL);
+  char* dbg_flag = getenv("MUCK_DEPS_DBG");
+  dbg = (dbg_flag && *dbg_flag);
 }
 
 
@@ -273,12 +402,12 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
   }
   str_validate(&canon_path);
 
-  // If we have the project dir, check that the reouested path is in it before sending the message.
+  // If we have the project dir, check that the requested path is in it before sending the message.
   if (*proj_dir) {
     if (!has_prefix(canon_path.ptr, proj_dir)) return;
   }
 
-  // Write the path and mode to message buffer.
+  // Format the message.
   str_clear(&msg);
   str_append_chars(&msg, call_name);
   str_append_char(&msg, '\t');
@@ -287,6 +416,10 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
   str_append_chars(&msg, pid);
   str_append_char(&msg, '\t');
   str_append_str(&msg, canon_path);
+
+  // If we have previously sent this exact message, skip it.
+  if (set_insert_chars(msg.ptr)) return;
+
   if (dbg) { errFL("\x1b[36m%s\x1b[0m", msg.ptr); }
   str_append_char(&msg, '\n');
 
@@ -364,3 +497,164 @@ static DIR* muck_opendir(const char* name) {
   return opendir(name);
 }
 INTERPOSE(opendir);
+
+
+// Hash table capacity primes.
+// Index with a power of two, to get the largest prime less than that power of two.
+static Size prime_caps[] = {
+  1, // 0.
+  2, // 1.
+  3, // 2.
+  7, // 3.
+  13, // 4.
+  31, // 5.
+  61, // 6.
+  127, // 7.
+  251, // 8.
+  509, // 9.
+  1021, // 10.
+  2039, // 11.
+  4093, // 12.
+  8191, // 13.
+  16381, // 14.
+  32749, // 15.
+  65521, // 16.
+  131071, // 17.
+  262139, // 18.
+  524287, // 19.
+  1048573, // 20.
+  2097143, // 21.
+  4194301, // 22.
+  8388593, // 23.
+  16777213, // 24.
+  33554393, // 25.
+  67108859, // 26.
+  134217689, // 27.
+  268435399, // 28.
+  536870909, // 29.
+  1073741789, // 30.
+  2147483647, // 31.
+  4294967291, // 32.
+  8589934583, // 33.
+  17179869143, // 34.
+  34359738337, // 35.
+  68719476731, // 36.
+  137438953447, // 37.
+  274877906899, // 38.
+  549755813881, // 39.
+  1099511627689, // 40.
+  2199023255531, // 41.
+  4398046511093, // 42.
+  8796093022151, // 43.
+  17592186044399, // 44.
+  35184372088777, // 45.
+  70368744177643, // 46.
+  140737488355213, // 47.
+  281474976710597, // 48.
+};
+
+
+/*
+SipHash reference C implementation, modified by George King to return uint64_t directly.
+
+original: https://raw.githubusercontent.com/veorq/SipHash/93ca99dcfa6a32b1b617e9a5c3c044685254ce8e/siphash.c
+
+Copyright (c) 2012-2016 Jean-Philippe Aumasson <jeanphilippe.aumasson@gmail.com>
+Copyright (c) 2012-2014 Daniel J. Bernstein <djb@cr.yp.to>
+
+To the extent possible under law, the author(s) have dedicated all copyright
+and related and neighboring rights to this software to the public domain
+worldwide. This software is distributed without any warranty.
+
+You should have received a copy of along with this software.
+See the CC0 Public Domain Dedication: <http://creativecommons.org/publicdomain/zero/1.0/>.
+*/
+
+
+/* default: SipHash-2-4 */
+#define cROUNDS 2
+#define dROUNDS 4
+
+#define ROTL(x, b) (uint64_t)(((x) << (b)) | ((x) >> (64 - (b))))
+
+#define U8TO64_LE(p)                                                           \
+    (((uint64_t)((p)[0])) | ((uint64_t)((p)[1]) << 8) |                        \
+     ((uint64_t)((p)[2]) << 16) | ((uint64_t)((p)[3]) << 24) |                 \
+     ((uint64_t)((p)[4]) << 32) | ((uint64_t)((p)[5]) << 40) |                 \
+     ((uint64_t)((p)[6]) << 48) | ((uint64_t)((p)[7]) << 56))
+
+#define SIPROUND                                                               \
+    do {                                                                       \
+        v0 += v1;                                                              \
+        v1 = ROTL(v1, 13);                                                     \
+        v1 ^= v0;                                                              \
+        v0 = ROTL(v0, 32);                                                     \
+        v2 += v3;                                                              \
+        v3 = ROTL(v3, 16);                                                     \
+        v3 ^= v2;                                                              \
+        v0 += v3;                                                              \
+        v3 = ROTL(v3, 21);                                                     \
+        v3 ^= v0;                                                              \
+        v2 += v1;                                                              \
+        v1 = ROTL(v1, 17);                                                     \
+        v1 ^= v2;                                                              \
+        v2 = ROTL(v2, 32);                                                     \
+    } while (0)
+
+static uint64_t siphash(const uint8_t *in, const size_t inlen, const uint8_t *k) {
+
+    uint64_t v0 = 0x736f6d6570736575ULL;
+    uint64_t v1 = 0x646f72616e646f6dULL;
+    uint64_t v2 = 0x6c7967656e657261ULL;
+    uint64_t v3 = 0x7465646279746573ULL;
+    uint64_t k0 = U8TO64_LE(k);
+    uint64_t k1 = U8TO64_LE(k + 8);
+    uint64_t m;
+    int i;
+    const uint8_t *end = in + inlen - (inlen % sizeof(uint64_t));
+    const int left = inlen & 7;
+    uint64_t b = ((uint64_t)inlen) << 56;
+    v3 ^= k1;
+    v2 ^= k0;
+    v1 ^= k1;
+    v0 ^= k0;
+
+    for (; in != end; in += 8) {
+        m = U8TO64_LE(in);
+        v3 ^= m;
+        for (i = 0; i < cROUNDS; ++i) SIPROUND;
+        v0 ^= m;
+    }
+
+    switch (left) {
+    case 7:
+        b |= ((uint64_t)in[6]) << 48;
+    case 6:
+        b |= ((uint64_t)in[5]) << 40;
+    case 5:
+        b |= ((uint64_t)in[4]) << 32;
+    case 4:
+        b |= ((uint64_t)in[3]) << 24;
+    case 3:
+        b |= ((uint64_t)in[2]) << 16;
+    case 2:
+        b |= ((uint64_t)in[1]) << 8;
+    case 1:
+        b |= ((uint64_t)in[0]);
+        break;
+    case 0:
+        break;
+    }
+
+    v3 ^= b;
+
+    for (i = 0; i < cROUNDS; ++i) SIPROUND;
+
+    v0 ^= b;
+    v2 ^= 0xff;
+
+    for (i = 0; i < dROUNDS; ++i) SIPROUND;
+
+    b = v0 ^ v1 ^ v2 ^ v3;
+    return b;
+}
