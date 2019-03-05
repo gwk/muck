@@ -58,6 +58,7 @@ typedef uint8_t U8;
 // Diagnostic macros.
 
 static const char* program_name = "?";
+static char pid_str[24] = "<PID>"; // U64 max is 20 chars plus terminator.
 
 #define errF(fmt, ...) { \
   fputs("\x1b[36mlibmuck: ", stderr); \
@@ -283,7 +284,6 @@ static int fd_fifo = 0;
 static int dbg = 0;
 static Str msg = {};
 static Str canon_path = {};
-static char pid[21] = "<UNKNOWN PID>";
 static char proj_dir[MAXPATHLEN] = {};
 static char curr_dir[MAXPATHLEN] = {};
 
@@ -322,9 +322,9 @@ static void muck_init() {
   hash_init();
 
   // Get this process' identifier.
-  const int pid_cap = sizeof(pid);
-  int n_chars = snprintf(pid, pid_cap, "%lld", (int64_t)getpid());
-  check(n_chars > 0 && n_chars < pid_cap, "failed to print PID.");
+  const int pid_cap = sizeof(pid_str);
+  int n_chars = snprintf(pid_str, pid_cap, "%lld", (int64_t)getpid());
+  check(n_chars > 0 && n_chars < pid_cap, "failed to format PID.");
 
   // Get the project dir.
   char* env_proj_dir = getenv("MUCK_PROJ_DIR");
@@ -409,17 +409,19 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
 
   // Format the message.
   str_clear(&msg);
+  str_append_chars(&msg, pid_str);
+  str_append_char(&msg, '\t');
+  Idx call_pos = msg.len;
   str_append_chars(&msg, call_name);
   str_append_char(&msg, '\t');
   str_append_char(&msg, mode_char);
   str_append_char(&msg, '\t');
-  str_append_chars(&msg, pid);
-  str_append_char(&msg, '\t');
   str_append_str(&msg, canon_path);
 
   // If we have previously sent this exact message, skip it.
-  if (set_insert_chars(msg.ptr)) return;
-
+  if (set_insert_chars(msg.ptr+call_pos)) {  // Skip the pid prefix, which changes per invocation. Makes debugging stable.
+    return;
+  }
   if (dbg) { errFL("\x1b[36m%s\x1b[0m", msg.ptr); }
   str_append_char(&msg, '\n');
 

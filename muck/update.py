@@ -459,7 +459,7 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
   '''
   try:
     dep_line_parts = dep_line.split('\t')
-    call, mode, pid_str, dep = dep_line_parts
+    pid_str, call, mode, dep = dep_line_parts
     pid = int(pid_str)
     if not (dep and dep[-1] == '\n'): raise ValueError
     dep = dep[:-1] # remove final newline.
