@@ -61,20 +61,20 @@ static const char* program_name = "?";
 static char pid_str[24] = "<PID>"; // U64 max is 20 chars plus terminator.
 
 #define errF(fmt, ...) { \
-  fputs("\x1b[36mlibmuck: ", stderr); \
-  fputs(program_name, stderr); \
-  fprintf(stderr, ":\x1b[0m " fmt, ## __VA_ARGS__); \
+  fprintf(stderr, "\x1b[36mlibmuck %s:\x1b[m " fmt, program_name, ## __VA_ARGS__); \
   fflush(stderr); \
 }
 
 #define errFL(fmt, ...) errF(fmt "\n", ## __VA_ARGS__)
+
+#define errFRL(chars, fmt, ...) { errF(fmt, __VA_ARGS__); write_chars_repr(2, chars); write_nl(2); }
 
 #define fail(fmt, ...) { errFL("error: " fmt, ## __VA_ARGS__); exit(1); }
 
 #define check(cond, fmt, ...) { if (!(cond)) {fail(fmt, ## __VA_ARGS__);} }
 
 
-// Allocation.
+// Checked system operations.
 
 static void* alloc(Size size) {
   assert(size >= 0);
@@ -84,6 +84,53 @@ static void* alloc(Size size) {
   void* p = malloc(size);
   check(p, "malloc failed.")
   return p;
+}
+
+static void write_bytes(int fd, const char* bytes, Size len) {
+  ssize_t res = write(fd, bytes, len);
+  check((Size)res == len, "write failed: %s.\n", strerror(errno));
+}
+
+static void write_chars(int fd, const char* chars) {
+  write_bytes(fd, chars, strlen(chars));
+}
+
+static void write_nl(int fd) { write_bytes(fd, "\n", 2); }
+
+
+static void write_chars_repr(int fd, char* chars) {
+  if (!chars) {
+    write_chars(fd, "NULL");
+    return;
+  }
+  char buffer[4096] = {'"'};
+  Size buf_len = 1;
+  #define append(character) buffer[buf_len++] = character
+  while (*chars) {
+    char c = *chars++;
+    if (c >= ' ' && c <= '~' && c != '"') { // Printable.
+      append(c);
+    } else {
+      append('\\');
+      switch (c) {
+      case '\0': append('0'); break;
+      case '\t': append('t'); break;
+      case '\n': append('n'); break;
+      case '"':  append('"'); break;
+      default:
+        append('x');
+        append((c>>8)+'0');
+        append((c&0xf)+'0');
+      }
+    }
+    if (buf_len > sizeof(buffer) - 4) { // Each iteration can add up to 4 chars.
+      write_bytes(fd, buffer, buf_len);
+      buf_len = 0;
+    }
+  }
+  append('"');
+  write_bytes(fd, buffer, buf_len);
+  #undef append
 }
 
 
@@ -166,8 +213,8 @@ static void str_append_str(Str* str, const Str s) {
   str->len += s.len;
 }
 
-static void str_write(Str* str, int fd) {
-  check((Size)write(fd, str->ptr, str->len) == str->len, "write failed: %s.\n", strerror(errno));
+static void write_str(int fd, Str* str) {
+  write_bytes(fd, str->ptr, str->len);
 }
 
 
@@ -426,7 +473,7 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
   str_append_char(&msg, '\n');
 
   if (fd_fifo) { // Communicate with the muck build process.
-    str_write(&msg, fd_fifo);
+    write_str(fd_fifo, &msg);
     raise(SIGSTOP); // Stop this process. The parent will cause it to resume with SIGCONT.
   }
   if (dbg) { // show that the client is no longer blocked.
