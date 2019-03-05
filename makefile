@@ -33,6 +33,7 @@ help: # Summarize the targets of this makefile.
 
 lib-check:
 	clang -fsyntax-only \
+	-Werror \
 	-Weverything \
 	-Wno-gnu-zero-variadic-macro-arguments \
 	-Wno-gnu-empty-initializer \
