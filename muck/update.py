@@ -355,7 +355,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
     raise error(target, f'internal error: match failed; src_path: {src_path!r}')
   args = tuple(m.groups())
   src_arg = cast(Tuple[str, ...], () if tool.src_to_stdin else (src_path,))
-  cmd = tool.cmd + src_arg + args
+  cmd = [*tool.cmd, *src_arg, *args]
 
   msg_stdin = f' < {src_path}' if tool.src_to_stdin else ''
   note(target, f"building: `{' '.join(sh_quote(w) for w in cmd)}{msg_stdin}`")
