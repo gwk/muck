@@ -3,6 +3,7 @@
 import argparse
 import re
 from dataclasses import dataclass
+from os import getpid
 from typing import Callable, DefaultDict, Dict, FrozenSet, Iterable, List, Match, NamedTuple, Optional, Set, Tuple
 
 from .constants import *
@@ -49,6 +50,7 @@ class Ctx(NamedTuple):
   statuses: Dict[str, TargetStatus] = {}
   dir_names: Dict[str, List[str]] = {}
   dependents: DefaultDict[str, Set[Dependent]] = DefaultDict(set)
+  pid_str: str = str(getpid())
 
 
   @property

@@ -371,6 +371,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
     env.update(tool.env_fn())
   env['MUCK_PROJ_DIR'] = ctx.proj_dir
   env['MUCK_FIFO'] = ctx.fifo_path
+  env['MUCK_PID'] = ctx.pid_str
   env['DYLD_INSERT_LIBRARIES'] = libmuck_path
   #env['DYLD_FORCE_FLAT_NAMESPACE'] = 'TRUE'
   #env['DYLD_PRINT_LIBRARIES'] = 'TRUE'
