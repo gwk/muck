@@ -299,16 +299,34 @@ static bool set_insert_chars(char* chars) {
     table_cap_idx = 1;
     set_resize();
   }
+
+  if ((false)) { // Dump table.
+    write_nl(2);
+    for (Idx idx = 0; idx < table_cap; idx++) {
+      Key existing = table[idx];
+      errFRL(existing, "TABLE idx=%llu ", idx);
+    }
+  }
+
   Hash hash = hash_for_chars(chars);
   hash %= table_cap;
+  //errFRL(chars, "CHARS idx=%llu ", hash);
   for (Size jump = 0; jump < table_cap; jump++) {
     Idx idx = (hash + jump * jump) % table_cap; // Quadratic probing.
     Key existing = table[idx];
     if (existing) {
+      //errFRL(existing, "EXIST idx=%llu ", idx);
       if (strcmp(existing, chars)) continue; // Different keys.
       else return true; // Key is already present.
     }
     // Found an open slot.
+    //errFL("AVAIL idx=%llu ", idx);
+    if ((false)) { // Debug check that the key is actually novel.
+      for (Idx i = 0; i < table_cap; i++) {
+        Key ex = table[i];
+        if (ex) { check(strcmp(ex, chars), "hash set missed existing key: %s", chars); }
+      }
+    }
     table[idx] = key_for_chars(chars);
     table_len++;
     // Supposedly we are guaranteed to find an open slot even when we are already exactly half full.
@@ -392,6 +410,8 @@ static void muck_init() {
   // Get the debug flag.
   char* dbg_flag = getenv("MUCK_DEPS_DBG");
   dbg = (dbg_flag && *dbg_flag);
+
+  if (dbg) { errFL("\x1b[36minitialized.\x1b[m"); }
 }
 
 
@@ -477,8 +497,8 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
     raise(SIGSTOP); // Stop this process. The parent will cause it to resume with SIGCONT.
   }
   if (dbg) { // show that the client is no longer blocked.
-    str_truncate_by(&msg, 1); // Trim newline for debug printing.
-    errFL("\x1b[30m%s -- done.\x1b[0m", msg.ptr)
+    //str_truncate_by(&msg, 1); // Trim newline for debug printing.
+    errFL("\x1b[36mresume.\x1b[m");
   }
 }
 
