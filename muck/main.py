@@ -32,9 +32,9 @@ def main() -> None:
   fifo_name = '_muck.fifo'
   reserved_names = { 'muck', '_fetch', '_fetch/tmp', db_name, fifo_name }
 
-  # argument parser setup.
-  # argparse's subparser feature does not allow for a default command.
-  # thus we build an argument parser for each command, as well as the main one,
+  # Argument parser setup.
+  # Argparse's subparser feature does not allow for a default command.
+  # To work around this, we build an argument parser for each command, as well as the main one,
   # and dispatch manually based on the first argument.
 
   parsers:Dict[str, ArgumentParser] = {}
