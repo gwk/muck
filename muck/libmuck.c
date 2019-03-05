@@ -200,7 +200,7 @@ static void hash_init() {
 
 
 static Key key_for_chars(char* chars) {
-  Size len = strlen(chars);
+  Size len = strlen(chars) + 1;
   Key key = alloc(len);
   memcpy(key, chars, len);
   return key;
@@ -229,7 +229,7 @@ static void set_resize() {
     for (Size jump = 0; jump < new_table_cap; jump++) {
       Idx new_idx = (hash + jump * jump) % new_table_cap; // Quadratic probing.
       if (!new_table[new_idx]) { // Found an open slot.
-        new_table[idx] = key;
+        new_table[new_idx] = key;
         goto next;
       }
     }
