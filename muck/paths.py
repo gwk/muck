@@ -6,7 +6,7 @@ Muck target path functions.
 
 import re
 from itertools import product
-from .pithy.format import format_partial, parse_formatters
+from .pithy.format import parse_formatters
 from .pithy.fs import path_stem
 from .pithy.string import pluralize
 from typing import Dict, Tuple
