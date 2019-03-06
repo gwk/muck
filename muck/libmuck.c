@@ -317,7 +317,9 @@ static bool set_insert_chars(char* chars) {
     if (existing) {
       //errFRL(existing, "EXIST idx=%llu ", idx);
       if (strcmp(existing, chars)) continue; // Different keys.
-      else return true; // Key is already present.
+      else {
+        return true; // Key is already present.
+      }
     }
     // Found an open slot.
     //errFL("AVAIL idx=%llu ", idx);
@@ -471,7 +473,9 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
 
   // If we have the project dir, check that the requested path is in it before sending the message.
   if (*proj_dir) {
-    if (!has_prefix(canon_path.ptr, proj_dir)) return;
+    if (!has_prefix(canon_path.ptr, proj_dir)) {
+      return;
+    }
   }
 
   // Format the message.
