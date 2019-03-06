@@ -375,7 +375,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   env['DYLD_INSERT_LIBRARIES'] = libmuck_path
   #env['DYLD_FORCE_FLAT_NAMESPACE'] = 'TRUE'
   #env['DYLD_PRINT_LIBRARIES'] = 'TRUE'
-  if ctx.dbg_libmuck:
+  if ctx.dbg_child:
     env['MUCK_DEPS_DBG'] = 'TRUE'
 
   # Get the source's inferred dependencies, to be ignored when observing target dependencies.
@@ -402,7 +402,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   in_cm = open(src_prod_path, 'rb') if tool.src_to_stdin else nullcontext(None)
   with in_cm as in_file, open(prod_path_out, 'wb') as out_file: # type: ignore
     time_start = now()
-    cmd, proc, _ = launch(cmd, cwd=ctx.build_dir, env=env, stdin=in_file, out=out_file)
+    _, proc, _ = launch(cmd, cwd=ctx.build_dir, env=env, stdin=in_file, out=out_file, lldb=ctx.dbg_child_lldb)
     if in_file: in_file.close()
     out_file.close()
     possible_causes: List[Tuple[str, ...]] = []

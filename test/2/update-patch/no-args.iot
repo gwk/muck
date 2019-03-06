@@ -3,7 +3,7 @@
   'code': 2,
   'err-val': '''\
 usage: muck update-patch [-h] [-build-dir BUILD_DIR] [-cd CD] [-dbg]
-                         [-dbg-libmuck] [-no-times] [-force]
+                         [-no-times] [-force] [-dbg-child] [-dbg-child-lldb]
                          patch
 muck update-patch: error: the following arguments are required: patch
 '''

@@ -46,10 +46,12 @@ def main() -> None:
     parser.add_argument('-build-dir', default='_build', help="specify build directory; defaults to '_build'.")
     parser.add_argument('-cd', help='change to this working directory before taking any further action.')
     parser.add_argument('-dbg', action='store_true', help='log lots of details to stderr.')
-    parser.add_argument('-dbg-libmuck', action='store_true', help='log lots of details to stderr.')
     if builds:
       parser.add_argument('-no-times', action='store_true', help='do not report process times.')
       parser.add_argument('-force', action='store_true', help='rebuild specified targets even if they are up to date.')
+      parser.add_argument('-dbg-child', action='store_true',
+        help='set an environment variables so that child processes log muck communication details to stderr.')
+      parser.add_argument('-dbg-child-lldb', action='store_true', help='run child processes in LLDB.')
     if targets_dflt is not None:
       default = ['index.html'] if targets_dflt else None
       help_msg = f'target file names' + ("; defaults to 'index.html'." if targets_dflt else '.')
@@ -142,7 +144,9 @@ def main() -> None:
     build_dir_abs=build_dir_abs,
     fifo_path=path_join(build_dir_abs, fifo_name),
     reserved_names=frozenset(reserved_names),
-    dbg=dbg, dbg_libmuck=args.dbg_libmuck)
+    dbg=dbg,
+    dbg_child=getattr(args, 'dbg_child', False),
+    dbg_child_lldb=getattr(args, 'dbg_child_lldb', True))
 
   args.fn(ctx)
 

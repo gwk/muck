@@ -14,3 +14,5 @@ if 'DYLD_INSERT_LIBRARIES' not in environ:
 for path in argv[1:]:
   print("opening:", path)
   open(path)
+
+print('open.py: done.')

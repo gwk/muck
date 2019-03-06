@@ -53,7 +53,10 @@ class BuildExtLibmuck(build_ext):
       import _osx_support
       compiler_so = _osx_support.compiler_fixup(compiler_so, cc_args=[])
     makedirs(dirname(ext_path), exist_ok=True) # necessary as of 3.6, 3.7a3.
-    self.spawn(compiler_so + sources + ['-dynamiclib', '-o', ext_path])
+    cmd = [*compiler_so, *sources,
+      '-g', '-fno-omit-frame-pointer',
+      '-dynamiclib', '-o', ext_path]
+    self.spawn(cmd)
 
 
 setup(

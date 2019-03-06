@@ -46,7 +46,8 @@ class Ctx(NamedTuple):
   fifo_path: str
   reserved_names: FrozenSet
   dbg: Callable[..., None]
-  dbg_libmuck: bool
+  dbg_child: bool
+  dbg_child_lldb: List[str]
   statuses: Dict[str, TargetStatus] = {}
   dir_names: Dict[str, List[str]] = {}
   dependents: DefaultDict[str, Set[Dependent]] = DefaultDict(set)
