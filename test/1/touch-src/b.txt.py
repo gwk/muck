@@ -1,4 +1,2 @@
-from muck import *
-
-for line in load('a.txt'):
+for line in open('a.txt'):
   print('B:', line.strip())

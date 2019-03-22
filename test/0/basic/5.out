@@ -1,13 +1,11 @@
 
-a.txt[m (⇠ [34mindex.html.wu[m, [31mmodule-import.txt[m)
-
 d.txt[m (⇠ [31mb.txt[m, [31mc.txt[m)
 ┗╸[32md.txt.py[m
   ╰╴[34mbasic_lib.py[m
 
 index.html[m
 ┗╸[32mindex.html.wu[m
-  ╰╴[34ma.txt[m ⇡
+  ╰╴[34ma.txt[m
   ╰╴[34mb.txt[m
   │ ┡╸[32mb.txt.py[m
   │ └╴[31md.txt[m ⇡
@@ -16,6 +14,3 @@ index.html[m
   │ │ ┗╸[32mc.txt.py.py[m
   │ └╴[31md.txt[m ⇡
   ╰╴[34mlinked-src.html[m
-  ╰╴[34mmodule-import.txt[m
-    ┡╸[32mmodule-import.txt.py[m
-    └╴[31ma.txt[m ⇡

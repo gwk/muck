@@ -1,4 +1,4 @@
-from muck import *
+from muck.pithy.fetch import load_url
 
 # fetch something that is guaranteed not to exist on the net;
 # if the preceding local move-to-fetched-url command worked,

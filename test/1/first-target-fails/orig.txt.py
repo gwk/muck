@@ -1,4 +1,4 @@
-from muck import *
+from sys import argv
 
 _, name = argv
 

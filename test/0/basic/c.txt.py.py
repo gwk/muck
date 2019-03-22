@@ -1,7 +1,6 @@
 print('''
-from muck import *
 from pithy.io import *
 
-d_lines = list(clip_newlines(load('d.txt')))
+d_lines = list(clip_newlines(open('d.txt')))
 print('c:', d_lines)
 ''')

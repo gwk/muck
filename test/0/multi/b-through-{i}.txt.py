@@ -1,4 +1,6 @@
-from muck import *
+from sys import argv
 
-f = load('a-to-many-{i}.txt')
+_, i = argv
+
+f = open(f'a-to-many-{i}.txt')
 print(f.read().replace('a-to-many', 'b-through'), end='')

@@ -6,13 +6,10 @@ muck note: b.txt: finished: (via stdout).
 muck note: b.txt: product is new; 19 B.
 muck note: c.txt.py: building: `python3 c.txt.py.py`
 muck note: c.txt.py: finished: (via stdout).
-muck note: c.txt.py: product is new; 111 B.
+muck note: c.txt.py: product is new; 92 B.
 muck note: c.txt: building: `python3 c.txt.py`
 muck note: c.txt: finished: (via stdout).
 muck note: c.txt: product is new; 19 B.
-muck note: module-import.txt: building: `python3 module-import.txt.py`
-muck note: module-import.txt: finished: (via stdout).
-muck note: module-import.txt: product is new; 42 B.
 muck note: index.html: building: `writeup index.html.wu`
 muck note: index.html: finished: (via stdout).
-muck note: index.html: product is new; 6.023 kB.
+muck note: index.html: product is new; 5.660 kB.

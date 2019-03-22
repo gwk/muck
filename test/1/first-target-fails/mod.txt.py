@@ -1,7 +1,7 @@
-import os
-from muck import *
+from os import environ
+from sys import argv
 
 _, name = argv
 
 print('mod', name)
-exit(int(os.environ['EXIT']))
+exit(int(environ['EXIT']))

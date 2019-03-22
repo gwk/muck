@@ -1,3 +1,1 @@
-from muck import *
-
-load('circular.txt')
+open('circular.txt')
