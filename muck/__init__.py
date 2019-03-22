@@ -4,31 +4,30 @@
 Muck client libary functions.
 '''
 
-import sys
-assert sys.version_info.major == 3 # python 2 is not supported.
-
 import os
 import random
 import shlex
+import sys
 import time
-
 from builtins import open as _std_open
 from http import HTTPStatus
 from io import TextIOWrapper
 from sys import argv
-from typing import *
-from typing import IO, TextIO, BinaryIO
+from typing import IO, Any, BinaryIO, Dict, Set, TextIO, Tuple
 from urllib.parse import urlencode, urlparse
 
+from .paths import bindings_from_args, dflt_prod_path_for_source, dst_path
 from .pithy.format import has_formatter
-from .pithy.loader import add_loader, load as _load, FileOrPath
-from .pithy.fs import make_dirs, move_file, path_dir, path_exists, path_ext, path_join, path_stem, split_stem_ext, Path, PathOrFd
-from .pithy.io import stderr, errL, errSL
+from .pithy.fs import (Path, PathOrFd, make_dirs, move_file, path_dir, path_exists, path_ext, path_join, path_stem,
+  split_stem_ext)
+from .pithy.io import errL, errSL, stderr
+from .pithy.loader import FileOrPath, add_loader, load as _load
 from .pithy.path_encode import path_for_url
 from .pithy.task import runCO
 from .pithy.transform import Transformer
 
-from .paths import bindings_from_args, dflt_prod_path_for_source, dst_path
+
+assert sys.version_info.major == 3 # python 2 is not supported.
 
 
 # module exports.
