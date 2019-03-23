@@ -25,7 +25,7 @@ def py_dependencies(src_path:str, src_file:TextIO, dir_names:Dict[str,Tuple[str,
   except SyntaxError as e:
     raise src_error(src_path, e.lineno, e.offset or 0, 'syntax error', e.text.rstrip('\n')) from e
 
-  def walk_import(module_name:Optional[str], dir_names:Dict[str,Tuple[str,...]]) -> Iterable[str]:
+  def extract_import(module_name:Optional[str], dir_names:Dict[str,Tuple[str,...]]) -> Iterable[str]:
     if module_name is None: raise ValueError
     src_dir = path_dir(src_path)
     m = re.match('\.*', module_name)
@@ -39,6 +39,6 @@ def py_dependencies(src_path:str, src_file:TextIO, dir_names:Dict[str,Tuple[str,
   for node in ast.walk(tree):
     if isinstance(node, ast.Import):
       for alias in node.names:
-        yield from walk_import(alias.name, dir_names)
+        yield from extract_import(alias.name, dir_names)
     elif isinstance(node, ast.ImportFrom):
-      yield from walk_import(node.module, dir_names)
+      yield from extract_import(node.module, dir_names)
