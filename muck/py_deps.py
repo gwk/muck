@@ -7,25 +7,25 @@ import ast
 import re
 
 
-def src_error(path: str, line1: int, col1: int, msg: str, text: str=None) -> SystemExit:
+def src_error(path:str, line1:int, col1:int, msg:str, text:str=None) -> SystemExit:
   pad = ' ' * (col1 - 1)
   if text is None:
     text = read_line_from_path(path, line0=line1-1, default='<MISSING>')
   return SystemExit(f'muck error: {path}:{line1}:{col1}: {msg}.\n  {text}\n  {pad}^')
 
 
-def node_error(path: str, node: ast.AST, msg: str) -> SystemExit:
+def node_error(path:str, node:ast.AST, msg:str) -> SystemExit:
   return src_error(path, node.lineno, node.col_offset + 1, msg)
 
 
-def py_dependencies(src_path: str, src_file: TextIO, dir_names: Any) -> Iterable[str]:
+def py_dependencies(src_path:str, src_file:TextIO, dir_names:Any) -> Iterable[str]:
   'Calculate dependencies for a .py (python3 source) file.'
   src_text = src_file.read()
   try: tree = ast.parse(src_text, filename=src_path)
   except SyntaxError as e:
     raise src_error(src_path, e.lineno, e.offset or 0, 'syntax error', e.text.rstrip('\n')) from e
 
-  def walk_import(module_name: Optional[str], dir_names: Any) -> Iterable[str]:
+  def walk_import(module_name:Optional[str], dir_names:Any) -> Iterable[str]:
     if module_name is None: raise ValueError
     src_dir = path_dir(src_path)
     m = re.match('\.*', module_name)
