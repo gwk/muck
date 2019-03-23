@@ -2,7 +2,7 @@
 
 from .pithy.fs import is_file, path_dir, path_join
 from .pithy.io import read_line_from_path
-from typing import Any, Iterable, Optional, TextIO
+from typing import Any, Dict, Iterable, Optional, TextIO, Tuple
 import ast
 import re
 
@@ -18,14 +18,14 @@ def node_error(path:str, node:ast.AST, msg:str) -> SystemExit:
   return src_error(path, node.lineno, node.col_offset + 1, msg)
 
 
-def py_dependencies(src_path:str, src_file:TextIO, dir_names:Any) -> Iterable[str]:
+def py_dependencies(src_path:str, src_file:TextIO, dir_names:Dict[str,Tuple[str,...]]) -> Iterable[str]:
   'Calculate dependencies for a .py (python3 source) file.'
   src_text = src_file.read()
   try: tree = ast.parse(src_text, filename=src_path)
   except SyntaxError as e:
     raise src_error(src_path, e.lineno, e.offset or 0, 'syntax error', e.text.rstrip('\n')) from e
 
-  def walk_import(module_name:Optional[str], dir_names:Any) -> Iterable[str]:
+  def walk_import(module_name:Optional[str], dir_names:Dict[str,Tuple[str,...]]) -> Iterable[str]:
     if module_name is None: raise ValueError
     src_dir = path_dir(src_path)
     m = re.match('\.*', module_name)

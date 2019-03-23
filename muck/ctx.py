@@ -49,7 +49,7 @@ class Ctx(NamedTuple):
   dbg_child: bool
   dbg_child_lldb: List[str]
   statuses: Dict[str, TargetStatus] = {}
-  dir_names: Dict[str, List[str]] = {}
+  dir_names: Dict[str, Tuple[str,...]] = {}
   dependents: DefaultDict[str, Set[Dependent]] = DefaultDict(set)
   pid_str: str = str(getpid())
 
@@ -63,15 +63,15 @@ class Ctx(NamedTuple):
     return path.startswith(self.build_dir_slash)
 
 
-  def list_dir_filtered(self, src_dir:str) -> List[str]:
+  def list_dir_filtered(self, src_dir:str) -> Tuple[str,...]:
     '''
     Given src_dir, cache and return the list of names that might be source files.
     TODO: eventually this should be replaced by using os.scandir.
     '''
     try: return self.dir_names[src_dir]
     except KeyError: pass
-    names = [n for n in list_dir(src_dir, hidden=False)
-      if n not in self.reserved_names and path_ext(n) not in reserved_or_ignored_exts]
+    names = tuple(n for n in list_dir(src_dir, hidden=False)
+      if n not in self.reserved_names and path_ext(n) not in reserved_or_ignored_exts)
     self.dir_names[src_dir] = names
     return names
 
