@@ -20,9 +20,9 @@ from .ctx import Ctx, Dependent, InvalidTarget, TargetNotFound, TargetStatus, ma
 from .db import DB, DBError, TargetRecord
 from .logging import error, error_msg, note, warn
 from .pithy.ansi import RST, TXT_G
-from .pithy.fs import (FileStatus, current_dir, dir_entry_type_char, file_size, file_status, is_dir, is_dir_not_link,
-  is_file_executable_by_owner, is_link, make_dir, make_dirs, make_link, move_file, path_exists, read_link, remove_file,
-  remove_path, remove_path_if_exists, scan_dir)
+from .pithy.fs import (DirEntries, FileStatus, current_dir, dir_entry_type_char, file_size, file_status, is_dir,
+  is_dir_not_link, is_file_executable_by_owner, is_link, make_dir, make_dirs, make_link, move_file,
+  path_exists, read_link, remove_file, remove_path, remove_path_if_exists, scan_dir)
 from .pithy.io import AsyncLineReader, errL, errSL
 from .pithy.path import PathIsNotDescendantError, is_path_abs, path_descendants, path_dir, path_ext, path_rel_to_ancestor
 from .pithy.string import format_byte_count
@@ -284,7 +284,7 @@ def update_deps_and_record(ctx, fifo:AsyncLineReader, target:str, is_target_dir:
 
   ctx.dbg(target, 'update_deps_and_record')
   if is_changed:
-    deps = calculate_dependencies(actual_path, ctx.dir_names)
+    deps = calculate_dependencies(actual_path, ctx.dir_entries)
     for dep in deps:
       try: ctx.validate_target(dep)
       except InvalidTarget as e:
@@ -505,7 +505,7 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
 
 # Dependency inference.
 
-def calculate_dependencies(path:str, dir_names:Dict[str, Tuple[str, ...]]) -> Tuple[str, ...]:
+def calculate_dependencies(path:str, dir_entries:DirEntries) -> Tuple[str, ...]:
   '''
   Infer the dependencies for the file at `path`.
   '''
@@ -513,12 +513,12 @@ def calculate_dependencies(path:str, dir_names:Dict[str, Tuple[str, ...]]) -> Tu
   try: deps_fn = ext_tools[ext].deps_fn
   except KeyError: return ()
   if deps_fn is None: return ()
-  return tuple(deps_fn(path, dir_names))
+  return tuple(deps_fn(path, dir_entries))
 
 
 # Type-specific dependency functions.
 
-def list_dependencies(src_path:str, dir_names:Dict[str, Tuple[str, ...]]) -> Iterator[str]:
+def list_dependencies(src_path:str, dir_entries:DirEntries) -> Iterator[str]:
   'Calculate dependencies for .list files.'
   with open(src_path) as f:
     for line in f:
@@ -527,7 +527,7 @@ def list_dependencies(src_path:str, dir_names:Dict[str, Tuple[str, ...]]) -> Ite
         yield line
 
 
-def sqlite3_dependencies(src_path:str, dir_names:Dict[str, Tuple[str, ...]]) -> Iterator[str]:
+def sqlite3_dependencies(src_path:str, dir_entries:DirEntries) -> Iterator[str]:
   'Calculate dependencies for .sql files (assumed to be sqlite3 commands).'
   with open(src_path) as f:
     for i, line in enumerate(f, 1):
@@ -537,7 +537,7 @@ def sqlite3_dependencies(src_path:str, dir_names:Dict[str, Tuple[str, ...]]) -> 
           yield tokens[j+1]
 
 
-def pat_dependencies(src_path:str, dir_names:Dict[str, Tuple[str, ...]]) -> List[str]:
+def pat_dependencies(src_path:str, dir_entries:DirEntries) -> List[str]:
   try: import pithy.pat as pat
   except ImportError: error(src_path, '`pat` is not installed; run `pip install pithy`.')
   with open(src_path) as f:
@@ -545,7 +545,7 @@ def pat_dependencies(src_path:str, dir_names:Dict[str, Tuple[str, ...]]) -> List
   return [dep]
 
 
-def writeup_dependencies(src_path:str, dir_names:Dict[str, Tuple[str, ...]]) -> List[str]:
+def writeup_dependencies(src_path:str, dir_entries:DirEntries) -> List[str]:
   try: import writeup
   except ImportError: raise error(src_path, '`writeup` is not installed; run `pip install pithy`.')
   with open(src_path) as f:
@@ -562,7 +562,7 @@ def py_env(ctx:Ctx) -> Dict[str, str]:
   }
 
 
-DependencyFn = Callable[[str,Dict[str,Tuple[str, ...]]], Iterable[str]]
+DependencyFn = Callable[[str,DirEntries], Iterable[str]]
 EnvFn = Callable[[Ctx], Dict[str, str]]
 
 class Tool(NamedTuple):

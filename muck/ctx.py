@@ -10,7 +10,7 @@ from .constants import *
 from .db import DB
 from .logging import error, note
 from .pithy.format import FormatError, format_to_re, parse_formatters
-from .pithy.fs import list_dir, norm_path, path_ext, path_join, path_name_stem, path_stem, split_dir_name
+from .pithy.fs import DirEntry, DirEntries, list_dir, norm_path, path_ext, path_join, path_name_stem, path_stem, split_dir_name
 from .pithy.iterable import first_el
 
 
@@ -50,22 +50,22 @@ class Ctx:
   dbg_child: bool
   dbg_child_lldb: List[str]
   statuses: Dict[str, TargetStatus] = field(default_factory=dict)
-  dir_names: Dict[str, Tuple[str,...]] = field(default_factory=dict)
+  dir_entries: DirEntries = field(default_factory=DirEntries)
   dependents: DefaultDict[str, Set[Dependent]] = field(default_factory=lambda:DefaultDict(set))
   pid_str: str = str(getpid())
 
 
   def __post_init__(self) -> None:
-    # Hack to make py_dependencies work.
-    self.list_dir_filtered('.')
+    self.dir_entries.hidden = False
+    reserved_names = self.reserved_names # Do not create circular reference between self and pred.
+    self.dir_entries.pred = lambda entry: \
+      entry.is_file() and (entry.name not in reserved_names and path_ext(entry.name) not in reserved_or_ignored_exts)
 
 
   def reset(self) -> None:
     self.statuses.clear()
-    self.dir_names.clear()
+    self.dir_entries.clear()
     self.dependents.clear()
-    self.__post_init__()
-
 
   @property
   def targets(self) -> List[str]:
@@ -76,19 +76,6 @@ class Ctx:
     return path.startswith(self.build_dir_slash)
 
 
-  def list_dir_filtered(self, src_dir:str) -> Tuple[str,...]:
-    '''
-    Given src_dir, cache and return the list of names that might be source files.
-    TODO: eventually this should be replaced by using os.scandir.
-    '''
-    try: return self.dir_names[src_dir]
-    except KeyError: pass
-    names = tuple(n for n in list_dir(src_dir, hidden=False)
-      if n not in self.reserved_names and path_ext(n) not in reserved_or_ignored_exts)
-    self.dir_names[src_dir] = names
-    return names
-
-
   def product_path_for_target(self, target:str) -> str:
     return path_join(self.build_dir, target)
 
@@ -97,18 +84,18 @@ class Ctx:
     '''
     Find the unique source path whose name matches `target`, or else error.
     '''
-    src_dir, prod_name = split_dir_name(target)
-    src_name = self.source_candidate(target, src_dir, prod_name)
+    src_dir, target_name = split_dir_name(target)
+    src_name = self.source_candidate(target, src_dir, target_name)
     src = path_join(src_dir, src_name)
     assert src != target
     return src
 
 
-  def source_candidate(self, target:str, src_dir:str, prod_name:str) -> str:
+  def source_candidate(self, target:str, src_dir:str, target_name:str) -> str:
     src_dir = src_dir or '.'
-    try: src_dir_names = self.list_dir_filtered(src_dir)
+    try: entries = self.dir_entries[src_dir]
     except FileNotFoundError: raise error(target, f'no such source directory: `{src_dir}`')
-    candidates = list(filter_source_names(src_dir_names, prod_name))
+    candidates = list(filter_source_candidates(entries, target_name))
     if len(candidates) == 1:
       return candidates[0]
     # error.
@@ -119,6 +106,7 @@ class Ctx:
     if len(candidates) == 0:
       raise TargetNotFound(dpdt_name, f'no source candidates matching `{target}` in `{src_dir}`')
     else:
+      candidates.sort()
       raise TargetNotFound(dpdt_name, f'multiple source candidates matching `{target}`: {candidates}')
 
 
@@ -179,26 +167,27 @@ target_invalids_re = re.compile(r'''(?x)
 ''')
 
 
-def filter_source_names(names:Iterable[str], prod_name:str) -> Iterable[str]:
+def filter_source_candidates(entries:Iterable[DirEntry], target_name:str) -> Iterable[str]:
   '''
-  Given `prod_name`, find all matching source names.
+  Given `target_name`, find all matching source names.
   There are several concerns that make this matching complex.
   * Muck allows named formatters (e.g. '{x}') in script names.
-    This allows a single script to produce many targets for corresponding arguments.
+    This allows a single script to produce many products for corresponding arguments.
   * A source might itself be the product of another source.
 
-  So, given product name "x.txt", match all of the following:
+  So, given target name "x.txt", match all of the following:
   * x.txt.py
   * {}.txt.py
   * x.txt.py.py
   * {}.txt.py.py
   '''
-  prod = prod_name.split('.')
-  for src_name in names:
-    src = src_name.split('.')
-    if len(src) <= len(prod): continue
-    if all(match_wilds(*p) for p in zip(src, prod)): # zip stops when prod is exhausted.
-      yield '.'.join(src[:len(prod)+1]) # the immediate source name has just one extension added.
+  target = target_name.split('.')
+  for entry in entries:
+    name = entry.name
+    src = name.split('.')
+    if len(src) <= len(target): continue
+    if all(match_wilds(*p) for p in zip(src, target)): # zip stops when target is exhausted.
+      yield '.'.join(src[:len(target)+1]) # the immediate source name has just one extension added.
 
 
 def match_wilds(wildcard_path:str, string:str) -> Optional[Match[str]]:
