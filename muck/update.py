@@ -8,22 +8,23 @@ from contextlib import nullcontext
 from datetime import datetime as DateTime
 from hashlib import blake2b
 from importlib.util import find_spec as find_module_spec
-from os import (O_RDONLY, O_NONBLOCK,
-  environ, kill, mkfifo, open as os_open, read as os_read, close as os_close, remove as os_remove)
+from os import (O_NONBLOCK, O_RDONLY, close as os_close, environ, kill, mkfifo, open as os_open, read as os_read,
+  remove as os_remove)
 from shlex import quote as sh_quote, split as sh_split
 from signal import SIGCONT
 from time import sleep, time as now
-from typing import Callable, Dict, Iterable, List, NamedTuple, Optional, Set, TextIO, Tuple, cast
+from typing import Callable, Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, TextIO, Tuple, cast
 
 from .constants import *
 from .ctx import Ctx, Dependent, InvalidTarget, TargetNotFound, TargetStatus, match_wilds
 from .db import DB, DBError, TargetRecord
 from .logging import error, error_msg, note, warn
 from .pithy.ansi import RST, TXT_G
-from .pithy.fs import (FileStatus, PathIsNotDescendantError, current_dir, dir_entry_type_char, file_size, file_status, is_dir,
-  is_dir_not_link, is_file_executable_by_owner, is_link, is_path_abs, make_dir, make_dirs, make_link, move_file, path_dir,
-  path_exists, path_ext, path_rel_to_ancestor, read_link, remove_file, remove_path, remove_path_if_exists, scan_dir)
-from .pithy.io import AsyncLineReader, errL
+from .pithy.fs import (FileStatus, current_dir, dir_entry_type_char, file_size, file_status, is_dir, is_dir_not_link,
+  is_file_executable_by_owner, is_link, make_dir, make_dirs, make_link, move_file, path_exists, read_link, remove_file,
+  remove_path, remove_path_if_exists, scan_dir)
+from .pithy.io import AsyncLineReader, errL, errSL
+from .pithy.path import PathIsNotDescendantError, is_path_abs, path_descendants, path_dir, path_ext, path_rel_to_ancestor
 from .pithy.string import format_byte_count
 from .pithy.task import launch
 from .py_deps import py_dependencies
@@ -354,7 +355,8 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   if m is None:
     raise error(target, f'internal error: match failed; src_path: {src_path!r}')
   args = tuple(m.groups())
-  src_arg = cast(Tuple[str, ...], () if tool.src_to_stdin else (src_path,))
+  src_arg:Tuple[str,...] = ()
+  if not tool.src_to_stdin: src_arg = (src_path,)
   cmd = [*tool.cmd, *src_arg, *args]
 
   msg_stdin = f' < {src_path}' if tool.src_to_stdin else ''
@@ -368,7 +370,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   # TODO: check that these variables are not already set.
   env['MUCK_TARGET'] = target
   if tool.env_fn is not None:
-    env.update(tool.env_fn())
+    env.update(tool.env_fn(ctx), src_path=src_path)
   env['MUCK_PROJ_DIR'] = ctx.proj_dir
   env['MUCK_FIFO'] = ctx.fifo_path
   env['MUCK_PID'] = ctx.pid_str
@@ -511,48 +513,57 @@ def calculate_dependencies(path:str, dir_names:Dict[str, Tuple[str, ...]]) -> Tu
   try: deps_fn = ext_tools[ext].deps_fn
   except KeyError: return ()
   if deps_fn is None: return ()
-  with open(path) as f:
-    return tuple(deps_fn(path, f, dir_names))
+  return tuple(deps_fn(path, dir_names))
 
 
 # Type-specific dependency functions.
 
-def list_dependencies(src_path:str, src_file:TextIO, dir_names:Dict[str, Tuple[str, ...]]) -> List[str]:
+def list_dependencies(src_path:str, dir_names:Dict[str, Tuple[str, ...]]) -> Iterator[str]:
   'Calculate dependencies for .list files.'
-  lines = (line.strip() for line in src_file)
-  return [l for l in lines if l and not l.startswith('#')]
+  with open(src_path) as f:
+    for line in f:
+      line = line.strip()
+      if line and not line.startswith('#'):
+        yield line
 
 
-def sqlite3_dependencies(src_path:str, src_file:TextIO, dir_names:Dict[str, Tuple[str, ...]]) -> Iterable[str]:
+def sqlite3_dependencies(src_path:str, dir_names:Dict[str, Tuple[str, ...]]) -> Iterator[str]:
   'Calculate dependencies for .sql files (assumed to be sqlite3 commands).'
-  for i, line in enumerate(src_file, 1):
-    tokens = sh_split(line)
-    for j, token in enumerate(tokens):
-      if token == '.open' and j+1 < len(tokens):
-        yield tokens[j+1]
+  with open(src_path) as f:
+    for i, line in enumerate(f, 1):
+      tokens = sh_split(line)
+      for j, token in enumerate(tokens):
+        if token == '.open' and j+1 < len(tokens):
+          yield tokens[j+1]
 
 
-def pat_dependencies(src_path:str, src_file:TextIO, dir_names:Dict[str, Tuple[str, ...]]) -> List[str]:
+def pat_dependencies(src_path:str, dir_names:Dict[str, Tuple[str, ...]]) -> List[str]:
   try: import pithy.pat as pat
   except ImportError: error(src_path, '`pat` is not installed; run `pip install pithy`.')
-  dep = pat.pat_dependency(src_path=src_path, src_file=src_file)
+  with open(src_path) as f:
+    dep = pat.pat_dependency(src_path=src_path, src_lines=f)
   return [dep]
 
 
-def writeup_dependencies(src_path:str, src_file:TextIO, dir_names:Dict[str, Tuple[str, ...]]) -> List[str]:
+def writeup_dependencies(src_path:str, dir_names:Dict[str, Tuple[str, ...]]) -> List[str]:
   try: import writeup
   except ImportError: raise error(src_path, '`writeup` is not installed; run `pip install pithy`.')
-  return writeup.writeup_dependencies(src_path=src_path, text_lines=src_file)
+  with open(src_path) as f:
+    return writeup.writeup_dependencies(src_path=src_path, text_lines=f)
 
 
 # Tools.
 
-def py_env() -> Dict[str, str]:
-  return { 'PYTHONPATH' : current_dir() }
+def py_env(ctx:Ctx) -> Dict[str, str]:
+  # Directory of build source path is added automatically by python.
+  # Also add build dir so that modules/packages can be accessed relative to project root.
+  return {
+    'PYTHONPATH': ctx.build_dir_abs
+  }
 
 
-DependencyFn = Callable[[str, TextIO, Dict[str, Tuple[str, ...]]], Iterable[str]]
-EnvFn = Callable[[], Dict[str, str]]
+DependencyFn = Callable[[str,Dict[str,Tuple[str, ...]]], Iterable[str]]
+EnvFn = Callable[[Ctx], Dict[str, str]]
 
 class Tool(NamedTuple):
   cmd: Tuple[str, ...]

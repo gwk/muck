@@ -2,7 +2,7 @@
 
 import argparse
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from os import getpid
 from typing import Callable, DefaultDict, Dict, FrozenSet, Iterable, List, Match, NamedTuple, Optional, Set, Tuple
 
@@ -36,7 +36,8 @@ class TargetStatus:
   is_updated: bool = False
 
 
-class Ctx(NamedTuple):
+@dataclass(frozen=True)
+class Ctx:
   args: argparse.Namespace
   db: DB
   proj_dir: str
@@ -45,13 +46,25 @@ class Ctx(NamedTuple):
   build_dir_abs: str
   fifo_path: str
   reserved_names: FrozenSet
-  dbg: Callable[..., None]
+  dbg: Callable
   dbg_child: bool
   dbg_child_lldb: List[str]
-  statuses: Dict[str, TargetStatus] = {}
-  dir_names: Dict[str, Tuple[str,...]] = {}
-  dependents: DefaultDict[str, Set[Dependent]] = DefaultDict(set)
+  statuses: Dict[str, TargetStatus] = field(default_factory=dict)
+  dir_names: Dict[str, Tuple[str,...]] = field(default_factory=dict)
+  dependents: DefaultDict[str, Set[Dependent]] = field(default_factory=lambda:DefaultDict(set))
   pid_str: str = str(getpid())
+
+
+  def __post_init__(self) -> None:
+    # Hack to make py_dependencies work.
+    self.list_dir_filtered('.')
+
+
+  def reset(self) -> None:
+    self.statuses.clear()
+    self.dir_names.clear()
+    self.dependents.clear()
+    self.__post_init__()
 
 
   @property
@@ -78,12 +91,6 @@ class Ctx(NamedTuple):
 
   def product_path_for_target(self, target:str) -> str:
     return path_join(self.build_dir, target)
-
-
-  def reset(self) -> None:
-    self.statuses.clear()
-    self.dir_names.clear()
-    self.dependents.clear()
 
 
   def source_for_target(self, target:str) -> str:
