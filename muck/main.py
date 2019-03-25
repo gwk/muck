@@ -15,7 +15,7 @@ from typing import Any, Callable, Dict, Optional, Set
 from .constants import tmp_ext
 from .ctx import Ctx
 from .db import DB
-from .logging import error, error_msg, note, warn
+from .logging import note
 from .pithy.ansi import RST, TXT_B, TXT_G, TXT_R
 from .pithy.fs import (abs_path, change_dir, clone, current_dir, is_dir, make_dirs, move_file, norm_path, path_dir,
   path_exists, path_ext, path_join, path_stem, remove_dir_contents, remove_path_if_exists, split_stem_ext, walk_dirs, walk_paths)
@@ -349,8 +349,8 @@ def muck_publish(ctx:Ctx) -> None:
     clone_to_pub(ctx.product_path_for_target(target))
 
   for pattern in ctx.args.files:
-    if not is_glob_pattern(pattern): raise error(f'not a glob pattern: {pattern!r}')
-    if pattern.startswith('/'): raise error(f'invalid glob pattern: leading slash: {pattern!r}')
+    if not is_glob_pattern(pattern): exit(f'muck error: not a glob pattern: {pattern!r}')
+    if pattern.startswith('/'): exit(f'muck error: invalid glob pattern: leading slash: {pattern!r}')
     errSL(f'publish glob: {pattern}')
     # Walk over products, not targets, so that glob applies to products (which are not always globbable by user's shell).
     for product in walk_glob(ctx.product_path_for_target(pattern)):
