@@ -539,7 +539,7 @@ def sqlite3_dependencies(src_path:str, dir_entries:DirEntries) -> Iterator[str]:
 
 def pat_dependencies(src_path:str, dir_entries:DirEntries) -> List[str]:
   try: import pithy.pat as pat
-  except ImportError: error(src_path, '`pat` is not installed; run `pip install pithy`.')
+  except ImportError: raise error(src_path, '`pat` is not installed; run `pip install pithy`.')
   with open(src_path) as f:
     dep = pat.pat_dependency(src_path=src_path, src_lines=f)
   return [dep]
