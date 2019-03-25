@@ -8,20 +8,28 @@ from typing import Any, Callable, DefaultDict, Dict, FrozenSet, Iterable, Iterat
 
 from .constants import *
 from .db import DB
-from .logging import error, note
+from .logging import error_msg, note
 from .pithy.format import FormatError, format_to_re, parse_formatters
 from .pithy.fs import DirEntry, DirEntries, list_dir, norm_path, path_ext, path_join, path_name_stem, path_stem, split_dir_name
 from .pithy.iterable import first_el
 
 
-class InvalidTarget(Exception):
-  def __init__(self, target:str, msg:str) -> None:
-    super().__init__(target, msg)
+class BuildError(Exception):
+  def __init__(self, target:str, *msg:Any) -> None:
+    super().__init__(target, *msg)
     self.target = target
     self.msg = msg
 
+  def __str__(self) -> str:
+    return error_msg(*self.args)
 
-class TargetNotFound(Exception): pass
+
+class InvalidTarget(BuildError):
+  def __str__(self) -> str:
+    return f'muck error: invalid target: {self.target!r}; ' + ''.join(str(m) for m in self.msg)
+
+
+class TargetNotFound(BuildError): pass
 
 
 OptDpdt = Optional[Any] # TODO: 'Dpdt'
@@ -54,7 +62,7 @@ class Dpdt(NamedTuple):
 @dataclass
 class TargetStatus:
   change_time: int = 0 # Logical (monotonic) time.
-  error: Optional[Tuple[str, ...]] = None
+  error: Optional[Tuple] = None
   is_updated: bool = False
 
 
@@ -116,7 +124,7 @@ class Ctx:
   def source_candidate(self, target:str, src_dir:str, target_name:str, dpdt:Dpdt) -> str:
     src_dir = src_dir or '.'
     try: entries = self.dir_entries[src_dir]
-    except FileNotFoundError: raise error(target, f'no such source directory: `{src_dir}`')
+    except FileNotFoundError: raise BuildError(target, f'no such source directory: `{src_dir}`')
     candidates = list(filter_source_candidates(entries, target_name))
     if len(candidates) == 1:
       return candidates[0]
@@ -173,10 +181,9 @@ class Ctx:
       raise InvalidTarget(target, 'invalid format') from e
 
 
-  def validate_target_or_error(self, target:str) -> None:
+  def validate_target_or_exit(self, target:str) -> None:
     try: self.validate_target(target)
-    except InvalidTarget as e:
-      exit(f'muck error: invalid target: {e.target!r}; {e.msg}')
+    except InvalidTarget as e: exit(e)
 
 
 target_invalids_re = re.compile(r'''(?x)

@@ -12,8 +12,5 @@ def note(path:str, *items:Any) -> None:
 def warn(path:str, *items:Any) -> None:
   errL(TXT_Y_ERR, f'muck WARNING: {path}: ', *items, RST_ERR)
 
-def error_msg(path:str, *items:Any) -> str:
-  return ''.join((f'muck error: {path}: ', *items))
-
-def error(path:str, *items:Any) -> SystemExit:
-  return SystemExit(error_msg(path, *items))
+def error_msg(path:str, *msg:Any) -> str:
+  return f'muck error: {path}: ' + ''.join(str(m) for m in msg)

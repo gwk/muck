@@ -23,7 +23,7 @@ from .pithy.io import errL, errSL, outL, outLL
 from .pithy.path_encode import path_for_url
 from .pithy.task import runC
 from .server import serve_build
-from .update import ext_tools, pat_dependencies, update_top
+from .update import ext_tools, pat_dependencies, update_or_exit
 
 
 def main() -> None:
@@ -165,7 +165,7 @@ def muck_build(ctx:Ctx) -> None:
         target = stem
       else:
         note(target, 'specified target is a source and not a product.')
-    update_top(ctx, target)
+    update_or_exit(ctx, target)
   if ctx.args.serve:
     serve_build(ctx, main_target=ctx.targets[0])
 
@@ -195,7 +195,7 @@ def muck_deps(ctx:Ctx) -> None:
   '`muck deps` command.'
   targets = ctx.targets
   for target in targets:
-    update_top(ctx, target)
+    update_or_exit(ctx, target)
 
   roots = set(targets)
   roots.update(t for t, dpdts in ctx.dependents.items() if len(dpdts) > 1)
@@ -245,14 +245,14 @@ dependent_colors = {
 def muck_deps_list(ctx:Ctx) -> None:
   '`muck deps-list` command.'
   for target in ctx.targets:
-    update_top(ctx, target)
+    update_or_exit(ctx, target)
   outLL(*sorted(ctx.statuses.keys()))
 
 
 def muck_prod_list(ctx:Ctx) -> None:
   '`muck prod-list` command.'
   for target in ctx.targets:
-    update_top(ctx, target)
+    update_or_exit(ctx, target)
   outLL(*sorted(ctx.product_path_for_target(t) for t in ctx.statuses.keys()))
 
 
@@ -260,8 +260,8 @@ def muck_create_patch(ctx:Ctx) -> None:
   '`muck create-patch` command.'
   original = norm_path(ctx.args.original)
   modified = norm_path(ctx.args.modified)
-  ctx.validate_target_or_error(original)
-  ctx.validate_target_or_error(modified)
+  ctx.validate_target_or_exit(original)
+  ctx.validate_target_or_exit(modified)
   patch = modified + '.pat'
   if original.endswith('.pat'):
     exit(f"muck create-patch error: 'original' should not be a patch file: {original}")
@@ -271,7 +271,7 @@ def muck_create_patch(ctx:Ctx) -> None:
     exit(f"muck create-patch error: 'modified' is an existing target: {modified}")
   if path_exists(patch) or ctx.db.contains_record(patch):
     exit(f"muck create-patch error: patch is an existing target: {patch}")
-  update_top(ctx, original)
+  update_or_exit(ctx, original)
   cmd = ['pat', 'create', original, modified, '../' + patch]
   cmd_str = ' '.join(shlex.quote(w) for w in cmd)
   errL(f'muck create-patch note: creating patch: `{cmd_str}`')
@@ -281,14 +281,14 @@ def muck_create_patch(ctx:Ctx) -> None:
 def muck_update_patch(ctx: Ctx) -> None:
   '`muck update-patch` command.'
   patch_path = norm_path(ctx.args.patch)
-  ctx.validate_target_or_error(patch_path)
+  ctx.validate_target_or_exit(patch_path)
   if path_ext(patch_path) != '.pat':
     exit(f'muck update-patch error: argument does not specify a .pat file: {patch_path!r}')
 
   deps = pat_dependencies(patch_path, dir_entries=ctx.dir_entries)
   assert len(deps) == 1
   orig_path = deps[0]
-  update_top(ctx, orig_path)
+  update_or_exit(ctx, orig_path)
   target = path_stem(patch_path)
   patch_path_tmp = patch_path + tmp_ext
   cmd = ['pat', 'diff', orig_path, target, '../' + patch_path_tmp]
@@ -325,9 +325,9 @@ def muck_publish(ctx:Ctx) -> None:
     if is_dir(target): # Non-product directory needs to be recursed. TODO: rethink how built directories work and the usage of symlinks.
       for d in walk_dirs(target):
         errSL('D', d)
-        update_top(ctx, d)
+        update_or_exit(ctx, d)
     else:
-      update_top(ctx, target)
+      update_or_exit(ctx, target)
 
   copied_products: Set[str] = set()
 

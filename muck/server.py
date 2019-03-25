@@ -1,11 +1,12 @@
 # Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
 
+from http.server import HTTPServer, SimpleHTTPRequestHandler
 from typing import Callable
-from http.server import SimpleHTTPRequestHandler, HTTPServer
+
+from .ctx import BuildError, Ctx
+from .pithy.fs import is_dir, path_join, rel_path
+from .pithy.io import errL
 from .pithy.task import run
-from .pithy.fs import *
-from .pithy.io import *
-from .ctx import Ctx
 from .update import update_top
 
 
@@ -47,7 +48,8 @@ def serve_build(ctx:Ctx, main_target:str) -> None:
           if should_rebuild: ctx.reset()
           should_rebuild = True
         ctx.dbg(f'local request: {self.path}; target: {target}')
-        update_top(ctx, target)
+        try: update_top(ctx, target)
+        except BuildError as e: errL(e)
 
       return super().send_head() # type: ignore # this is technically a private method.
 
