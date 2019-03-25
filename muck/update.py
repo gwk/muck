@@ -16,7 +16,7 @@ from time import sleep, time as now
 from typing import Callable, Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, TextIO, Tuple, cast
 
 from .constants import *
-from .ctx import Ctx, Dependent, InvalidTarget, TargetNotFound, TargetStatus, match_wilds
+from .ctx import Ctx, Dpdt, InvalidTarget, TargetNotFound, TargetStatus, match_wilds
 from .db import DB, DBError, TargetRecord
 from .logging import error, error_msg, note, warn
 from .pithy.ansi import RST, TXT_G
@@ -45,7 +45,8 @@ def update_top(ctx:Ctx, target:str) -> int:
     except Exception as e: raise error(ctx.fifo_path, 'FIFO path could not be opened for reading.') from e
 
     with fifo:
-      try: return update_target(ctx, fifo=fifo, target=target, dependent=None, force=ctx.args.force)
+      dpdt = Dpdt(kind='top', target='', parent=None)
+      try: return update_target(ctx, fifo=fifo, target=target, dpdt=dpdt, force=ctx.args.force)
       except TargetNotFound as e: raise error(*e.args) from e
 
   finally: # Remove the FIFO.
@@ -55,29 +56,29 @@ def update_top(ctx:Ctx, target:str) -> int:
       raise error(ctx.fifo_path, 'fifo could not be removed.')
 
 
-def update_target(ctx:Ctx, fifo:AsyncLineReader, target:str, dependent:Optional[Dependent], force=False) -> int:
+def update_target(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, force=False) -> int:
   '''
   The central function of the Muck.
   returns transitive change_time.
   '''
   ctx.validate_target_or_error(target)
 
-  if dependent is not None:
-    ctx.dependents[target].add(dependent)
+  if dpdt.parent is not None:
+    ctx.dependents[target].add(dpdt)
 
   # Recursion check.
   try: target_status = ctx.statuses[target]
   except KeyError: pass
   else: # if in ctx.statuses, this path has already been visited during this build process run.
     if not target_status.is_updated: # recursion check.
-      involved_paths = sorted(path for path, s in ctx.statuses.items() if not s.is_updated)
-      raise error(target, 'target has circular dependency; involved paths:', *('\n  ' + p for p in involved_paths))
+      cycle = list(dpdt.cycle(target=target))
+      raise error(target, 'target has circular dependency:', *(f'\n  {t}' for t in cycle))
     elif target_status.error is not None: # Previously encountered TargetNotFound exception; reraise.
       raise TargetNotFound(*target_status.error)
     return target_status.change_time
 
   target_status = ctx.statuses[target] = TargetStatus() # Update_deps_and_record updates the status upon completion.
-  ctx.dbg(target, f'{TXT_G}update; {dependent or "<requested>"}{RST}')
+  ctx.dbg(target, f'{TXT_G}update; {dpdt}{RST}')
 
   status = file_status(target) # follows symlinks.
   if status is None and is_link(target):
@@ -88,7 +89,7 @@ def update_target(ctx:Ctx, fifo:AsyncLineReader, target:str, dependent:Optional[
   if is_product:
     target_dir = path_dir(target)
     if target_dir and not path_exists(target_dir): # Not possible to find a source; must be the contents of a built directory.
-      update_target(ctx, fifo=fifo, target=target_dir, dependent=Dependent(kind='directory contents', target=target), force=force)
+      update_target(ctx, fifo=fifo, target=target_dir, dpdt=dpdt.sub(kind='directory contents', target=target), force=force)
       if not target_status.is_updated: # build of parent did not create this product.
         raise error(target, f'target resides in a product directory but was not created by building that directory')
       return target_status.change_time # TODO: verify that we should be returning this change_time and not the result of target_dir update.
@@ -104,13 +105,13 @@ def update_target(ctx:Ctx, fifo:AsyncLineReader, target:str, dependent:Optional[
 
   if is_product:
     try:
-      return update_product(ctx, fifo=fifo, target=target, needs_update=needs_update, old=old)
+      return update_product(ctx, fifo=fifo, target=target, needs_update=needs_update, old=old, dpdt=dpdt)
     except TargetNotFound as e:
       target_status.error = e.args
       raise
   else:
     assert status
-    return update_non_product(ctx, fifo=fifo, target=target, status=status, needs_update=needs_update, old=old)
+    return update_non_product(ctx, fifo=fifo, target=target, status=status, needs_update=needs_update, old=old, dpdt=dpdt)
 
 
 def check_product_not_modified(ctx:Ctx, target:str, prod_path:str, is_prod_dir:int, size:int, mtime:float, old:TargetRecord) -> None:
@@ -129,7 +130,7 @@ def check_product_not_modified(ctx:Ctx, target:str, prod_path:str, is_prod_dir:i
     f'  Otherwise, save your changes if necessary and then `muck clean {target}`.')
 
 
-def update_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:bool, old:Optional[TargetRecord]) -> int:
+def update_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:bool, old:Optional[TargetRecord], dpdt:Dpdt) -> int:
   '''
   Returns transitive change_time.
   Note: we must pass the just-retrieved mtime, in case it has changed but product contents have not.
@@ -145,7 +146,7 @@ def update_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:bool,
     else:
       check_product_not_modified(ctx, target, prod_path=prod_path, is_prod_dir=is_prod_dir, size=size, mtime=mtime, old=old)
 
-  src = ctx.source_for_target(target)
+  src = ctx.source_for_target(target, dpdt=dpdt)
   ctx.validate_target_or_error(src)
   ctx.dbg(target, f'src: ', src)
   if old is not None and old.src != src:
@@ -156,7 +157,7 @@ def update_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:bool,
   # This design avoids dependency on file system time stamps and OS clocks.
   # For file systems with poor time resolution (e.g. HFS mtime is 1 sec resolution), this is important.
   last_update_time = 0 if old is None else old.update_time
-  src_change_time = update_target(ctx, fifo=fifo, target=src, dependent=Dependent(kind='source', target=target))
+  src_change_time = update_target(ctx, fifo=fifo, target=src, dpdt=dpdt.sub(kind='source', target=target))
   needs_update = needs_update or last_update_time < src_change_time
   update_time = max(last_update_time, src_change_time)
 
@@ -165,18 +166,20 @@ def update_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:bool,
     # if they have not, then no rebuild is necessary.
     assert old is not None
     for dyn_dep in old.dyn_deps:
-      dep_change_time = update_target(ctx, fifo=fifo, target=dyn_dep, dependent=Dependent(kind='observed', target=target))
+      dep_change_time = update_target(ctx, fifo=fifo, target=dyn_dep, dpdt=dpdt.sub(kind='observed', target=target))
       update_time = max(update_time, dep_change_time)
   needs_update = needs_update or last_update_time < update_time
 
   if needs_update: # must rebuild product.
-    dyn_change_time, dyn_deps, all_outs = build_product(ctx, fifo=fifo, target=target, src_path=src, prod_path=prod_path)
+    dyn_change_time, dyn_deps, all_outs = build_product(ctx, fifo=fifo, target=target, src_path=src, prod_path=prod_path,
+      dpdt=dpdt)
     update_time = max(update_time, dyn_change_time)
     ctx.dbg(target, f'all_outs: {all_outs}')
     assert target in all_outs
     change_time = 0
     for product in sorted(all_outs):
-      product_change_time = update_product_with_output(ctx, fifo=fifo, target=product, src=src, dyn_deps=dyn_deps, update_time=update_time)
+      product_change_time = update_product_with_output(ctx, fifo=fifo, target=product, src=src, dyn_deps=dyn_deps,
+        update_time=update_time, dpdt=dpdt)
       if product == target:
         change_time = product_change_time
     assert change_time > 0
@@ -185,10 +188,11 @@ def update_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:bool,
     assert old is not None
     return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=False, actual_path=prod_path, is_changed=False,
       size=old.size, mtime=mtime, change_time=old.change_time, update_time=update_time, file_hash=old.hash, src=src,
-      dyn_deps=old.dyn_deps, old=old)
+      dyn_deps=old.dyn_deps, old=old, dpdt=dpdt)
 
 
-def update_product_with_output(ctx:Ctx, fifo:AsyncLineReader, target:str, src:str, dyn_deps:Tuple[str, ...], update_time:int) -> int:
+def update_product_with_output(ctx:Ctx, fifo:AsyncLineReader, target:str, src:str, dyn_deps:Tuple[str, ...], update_time:int,
+ dpdt:Dpdt) -> int:
   'Returns (target, change_time).'
   old = ctx.db.get_record(target=target)
   path = ctx.product_path_for_target(target)
@@ -205,10 +209,11 @@ def update_product_with_output(ctx:Ctx, fifo:AsyncLineReader, target:str, src:st
   note(target, f"product {change_verb}; {format_byte_count(size)}.")
   return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=is_target_dir, actual_path=path, is_changed=is_changed,
     size=size, mtime=mtime, change_time=change_time, update_time=update_time, file_hash=file_hash, src=src, dyn_deps=dyn_deps,
-    old=old)
+    old=old, dpdt=dpdt)
 
 
-def update_non_product(ctx:Ctx, fifo:AsyncLineReader, target:str, status:FileStatus, needs_update:bool, old:Optional[TargetRecord]) -> int:
+def update_non_product(ctx:Ctx, fifo:AsyncLineReader, target:str, status:FileStatus, needs_update:bool,
+ old:Optional[TargetRecord], dpdt:Dpdt) -> int:
   'returns transitive change_time.'
   ctx.dbg(target, 'update_non_product')
 
@@ -273,13 +278,14 @@ def update_non_product(ctx:Ctx, fifo:AsyncLineReader, target:str, status:FileSta
       note(target, f'source modification time changed but contents did not.')
 
   return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=False, actual_path=target, is_changed=is_changed,
-    size=size, mtime=mtime, change_time=change_time, update_time=change_time, file_hash=target_hash, src=None, dyn_deps=(), old=old)
+    size=size, mtime=mtime, change_time=change_time, update_time=change_time, file_hash=target_hash, src=None, dyn_deps=(),
+    old=old, dpdt=dpdt)
   # TODO: non_product update_time is meaningless? mark as -1?
 
 
 def update_deps_and_record(ctx, fifo:AsyncLineReader, target:str, is_target_dir:bool, actual_path:str, is_changed:bool,
  size:int, mtime:float, change_time:int, update_time:int, file_hash:bytes, src:Optional[str], dyn_deps:Tuple[str, ...],
- old:Optional[TargetRecord]) -> int:
+ old:Optional[TargetRecord], dpdt:Dpdt) -> int:
   'returns transitive change_time.'
 
   ctx.dbg(target, 'update_deps_and_record')
@@ -294,7 +300,7 @@ def update_deps_and_record(ctx, fifo:AsyncLineReader, target:str, is_target_dir:
     deps = old.deps
 
   for dep in deps:
-    dep_change_time = update_target(ctx, fifo=fifo, target=dep, dependent=Dependent(kind='inferred', target=target))
+    dep_change_time = update_target(ctx, fifo=fifo, target=dep, dpdt=dpdt.sub(kind='inferred', target=target))
     change_time = max(change_time, dep_change_time)
   update_time = max(update_time, change_time)
 
@@ -328,7 +334,8 @@ class DepCtx(NamedTuple):
 
 
 
-def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_path:str) -> Tuple[int, Tuple[str, ...], Set[str]]:
+def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_path:str, dpdt:Dpdt) \
+ -> Tuple[int, Tuple[str, ...], Set[str]]:
   '''
   Run a source file, producing zero or more products.
   Return a list of produced product paths.
@@ -414,7 +421,8 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
         dep_line = fifo.readline()
         if dep_line:
           try:
-            dep_pid, dyn_time = handle_dep_line(ctx, depCtx=depCtx, fifo=fifo, target=target, dep_line=dep_line, dyn_time=dyn_time)
+            dep_pid, dyn_time = handle_dep_line(ctx, depCtx=depCtx, fifo=fifo, target=target, dep_line=dep_line,
+              dyn_time=dyn_time, dpdt=dpdt)
           except TargetNotFound as e:
             possible_causes.append(e.args)
           kill(dep_pid, SIGCONT) # Tell whichever process sent the dep to continue.
@@ -449,7 +457,8 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   return dyn_time, tuple(sorted(depCtx.dyn_deps)), depCtx.all_outs
 
 
-def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, dep_line:str, dyn_time:int) -> Tuple[int, int]:
+def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, dep_line:str, dyn_time:int, dpdt:Dpdt) \
+ -> Tuple[int,int]:
   '''
   Parse and handle a dependency line sent from a child build process.
   Since the parent and child processes have different current working directories,
@@ -492,7 +501,7 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
     if mode == 'S' and dep == target:
       return pid, dyn_time # sqlite stats the db before opening. Imperfect, but better than nothing.
     if dep in depCtx.restricted_deps_rd: raise error(target, f'attempted to open restricted file for reading: {dep!r}')
-    dep_time = update_target(ctx, fifo=fifo, target=dep, dependent=Dependent(kind='observed', target=target))
+    dep_time = update_target(ctx, fifo=fifo, target=dep, dpdt=dpdt.sub(kind='observed', target=target))
     dyn_time = max(dyn_time, dep_time)
     depCtx.dyn_deps.add(dep)
   elif mode in 'AMUW':

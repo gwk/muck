@@ -1,9 +1,11 @@
 {
-  'cmd': '$MUCK circular.txt',
-  'links': {'test/2/circular.txt.py'},
+  'cmd': '$MUCK circular-top',
+  'links': {'test/2/circular.txt.py', 'test/2/circular-top.py'},
   'err-val': '''\
+muck note: circular-top: building: `python3 circular-top.py`
 muck note: circular.txt: building: `python3 circular.txt.py`
-muck error: circular.txt: target has circular dependency; involved paths:
+muck error: circular.txt: target has circular dependency:
+  circular.txt
   circular.txt
 '''
 }

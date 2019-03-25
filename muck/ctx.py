@@ -4,7 +4,7 @@ import argparse
 import re
 from dataclasses import dataclass, field
 from os import getpid
-from typing import Callable, DefaultDict, Dict, FrozenSet, Iterable, List, Match, NamedTuple, Optional, Set, Tuple
+from typing import Any, Callable, DefaultDict, Dict, FrozenSet, Iterable, Iterator, List, Match, NamedTuple, Optional, Set, Tuple
 
 from .constants import *
 from .db import DB
@@ -12,11 +12,6 @@ from .logging import error, note
 from .pithy.format import FormatError, format_to_re, parse_formatters
 from .pithy.fs import DirEntry, DirEntries, list_dir, norm_path, path_ext, path_join, path_name_stem, path_stem, split_dir_name
 from .pithy.iterable import first_el
-
-
-class Dependent(NamedTuple):
-  kind: str # 'source', 'inferred', or 'observed'.
-  target: str
 
 
 class InvalidTarget(Exception):
@@ -27,6 +22,33 @@ class InvalidTarget(Exception):
 
 
 class TargetNotFound(Exception): pass
+
+
+OptDpdt = Optional[Any] # TODO: 'Dpdt'
+
+class Dpdt(NamedTuple):
+  '''
+  Dependent target tracking.
+  Each recursive update creates a `Dpdt`, forming a linked list of targets.
+  These are used for reporting circular dependency errors,
+  and for rendering dependency tree info
+  '''
+  kind:str # 'source', 'inferred', or 'observed'.
+  target:str
+  parent:OptDpdt
+
+  def sub(self, kind:str, target:str) -> 'Dpdt':
+    return Dpdt(kind=kind, target=target, parent=self)
+
+  def cycle(self, target:str) -> Iterator[str]:
+    'Yield the sequence of targets creating a dependency cycle.'
+    yield target
+    current:OptDpdt = self
+    while current is not None:
+      yield current.target
+      if current.target == target: return
+      current = current.parent
+    yield '<ACYCLIC?>'
 
 
 @dataclass
@@ -51,7 +73,7 @@ class Ctx:
   dbg_child_lldb: List[str]
   statuses: Dict[str, TargetStatus] = field(default_factory=dict)
   dir_entries: DirEntries = field(default_factory=DirEntries)
-  dependents: DefaultDict[str, Set[Dependent]] = field(default_factory=lambda:DefaultDict(set))
+  dependents: DefaultDict[str, Set[Dpdt]] = field(default_factory=lambda:DefaultDict(set))
   pid_str: str = str(getpid())
 
 
@@ -80,29 +102,28 @@ class Ctx:
     return path_join(self.build_dir, target)
 
 
-  def source_for_target(self, target:str) -> str:
+  def source_for_target(self, target:str, dpdt:Dpdt) -> str:
     '''
     Find the unique source path whose name matches `target`, or else error.
     '''
     src_dir, target_name = split_dir_name(target)
-    src_name = self.source_candidate(target, src_dir, target_name)
+    src_name = self.source_candidate(target, src_dir, target_name, dpdt)
     src = path_join(src_dir, src_name)
     assert src != target
     return src
 
 
-  def source_candidate(self, target:str, src_dir:str, target_name:str) -> str:
+  def source_candidate(self, target:str, src_dir:str, target_name:str, dpdt:Dpdt) -> str:
     src_dir = src_dir or '.'
     try: entries = self.dir_entries[src_dir]
     except FileNotFoundError: raise error(target, f'no such source directory: `{src_dir}`')
     candidates = list(filter_source_candidates(entries, target_name))
     if len(candidates) == 1:
       return candidates[0]
-    # error.
-    # Use dependent to describe error if possible; often the dependent code is naming something that does not exist.
+    # Error. Use dependent to describe the error;
+    # usually the dependent is requesting something that does not exist.
     # TODO: use source locations wherever possible.
-    dpdts = self.dependents[target]
-    dpdt_name = first_el(dpdts).target if dpdts else target
+    dpdt_name = dpdt.target or target
     if len(candidates) == 0:
       raise TargetNotFound(dpdt_name, f'no source candidates matching `{target}` in `{src_dir}`')
     else:
