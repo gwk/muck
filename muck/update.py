@@ -420,7 +420,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
     _, proc, _ = launch(cmd, cwd=ctx.build_dir, env=env, stdin=in_file, out=out_file, lldb=ctx.dbg_child_lldb)
     if in_file: in_file.close()
     out_file.close()
-    possible_causes: List[Tuple[str, ...]] = []
+    targets_not_found: Set[Tuple[str, ...]] = set()
     # For now, the best we can do is poll the nonblocking FIFO reader for deplines and the task for completion.
     try:
       while proc.poll() is None: # Child process has not terminated yet.
@@ -430,7 +430,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
             dep_pid, dyn_time = handle_dep_line(ctx, depCtx=depCtx, fifo=fifo, target=target, dep_line=dep_line,
               dyn_time=dyn_time, dpdt=dpdt)
           except TargetNotFound as e:
-            possible_causes.append(e.args)
+            targets_not_found.add(e.args)
           kill(dep_pid, SIGCONT) # Tell whichever process sent the dep to continue.
         else:
           sleep(0.00001) # Sleep for a minimal duration.
@@ -438,8 +438,11 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
       proc.kill()
       #^ Killing the script avoids a confusing exception message from the child script when muck fails,
       #^ and/or zombie child processes (e.g. sqlite3).
-      for cause in possible_causes:
-        errL(error_msg(*cause))
+      for cause in sorted(targets_not_found): note(*cause)
+      #^ Only describe targets not found if the process fails;
+      #^ some scripts will stat or attempt to open nonexistant files that do not affect correctness.
+      #^ While this is not desirable in terms of reproducible builds,
+      #^ at the moment it seems too verbose to issue a warning every time it happens.
       raise
     code = proc.returncode
     time_elapsed = now() - time_start
