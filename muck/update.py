@@ -505,7 +505,6 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
   # TODO: further verifications? source dir, etc.
 
   ctx.dbg(target, f'{mode} dep: {dep}')
-  assert not is_path_abs(dep)
   if mode in 'RS':
     if mode == 'S' and dep == target:
       return pid, dyn_time # sqlite stats the db before opening. Imperfect, but better than nothing.
