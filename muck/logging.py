@@ -13,7 +13,7 @@ def warn(path:str, *items:Any) -> None:
   errL(TXT_Y_ERR, f'muck WARNING: {path}: ', *items, RST_ERR)
 
 def error_msg(path:str, *items:Any) -> str:
-  return ''.join((f'muck error: {path}: ',) + items)
+  return ''.join((f'muck error: {path}: ', *items))
 
 def error(path:str, *items:Any) -> SystemExit:
   return SystemExit(error_msg(path, *items))
