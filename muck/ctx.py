@@ -47,6 +47,9 @@ class Dpdt(NamedTuple):
   target:str
   parent:OptDpdt
 
+  def __str__(self) -> str:
+    return f'Dpdt: {self.target} ({self.kind})'
+
   def sub(self, kind:str, target:str) -> 'Dpdt':
     return Dpdt(kind=kind, target=target, parent=self)
 
