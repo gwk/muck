@@ -19,6 +19,7 @@ from .logging import note
 from .pithy.ansi import RST, TXT_B, TXT_G, TXT_R
 from .pithy.fs import (abs_path, change_dir, clone, current_dir, is_dir, make_dirs, move_file, norm_path, path_dir,
   path_exists, path_ext, path_join, path_stem, remove_dir_contents, remove_path_if_exists, split_stem_ext, walk_dirs, walk_paths)
+from .pithy.interactive import ExitOnKeyboardInterrupt
 from .pithy.io import errL, errSL, outL, outLL
 from .pithy.path_encode import path_for_url
 from .pithy.task import runC
@@ -132,7 +133,8 @@ def main() -> None:
   make_dirs(args.build_dir) # required to create new DB.
 
   if not args.takes_ctx:
-    args.fn(args)
+    with ExitOnKeyboardInterrupt(dbg=args.dbg):
+      args.fn(args)
     return
 
   build_dir_abs = abs_path(args.build_dir)
@@ -150,7 +152,8 @@ def main() -> None:
     dbg_child=getattr(args, 'dbg_child', False),
     dbg_child_lldb=getattr(args, 'dbg_child_lldb', True))
 
-  args.fn(ctx)
+  with ExitOnKeyboardInterrupt(dbg=args.dbg):
+    args.fn(ctx)
 
 
 # Commands.
