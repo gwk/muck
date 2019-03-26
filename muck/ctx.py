@@ -4,13 +4,15 @@ import argparse
 import re
 from dataclasses import dataclass, field
 from os import getpid
-from typing import Any, Callable, DefaultDict, Dict, FrozenSet, Iterable, Iterator, List, Match, NamedTuple, Optional, Set, Tuple
+from typing import (Any, Callable, DefaultDict, Dict, FrozenSet, Iterable, Iterator, List, Match, NamedTuple, Optional, Pattern,
+  Set, Tuple)
 
 from .constants import *
 from .db import DB
 from .logging import error_msg, note
 from .pithy.format import FormatError, format_to_re, parse_formatters
-from .pithy.fs import DirEntry, DirEntries, list_dir, norm_path, path_ext, path_join, path_name_stem, path_stem, split_dir_name
+from .pithy.fs import (DirEntries, DirEntry, file_status, is_dir_not_link, is_link_to_dir, list_dir, make_dir, make_link,
+  norm_path, path_exists, path_ext, path_join, path_name_stem, path_stem, split_dir_name)
 from .pithy.iterable import first_el
 
 
@@ -62,9 +64,14 @@ class Dpdt(NamedTuple):
 @dataclass
 class TargetStatus:
   change_time: int = 0 # Logical (monotonic) time.
-  error: Optional[Tuple] = None
+  error: Optional[BuildError] = None
   is_updated: bool = False
 
+
+@dataclass
+class CtxState:
+  has_fetch_dirs = False
+  reserved_prefixes_pattern: Pattern = re.compile('')
 
 @dataclass(frozen=True)
 class Ctx:
@@ -76,6 +83,7 @@ class Ctx:
   build_dir_abs: str
   fifo_path: str
   reserved_names: FrozenSet
+  reserved_prefixes: Tuple[str,...]
   dbg: Callable
   dbg_child: bool
   dbg_child_lldb: List[str]
@@ -83,23 +91,42 @@ class Ctx:
   dir_entries: DirEntries = field(default_factory=DirEntries)
   dependents: DefaultDict[str, Set[Dpdt]] = field(default_factory=lambda:DefaultDict(set))
   pid_str: str = str(getpid())
-
+  fetch_dir = '_fetch' # Currently a constant to match pithy.fetch.
+  state: CtxState = field(default_factory=CtxState)
 
   def __post_init__(self) -> None:
     self.dir_entries.hidden = False
     reserved_names = self.reserved_names # Do not create circular reference between self and pred.
     self.dir_entries.pred = lambda entry: \
       entry.is_file() and (entry.name not in reserved_names and path_ext(entry.name) not in reserved_or_ignored_exts)
+    self.state.reserved_prefixes_pattern = re.compile('(' + f'|'.join(self.reserved_prefixes) + ')')
 
 
   def reset(self) -> None:
     self.statuses.clear()
     self.dir_entries.clear()
     self.dependents.clear()
+    self.state.has_fetch_dirs = False
 
   @property
   def targets(self) -> List[str]:
     return [norm_path(t) for t in self.args.targets]
+
+
+  def create_fetch_dirs(self) -> None:
+    if self.state.has_fetch_dirs: return
+    self.state.has_fetch_dirs = True
+
+    if not is_dir_not_link(self.fetch_dir):
+      if path_exists(self.fetch_dir):
+        exit(f'muck fatal error: fetch directory {self.fetch_dir} exists but is not a directory.')
+      make_dir(self.fetch_dir)
+
+    fetch_link = path_join(self.build_dir, self.fetch_dir)
+    if not is_link_to_dir(fetch_link):
+      if path_exists(fetch_link):
+        exit(f'muck fatal error: fetch directory link {fetch_link} exists but is not a symlink.')
+      make_link(self.fetch_dir, link=fetch_link)
 
 
   def is_product_path(self, path:str) -> bool:
@@ -159,8 +186,6 @@ class Ctx:
       raise InvalidTarget(target, 'empty string.')
     inv_m = target_invalids_re.search(target)
     if inv_m:
-      if target.startswith('../_fetch/'): # TODO: this is a hack.
-        return
       raise InvalidTarget(target, f'cannot contain {inv_m[0]!r}.')
     if target.startswith('-'):
       raise InvalidTarget(target, "cannot begin with '-'.")
@@ -172,7 +197,11 @@ class Ctx:
       reserved_desc = ', '.join(sorted(self.reserved_names))
       raise InvalidTarget(target, f'name is reserved; please rename the target.\n(reserved names: {reserved_desc}.)')
     if path_ext(target) in reserved_exts:
-      raise InvalidTarget(target, 'target name has reserved extension; please rename the target.')
+      raise InvalidTarget(target, 'name has a reserved extension; please rename the target.')
+    if self.state.reserved_prefixes_pattern.match(target):
+      reserved_desc = ', '.join(sorted(self.reserved_prefixes))
+      raise InvalidTarget(target, 'name has a reserved prefix; please rename the target.\n'
+        f'(reserved prefixes: {reserved_desc}.)')
     try:
       for name, _, _, _t in parse_formatters(target):
         if not name:

@@ -507,6 +507,9 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
 
   if (dep in depCtx.ignored_deps) or (path_ext(dep) in ignored_dep_exts):
     return pid, dyn_time
+  if dep.startswith(ctx.fetch_dir):
+    ctx.create_fetch_dirs()
+    return pid, dyn_time
   # TODO: further verifications? source dir, etc.
 
   ctx.dbg(target, f'{mode} dep: {dep}')

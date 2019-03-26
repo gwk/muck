@@ -30,7 +30,8 @@ def main() -> None:
 
   db_name = '_muck'
   fifo_name = '_muck.fifo'
-  reserved_names = { 'muck', '_fetch', '_fetch/tmp', db_name, fifo_name }
+  reserved_names = { 'muck', }
+  reserved_prefixes = ('_fetch', '_muck')
 
   # Argument parser setup.
   # Argparse's subparser feature does not allow for a default command.
@@ -144,6 +145,7 @@ def main() -> None:
     build_dir_abs=build_dir_abs,
     fifo_path=path_join(build_dir_abs, fifo_name),
     reserved_names=frozenset(reserved_names),
+    reserved_prefixes=reserved_prefixes,
     dbg=dbg,
     dbg_child=getattr(args, 'dbg_child', False),
     dbg_child_lldb=getattr(args, 'dbg_child_lldb', True))
