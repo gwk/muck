@@ -510,6 +510,12 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
   if dep.startswith(ctx.fetch_dir):
     ctx.create_fetch_dirs()
     return pid, dyn_time
+  if '__pycache__/' in dep:
+    # This is now necessary because python3.7 appears to produce temporary files with extensions like `.pyc.4780302000`.
+    # We can either regex for the extension pattern, or just test for the prefix.
+    # In general, it seems like the smart approach would be to create one regex for left-to-right match/search,
+    # and a separate test that extracts the multi-extension suffix and matches against that.
+    return pid, dyn_time
   # TODO: further verifications? source dir, etc.
 
   ctx.dbg(target, f'{mode} dep: {dep}')
@@ -638,7 +644,7 @@ def hash_for_path(path:str) -> bytes:
   Return a hash string for the contents of the file at `path`.
   '''
   s = file_status(path)
-  assert s is not None
+  assert s is not None, path
   if s.is_file: return hash_for_file_contents(path)
   if s.is_dir: return hash_for_dir_listing(path)
   raise BuildError(path, f'path is a {s.type_desc}')
