@@ -186,14 +186,14 @@ def update_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:bool,
       dpdt=dpdt)
     update_time = max(update_time, dyn_change_time)
     ctx.dbg(target, f'all_outs: {all_outs}')
-    assert target in all_outs
+    # For `.list` and any other no-op targets, there is no output, so change_time will be zero.
     change_time = 0
+    product_change_time = 0
     for product in sorted(all_outs):
       product_change_time = update_product_with_output(ctx, fifo=fifo, target=product, src=src, dyn_deps=dyn_deps,
         update_time=update_time, dpdt=dpdt)
       if product == target:
         change_time = product_change_time
-    assert change_time > 0
     return change_time
   else: # not needs_update.
     assert old is not None
@@ -364,8 +364,8 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
     # TODO: check for explicit deps file.
     try: tool = ext_tools[src_ext]
     except KeyError as e: raise BuildError(target, f'unsupported source file extension: {src_ext!r}') from e
-    if not tool.cmd: # TODO: weird now that we create an empty tool cmd above.
-      note(target, 'no op.')
+    if not tool.cmd:
+      note(target, 'no-op.')
       return 0, (), set() # no product.
 
   # Extract args from the combination of wilds in the source and the matching target.
