@@ -75,15 +75,24 @@ def update_target(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, force=Fa
   # Recursion check.
   try: target_status = ctx.statuses[target]
   except KeyError: pass
-  else: # if in ctx.statuses, this path has already been visited during this build process run.
-    if not target_status.is_updated: # recursion check.
+  else: # If status value is present, then this path has already been visited during this build.
+    if target_status.error is not None: # Already failed; reraise.
+      raise target_status.error
+    if not target_status.is_updated: # We have recursed back to a target already on the stack.
       cycle = list(dpdt.cycle(target=target))
       raise BuildError(target, 'target has circular dependency:', *(f'\n  {t}' for t in cycle))
-    elif target_status.error is not None: # Previously encountered TargetNotFound exception; reraise.
-      raise TargetNotFound(*target_status.error)
     return target_status.change_time
 
   target_status = ctx.statuses[target] = TargetStatus() # Update_deps_and_record updates the status upon completion.
+  try:
+    return update_target_status(ctx=ctx, fifo=fifo, target=target, dpdt=dpdt, force=force, target_status=target_status)
+  except BuildError as e:
+    target_status.error = e
+    raise
+
+
+def update_target_status(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, force:bool, target_status:TargetStatus) \
+ -> int:
   ctx.dbg(target, f'{TXT_G}update; {dpdt}{RST}')
 
   status = file_status(target) # follows symlinks.
@@ -110,11 +119,7 @@ def update_target(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, force=Fa
       needs_update = True
 
   if is_product:
-    try:
-      return update_product(ctx, fifo=fifo, target=target, needs_update=needs_update, old=old, dpdt=dpdt)
-    except TargetNotFound as e:
-      target_status.error = e.args
-      raise
+    return update_product(ctx, fifo=fifo, target=target, needs_update=needs_update, old=old, dpdt=dpdt)
   else:
     assert status
     return update_non_product(ctx, fifo=fifo, target=target, status=status, needs_update=needs_update, old=old, dpdt=dpdt)
