@@ -163,7 +163,7 @@ def muck_build(ctx:Ctx) -> None:
   '`muck build` (default) command: update each specified target.'
 
   for target in ctx.targets:
-    if path_exists(target):
+    if path_exists(target, follow=True):
       stem, ext = split_stem_ext(target)
       if ext in ext_tools:
         note(target, f'specified target is a source and not a product; building {stem!r}...')
@@ -272,9 +272,9 @@ def muck_create_patch(ctx:Ctx) -> None:
     exit(f"muck create-patch error: 'original' should not be a patch file: {original}")
   if modified.endswith('.pat'):
     exit(f"muck create-patch error: 'modified' should not be a patch file: {modified}")
-  if path_exists(modified) or ctx.db.contains_record(patch):
+  if path_exists(modified, follow=False) or ctx.db.contains_record(patch):
     exit(f"muck create-patch error: 'modified' is an existing target: {modified}")
-  if path_exists(patch) or ctx.db.contains_record(patch):
+  if path_exists(patch, follow=False) or ctx.db.contains_record(patch):
     exit(f"muck create-patch error: patch is an existing target: {patch}")
   update_or_exit(ctx, original)
   cmd = ['pat', 'create', original, modified, '../' + patch]
@@ -313,7 +313,7 @@ def muck_move_to_fetched_url(args:Namespace) -> None:
   path = args.path
   fetch_path = path_join('_fetch', path_for_url(args.url))
   make_dirs(path_dir(fetch_path))
-  if path_exists(fetch_path):
+  if path_exists(fetch_path, follow=False):
     exit(f'muck move-to-fetched-url error: file already exists at destination fetch path: {fetch_path}')
     # TODO: offer to remove.
   try: move_file(path, fetch_path)
@@ -327,7 +327,8 @@ def muck_publish(ctx:Ctx) -> None:
   remove_dir_contents(dst_root)
 
   for target in ctx.targets:
-    if is_dir(target): # Non-product directory needs to be recursed. TODO: rethink how built directories work and the usage of symlinks.
+    if is_dir(target, follow=False): # Non-product directory needs to be recursed.
+      #^ TODO: rethink how built directories work and the usage of symlinks.
       for d in walk_dirs(target):
         errSL('D', d)
         update_or_exit(ctx, d)
@@ -343,9 +344,9 @@ def muck_publish(ctx:Ctx) -> None:
       target = ctx.target_for_product(p)
       dst = path_join(dst_root, target)
       errL(f'publish: {p} -> {dst}')
-      if is_dir(p):
+      if is_dir(p, follow=False):
         make_dirs(dst)
-      else:
+      else: # TODO: do we need a third case for when p is a symlink?
         make_dirs(path_dir(dst))
         clone(src=p, dst=dst)
       copied_products.add(p)

@@ -21,8 +21,8 @@ from .db import DB, DBError, TargetRecord
 from .logging import error_msg, note, warn
 from .pithy.ansi import RST, TXT_G
 from .pithy.fs import (DirEntries, FileStatus, current_dir, dir_entry_type_char, file_size, file_status, is_dir,
-  is_dir_not_link, is_file_executable_by_owner, is_link, make_dir, make_dirs, make_link, move_file,
-  path_exists, read_link, remove_file, remove_path, remove_path_if_exists, scan_dir)
+  is_file_executable_by_owner, is_link, make_dir, make_dirs, make_link, move_file, path_exists, read_link, remove_file,
+  remove_path, remove_path_if_exists, scan_dir)
 from .pithy.io import AsyncLineReader, errL, errSL
 from .pithy.path import PathIsNotDescendantError, is_path_abs, path_descendants, path_dir, path_ext, path_rel_to_ancestor
 from .pithy.string import format_byte_count
@@ -41,7 +41,7 @@ def update_top(ctx:Ctx, target:str) -> int:
   try:
     mkfifo(ctx.fifo_path, mode=0o600)
   except OSError as e:
-    if path_exists(ctx.fifo_path):
+    if path_exists(ctx.fifo_path, follow=False):
       exit(f'muck fatal error: {ctx.fifo_path}: '
         'FIFO path already exists; another `muck` process is either running or previously failed.')
     raise
@@ -95,7 +95,7 @@ def update_target_status(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, f
  -> int:
   ctx.dbg(target, f'{TXT_G}update; {dpdt}{RST}')
 
-  status = file_status(target) # follows symlinks.
+  status = file_status(target, follow=True) # follows symlinks.
   if status is None and is_link(target):
     raise BuildError(target, f'target is a dangling symlink to: {read_link(target)}')
 
@@ -103,7 +103,8 @@ def update_target_status(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, f
 
   if is_product:
     target_dir = path_dir(target)
-    if target_dir and not path_exists(target_dir): # Not possible to find a source; must be the contents of a built directory.
+    if target_dir and not path_exists(target_dir, follow=True):
+      # Not possible to find a source; must be the contents of a built directory.
       update_target(ctx, fifo=fifo, target=target_dir, dpdt=dpdt.sub(kind='directory contents', target=target), force=force)
       if not target_status.is_updated: # build of parent did not create this product.
         raise BuildError(target, f'target resides in a product directory but was not created by building that directory')
@@ -232,7 +233,8 @@ def update_non_product(ctx:Ctx, fifo:AsyncLineReader, target:str, status:FileSta
   size = status.size
   mtime = status.mtime
   prod_path = ctx.product_path_for_target(target)
-  prod_status = file_status(prod_path)
+  is_prod_link = is_link(prod_path)
+  prod_status = file_status(prod_path, follow=True)
 
   if needs_update or prod_status is None or (is_target_dir != prod_status.is_dir):
     is_changed = True
@@ -275,7 +277,7 @@ def update_non_product(ctx:Ctx, fifo:AsyncLineReader, target:str, status:FileSta
         remove_file(entry.path)
 
     else: # target is regular file.
-      if prod_status: remove_path(prod_path)
+      if is_prod_link or prod_status: remove_path(prod_path)
       make_link(target, link=prod_path, create_dirs=True)
 
     if not needs_update: note(target, 'source changed.') # only want to report this on subsequent changes.
@@ -356,7 +358,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   prod_dir = path_dir(prod_path)
   prod_path_out = prod_path + out_ext
 
-  if is_dir(src_prod_path):
+  if is_dir(src_prod_path, follow=True):
     raise BuildError(target, f'source path is a directory: {src_prod_path!r}')
   if is_file_executable_by_owner(src_prod_path):
     tool = Tool(cmd=(), deps_fn=None, env_fn=None)
@@ -454,7 +456,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
 
   if code != 0: raise BuildError(target, f'build failed with code: {code}')
 
-  if path_exists(prod_path):
+  if path_exists(prod_path, follow=False):
     via = 'open'
     if target not in depCtx.all_outs:
       warn(target, f'wrote data to {prod_path}, but muck did not observe `open` system call.')
@@ -643,7 +645,7 @@ def hash_for_path(path:str) -> bytes:
   '''
   Return a hash string for the contents of the file at `path`.
   '''
-  s = file_status(path)
+  s = file_status(path, follow=True)
   assert s is not None, path
   if s.is_file: return hash_for_file_contents(path)
   if s.is_dir: return hash_for_dir_listing(path)
@@ -691,7 +693,7 @@ def hash_for_dir_listing(path:str) -> bytes:
 
 def file_stats(path:str) -> Tuple[bool, int, float]:
   'Returns (is_dir, size, mtime). Negative size indicates file does not exist.'
-  s = file_status(path)
+  s = file_status(path, follow=True)
   if s is None: return (False, -1, -1)
   return (s.is_dir, s.size, s.mtime)
 

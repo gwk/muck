@@ -81,7 +81,7 @@ def serve_build(ctx:Ctx, main_target:str) -> None:
       Note: muck does not support 'index.htm', only 'index.html', nor does it support the fallback directory listing.
       '''
       target = rel_path(super().translate_path(self.path)) # type: ignore # this is technically a private method.
-      return path_join(target, 'index.html') if is_dir(target) else target
+      return path_join(target, 'index.html') if is_dir(target, follow=True) else target
 
 
   server = HTTPServer(address, Handler)

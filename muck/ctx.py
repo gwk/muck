@@ -11,8 +11,8 @@ from .constants import *
 from .db import DB
 from .logging import error_msg, note
 from .pithy.format import FormatError, format_to_re, parse_formatters
-from .pithy.fs import (DirEntries, DirEntry, file_status, is_dir_not_link, is_link_to_dir, list_dir, make_dir, make_link,
-  norm_path, path_exists, path_ext, path_join, path_name_stem, path_stem, split_dir_name)
+from .pithy.fs import (DirEntries, DirEntry, file_status, is_link_to_dir, list_dir, make_dir, make_link, norm_path, path_exists,
+  path_ext, path_join, path_name_stem, path_stem, read_link, split_dir_name)
 from .pithy.iterable import first_el
 
 
@@ -120,16 +120,20 @@ class Ctx:
     if self.state.has_fetch_dirs: return
     self.state.has_fetch_dirs = True
 
-    if not is_dir_not_link(self.fetch_dir):
-      if path_exists(self.fetch_dir):
-        exit(f'muck fatal error: fetch directory {self.fetch_dir} exists but is not a directory.')
-      make_dir(self.fetch_dir)
+    s = file_status(self.fetch_dir, follow=False)
+    if not s: make_dir(self.fetch_dir)
+    elif not s.is_dir:
+      exit(f'muck fatal error: fetch directory {self.fetch_dir} exists but is not a directory.')
 
     fetch_link = path_join(self.build_dir, self.fetch_dir)
-    if not is_link_to_dir(fetch_link):
-      if path_exists(fetch_link):
+    s = file_status(fetch_link, follow=False)
+    if not s: make_link(self.fetch_dir, link=fetch_link)
+    else:
+      if not s.is_link:
         exit(f'muck fatal error: fetch directory link {fetch_link} exists but is not a symlink.')
-      make_link(self.fetch_dir, link=fetch_link)
+      dst = read_link(fetch_link)
+      if dst != self.fetch_dir:
+        exit(f'muck fatal error: fetch directory link {fetch_link} exists but points to the wrong location: {dst}.')
 
 
   def is_product_path(self, path:str) -> bool:
