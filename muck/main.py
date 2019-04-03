@@ -97,7 +97,7 @@ def main() -> None:
   publish_parser.add_argument('-files', nargs='*', default=[], help='glob patterns specifying additional files to publish.')
   publish_parser.add_argument('-to', required=True, help='directory to copy files to.')
 
-  # add build_parser last so that we can describe other commands in its epilog.
+  # add `build` last so that we can describe other commands in its epilog.
   cmds_str = ', '.join(parsers)
   build_parser = add_parser('build', muck_build, builds=True, targets_dflt=True,
     description='build the specified targets.',
