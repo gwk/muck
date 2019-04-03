@@ -41,7 +41,8 @@ def main() -> None:
 
   parsers:Dict[str, ArgumentParser] = {}
 
-  def add_parser(cmd:str, fn:Callable[..., None], builds:bool, targets_dflt:Optional[bool]=None, takes_ctx:bool=True, **kwargs) -> ArgumentParser:
+  def add_parser(cmd:str, fn:Callable[..., None], builds:bool, targets_dflt:Optional[bool]=None, takes_ctx:bool=True,
+   **kwargs) -> ArgumentParser:
     reserved_names.add(cmd)
     parser = ArgumentParser(prog='muck ' + cmd, **kwargs)
     parser.set_defaults(cmd=cmd, fn=fn, builds=builds, targets_dflt=targets_dflt, takes_ctx=takes_ctx)
@@ -66,6 +67,9 @@ def main() -> None:
 
   add_parser('clean', muck_clean, builds=False, targets_dflt=False,
     description='clean the specified targets.')
+
+  add_parser('dependents', muck_dependents, builds=False, targets_dflt=False,
+    description='print the set of targets that directly depend on the specified target.')
 
   add_parser('deps', muck_deps, builds=True, targets_dflt=True,
     description='print targets and their dependencies as a visual hierarchy.')
@@ -197,6 +201,15 @@ def muck_clean(ctx:Ctx) -> None:
     prod_path = ctx.product_path_for_target(target)
     remove_path_if_exists(prod_path)
     ctx.db.delete_record(target=target)
+
+
+def muck_dependents(ctx:Ctx) -> None:
+  '`muck dependents command.'
+  s = set()
+  for target in ctx.targets:
+    s.update(ctx.db.get_dependents(target))
+  for t in sorted(s):
+    outL(t)
 
 
 def muck_deps(ctx:Ctx) -> None:

@@ -167,3 +167,13 @@ class DB:
     assert record is not None
     return record.deps
 
+
+  def get_dependents(self, target:str) -> Set[str]:
+    c = self.run('SELECT path, deps, dyn_deps FROM targets')
+    rows = c.fetchall()
+    dependents:Set[str] = set()
+    for path, deps_blob, dyn_deps_blob in rows:
+      d = from_marshalled(dyn_deps_blob)
+      if (target in from_marshalled(deps_blob)) or (target in from_marshalled(dyn_deps_blob)):
+        dependents.add(path)
+    return dependents
