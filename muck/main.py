@@ -44,7 +44,7 @@ def main() -> None:
   def add_parser(cmd:str, fn:Callable[..., None], builds:bool, targets_dflt:Optional[bool]=None, takes_ctx:bool=True, **kwargs) -> ArgumentParser:
     reserved_names.add(cmd)
     parser = ArgumentParser(prog='muck ' + cmd, **kwargs)
-    parser.set_defaults(fn=fn, builds=builds, targets_dflt=targets_dflt, takes_ctx=takes_ctx)
+    parser.set_defaults(cmd=cmd, fn=fn, builds=builds, targets_dflt=targets_dflt, takes_ctx=takes_ctx)
     parser.add_argument('-build-dir', default='_build', help="specify build directory; defaults to '_build'.")
     parser.add_argument('-cd', help='change to this working directory before taking any further action.')
     parser.add_argument('-dbg', action='store_true', help='log lots of details to stderr.')
@@ -154,6 +154,9 @@ def main() -> None:
       dbg_child_lldb=getattr(args, 'dbg_child_lldb', True))
 
     args.fn(ctx)
+    #^ Fail for missing target args. We call the comamnd first, so that it can fail with a custom message.
+    if args.targets_dflt is False and not args.targets:
+      exit(f'muck {args.cmd}: no targets specified.')
 
 
 # Commands.
