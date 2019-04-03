@@ -35,6 +35,27 @@ except ImportError:
   def Hasher() -> blake2b: return blake2b(digest_size=16)
 
 
+def fake_update(ctx:Ctx, target:str) -> None:
+  'Fake an update to the target by mutating the build record.'
+  try:
+
+    is_product = not path_exists(target, follow=True)
+    if is_product and is_link(target):
+      BuildError(target, f'target is a dangling symlink to: {read_link(target)}')
+
+    path = ctx.product_path_for_target(target) if is_product else target
+    is_dir, size, mtime = file_stats(path)
+    if size < 0: raise BuildError(target, f'product does not exist: {path!r}')
+
+    record = ctx.db.get_record(target)
+    if not record: raise BuildError(target, f'unknown target')
+    if record.is_dir != is_dir: raise BuildError(target, f'cannot fake is_dir change: {record.is_dir} -> {is_dir}')
+    fake = record._replace(size=size, mtime=mtime)
+    ctx.db.insert_or_replace_record(fake)
+
+  except BuildError as e: exit(e)
+
+
 def update_or_exit(ctx:Ctx, target:str) -> int:
   try: return update_top(ctx, target)
   except BuildError as e: exit(e)

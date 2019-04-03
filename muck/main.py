@@ -24,7 +24,7 @@ from .pithy.io import errL, errSL, outL, outLL
 from .pithy.path_encode import path_for_url
 from .pithy.task import runC
 from .server import serve_build
-from .update import ext_tools, pat_dependencies, update_or_exit
+from .update import ext_tools, fake_update, pat_dependencies, update_or_exit
 
 
 def main() -> None:
@@ -79,6 +79,9 @@ def main() -> None:
 
   add_parser('prod-list', muck_prod_list, builds=True, targets_dflt=True,
     description='print products as a list.')
+
+  add_parser('fake', muck_fake, builds=False, targets_dflt=False,
+    description='fake the update of a dependency (use to avoid an expensive update for a trivial change).')
 
   create_patch = add_parser('create-patch', muck_create_patch, builds=True,
     description="create a patch; creates a new '.pat' source.",
@@ -275,6 +278,12 @@ def muck_prod_list(ctx:Ctx) -> None:
   for target in ctx.targets:
     update_or_exit(ctx, target)
   outLL(*sorted(ctx.product_path_for_target(t) for t in ctx.statuses.keys()))
+
+
+def muck_fake(ctx:Ctx) -> None:
+  '`muck fake` command.`'
+  for target in ctx.targets:
+    fake_update(ctx, target)
 
 
 def muck_create_patch(ctx:Ctx) -> None:
