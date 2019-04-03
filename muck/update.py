@@ -6,7 +6,6 @@ Muck's core update algorithm.
 
 from contextlib import nullcontext
 from datetime import datetime as DateTime
-from hashlib import blake2b
 from importlib.util import find_spec as find_module_spec
 from os import (O_NONBLOCK, O_RDONLY, close as os_close, environ, kill, mkfifo, open as os_open, read as os_read,
   remove as os_remove)
@@ -28,6 +27,12 @@ from .pithy.path import PathIsNotDescendantError, is_path_abs, path_descendants,
 from .pithy.string import format_byte_count
 from .pithy.task import launch
 from .py_deps import py_dependencies
+
+try:
+  from hashing import Aquahash as Hasher
+except ImportError:
+  from hashlib import blake2b
+  def Hasher() -> blake2b: return blake2b(digest_size=16)
 
 
 def update_or_exit(ctx:Ctx, target:str) -> int:
@@ -662,7 +667,7 @@ def hash_for_file_contents(path:str) -> bytes:
   except IsADirectoryError: raise BuildError(path, 'expected a file but found a directory')
 
   try:
-    h = blake2b(digest_size=32)
+    h = Hasher()
     while True:
       chunk = f.read(hash_chunk_size)
       if not chunk: break
@@ -670,7 +675,7 @@ def hash_for_file_contents(path:str) -> bytes:
     return h.digest()
   except KeyboardInterrupt:
     errL()
-    warn(path, 'interrupted while hashing file.')
+    warn(path, f'interrupted while hashing file: {path!r}')
     raise
 
 
@@ -683,12 +688,17 @@ def hash_for_dir_listing(path:str) -> bytes:
   recursion into the deep tree by the process requires additional syscalls,
   and will thus trigger additional dependency analysis.
   '''
-  h =  blake2b(digest_size=32)
-  for entry in scan_dir(path, hidden=False): # Ignore hidden files.
-    h.update(dir_entry_type_char(entry).encode())
-    h.update(entry.name.encode())
-    h.update(b'\0')
-  return h.digest()
+  try:
+    h = Hasher()
+    for entry in scan_dir(path, hidden=False): # Ignore hidden files.
+      h.update(dir_entry_type_char(entry).encode())
+      h.update(entry.name.encode())
+      h.update(b'\0')
+    return h.digest()
+  except KeyboardInterrupt:
+    errL()
+    warn(path, f'interrupted while hashing directory: {path!r}')
+    raise
 
 
 def file_stats(path:str) -> Tuple[bool, int, float]:

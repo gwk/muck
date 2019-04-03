@@ -56,4 +56,4 @@ test:
 	iotest -fail-fast
 
 typecheck:
-	craft-py-check muck pithy/pithy -deps pithy writeup
+	craft-py-check muck pithy/pithy -deps hashing pithy writeup
