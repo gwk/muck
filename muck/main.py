@@ -132,27 +132,27 @@ def main() -> None:
 
   make_dirs(args.build_dir) # required to create new DB.
 
-  if not args.takes_ctx:
-    with ExitOnKeyboardInterrupt(dbg=args.dbg):
-      args.fn(args)
-    return
-
-  build_dir_abs = abs_path(args.build_dir)
-  ctx = Ctx(
-    args=args,
-    db=DB(path=db_path),
-    proj_dir=current_dir(),
-    build_dir=args.build_dir,
-    build_dir_slash=args.build_dir + '/',
-    build_dir_abs=build_dir_abs,
-    fifo_path=path_join(build_dir_abs, fifo_name),
-    reserved_names=frozenset(reserved_names),
-    reserved_prefixes=reserved_prefixes,
-    dbg=dbg,
-    dbg_child=getattr(args, 'dbg_child', False),
-    dbg_child_lldb=getattr(args, 'dbg_child_lldb', True))
-
   with ExitOnKeyboardInterrupt(dbg=args.dbg):
+
+    if not args.takes_ctx:
+      args.fn(args)
+      return
+
+    build_dir_abs = abs_path(args.build_dir)
+    ctx = Ctx(
+      args=args,
+      db=DB(path=db_path),
+      proj_dir=current_dir(),
+      build_dir=args.build_dir,
+      build_dir_slash=args.build_dir + '/',
+      build_dir_abs=build_dir_abs,
+      fifo_path=path_join(build_dir_abs, fifo_name),
+      reserved_names=frozenset(reserved_names),
+      reserved_prefixes=reserved_prefixes,
+      dbg=dbg,
+      dbg_child=getattr(args, 'dbg_child', False),
+      dbg_child_lldb=getattr(args, 'dbg_child_lldb', True))
+
     args.fn(ctx)
 
 
