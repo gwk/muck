@@ -387,7 +387,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   if is_dir(src_prod_path, follow=True):
     raise BuildError(target, f'source path is a directory: {src_prod_path!r}')
   if is_file_executable_by_owner(src_prod_path):
-    tool = Tool(cmd=(), deps_fn=None, env_fn=None)
+    tool = Tool(cmd=(), deps_fn=None, env_mod_fn=None)
   else:
     # TODO: check for explicit deps file.
     try: tool = ext_tools[src_ext]
@@ -415,8 +415,8 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   env = environ.copy()
   # TODO: check that these variables are not already set.
   env['MUCK_TARGET'] = target
-  if tool.env_fn is not None:
-    env.update(tool.env_fn(ctx), src_path=src_path)
+  if tool.env_mod_fn is not None:
+    tool.env_mod_fn(ctx, env)
   env['MUCK_PROJ_DIR'] = ctx.proj_dir
   env['MUCK_FIFO'] = ctx.fifo_path
   env['MUCK_PID'] = ctx.pid_str
@@ -613,21 +613,22 @@ def writeup_dependencies(src_path:str, dir_entries:DirEntries) -> List[str]:
 
 # Tools.
 
-def py_env(ctx:Ctx) -> Dict[str, str]:
+def py_env(ctx:Ctx, env:Dict[str,str]) -> None:
   # Directory of build source path is added automatically by python.
   # Also add build dir so that modules/packages can be accessed relative to project root.
-  return {
-    'PYTHONPATH': ctx.build_dir_abs
-  }
+  ppath = env.get('PYTHONPATH', '')
+  if ppath: ppath += ':' + ctx.build_dir_abs
+  else: ppath = ctx.build_dir_abs
+  env['PYTHONPATH'] = ppath
 
 
 DependencyFn = Callable[[str,DirEntries], Iterable[str]]
-EnvFn = Callable[[Ctx], Dict[str, str]]
+EnvModFn = Callable[[Ctx,Dict[str, str]],None]
 
 class Tool(NamedTuple):
   cmd: Tuple[str, ...]
   deps_fn: Optional[DependencyFn]
-  env_fn: Optional[EnvFn]
+  env_mod_fn: Optional[EnvModFn]
   src_to_stdin: bool = False
 
 
