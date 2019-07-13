@@ -605,10 +605,10 @@ def pat_dependencies(src_path:str, dir_entries:DirEntries) -> List[str]:
 
 
 def writeup_dependencies(src_path:str, dir_entries:DirEntries) -> List[str]:
-  try: import writeup
-  except ImportError: raise BuildError(src_path, '`writeup` is not installed; run `pip install pithy`.')
+  try: import wu
+  except ImportError: raise BuildError(src_path, '`writeup` is not installed; run `pip3 install wu`.')
   with open(src_path) as f:
-    return writeup.writeup_dependencies(src_path=src_path, text_lines=f)
+    return wu.writeup_dependencies(src_path=src_path, text_lines=f)
 
 
 # Tools.
