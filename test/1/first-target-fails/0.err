@@ -1,3 +1,3 @@
 muck note: {name}.txt.py: source changed.
-muck note: a.txt: building: `python3 '{name}.txt.py' a`
-muck error: a.txt: build failed with code: 1
+muck note: a.txt: `python3 '{name}.txt.py' a` running…
+muck error: a.txt: `python3 '{name}.txt.py' a` failed with code: 1

@@ -1,15 +1,15 @@
-muck note: b.txt: building: `python3 b.txt.py`
-muck note: d.txt: building: `python3 d.txt.py`
-muck note: d.txt: finished: (via stdout).
+muck note: b.txt: `python3 b.txt.py` running…
+muck note: d.txt: `python3 d.txt.py` running…
+muck note: d.txt: `python3 d.txt.py` finished: (via stdout).
 muck note: d.txt: product is new; 6 B.
-muck note: b.txt: finished: (via stdout).
+muck note: b.txt: `python3 b.txt.py` finished: (via stdout).
 muck note: b.txt: product is new; 19 B.
-muck note: c.txt.py: building: `python3 c.txt.py.py`
-muck note: c.txt.py: finished: (via stdout).
+muck note: c.txt.py: `python3 c.txt.py.py` running…
+muck note: c.txt.py: `python3 c.txt.py.py` finished: (via stdout).
 muck note: c.txt.py: product is new; 92 B.
-muck note: c.txt: building: `python3 c.txt.py`
-muck note: c.txt: finished: (via stdout).
+muck note: c.txt: `python3 c.txt.py` running…
+muck note: c.txt: `python3 c.txt.py` finished: (via stdout).
 muck note: c.txt: product is new; 19 B.
-muck note: index.html: building: `writeup index.html.wu`
-muck note: index.html: finished: (via stdout).
+muck note: index.html: `writeup index.html.wu` running…
+muck note: index.html: `writeup index.html.wu` finished: (via stdout).
 muck note: index.html: product is new; 5.660 kB.

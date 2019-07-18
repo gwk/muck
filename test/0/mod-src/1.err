@@ -1,4 +1,4 @@
 muck note: a.txt.py: source changed.
-muck note: a.txt: building: `python3 a.txt.py`
-muck note: a.txt: finished: (via stdout).
+muck note: a.txt: `python3 a.txt.py` running…
+muck note: a.txt: `python3 a.txt.py` finished: (via stdout).
 muck note: a.txt: product did not change; 2 B.

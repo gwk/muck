@@ -1,9 +1,9 @@
-muck note: c.txt: building: `python3 c.txt.py`
-muck note: b.txt: building: `python3 b.txt.py`
-muck note: a.txt: building: `python3 a.txt.py`
-muck note: a.txt: finished: (via stdout).
+muck note: c.txt: `python3 c.txt.py` running…
+muck note: b.txt: `python3 b.txt.py` running…
+muck note: a.txt: `python3 a.txt.py` running…
+muck note: a.txt: `python3 a.txt.py` finished: (via stdout).
 muck note: a.txt: product is new; 2 B.
-muck note: b.txt: finished: (via stdout).
+muck note: b.txt: `python3 b.txt.py` finished: (via stdout).
 muck note: b.txt: product is new; 5 B.
-muck note: c.txt: finished: (via stdout).
+muck note: c.txt: `python3 c.txt.py` finished: (via stdout).
 muck note: c.txt: product is new; 8 B.

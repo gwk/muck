@@ -406,7 +406,8 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   cmd = [*tool.cmd, *src_arg, *args]
 
   msg_stdin = f' < {src_path}' if tool.src_to_stdin else ''
-  note(target, f"building: `{' '.join(sh_quote(w) for w in cmd)}{msg_stdin}`")
+  cmd_msg = f"`{' '.join(sh_quote(w) for w in cmd)}{msg_stdin}`"
+  note(target, cmd_msg, ' running…')
 
   make_dirs(prod_dir)
   remove_path_if_exists(prod_path_out)
@@ -480,7 +481,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
     code = proc.returncode
     time_elapsed = now() - time_start
 
-  if code != 0: raise BuildError(target, f'build failed with code: {code}')
+  if code != 0: raise BuildError(target, cmd_msg, f' failed with code: {code}')
 
   if path_exists(prod_path, follow=False):
     via = 'open'
@@ -495,7 +496,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
     move_file(prod_path_out, prod_path)
   depCtx.all_outs.add(target)
   time_msg = '' if ctx.args.no_times else f'{time_elapsed:0.2f} seconds '
-  note(target, f'finished: {time_msg}(via {via}).')
+  note(target, cmd_msg, f' finished: {time_msg}(via {via}).')
   return dyn_time, tuple(sorted(depCtx.dyn_deps)), depCtx.all_outs
 
 
@@ -598,7 +599,7 @@ def sqlite3_dependencies(src_path:str, dir_entries:DirEntries) -> Iterator[str]:
 
 def pat_dependencies(src_path:str, dir_entries:DirEntries) -> List[str]:
   try: import pithy.pat as pat
-  except ImportError: raise BuildError(src_path, '`pat` is not installed; run `pip install pithy`.')
+  except ImportError: raise BuildError(src_path, '`pat` is not installed; run `pip3 install pithy`.')
   with open(src_path) as f:
     dep = pat.pat_dependency(src_path=src_path, src_lines=f)
   return [dep]
@@ -606,7 +607,9 @@ def pat_dependencies(src_path:str, dir_entries:DirEntries) -> List[str]:
 
 def writeup_dependencies(src_path:str, dir_entries:DirEntries) -> List[str]:
   try: import wu
-  except ImportError: raise BuildError(src_path, '`writeup` is not installed; run `pip3 install wu`.')
+  except ImportError as e:
+    errL(e)
+    raise BuildError(src_path, '`writeup` is not installed; run `pip3 install wu`.')
   with open(src_path) as f:
     return wu.writeup_dependencies(src_path=src_path, text_lines=f)
 
