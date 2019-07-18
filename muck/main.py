@@ -9,6 +9,7 @@ import shlex
 import sys
 from argparse import ArgumentParser, Namespace
 from glob import iglob as walk_glob, has_magic as is_glob_pattern  # type: ignore # has_magic is private.
+from os import environ
 from sys import argv
 from typing import Any, Callable, Dict, Optional, Set
 
@@ -20,7 +21,7 @@ from .pithy.ansi import RST, TXT_B, TXT_G, TXT_R
 from .pithy.fs import (abs_path, change_dir, clone, current_dir, is_dir, make_dirs, move_file, norm_path, path_dir,
   path_exists, path_ext, path_join, path_stem, remove_dir_contents, remove_path_if_exists, split_stem_ext, walk_dirs, walk_paths)
 from .pithy.interactive import ExitOnKeyboardInterrupt
-from .pithy.io import errL, errSL, outL, outLL
+from .pithy.io import errL, errSL, errZ, outL, outLL
 from .pithy.path_encode import path_for_url
 from .pithy.task import runC
 from .server import serve_build
@@ -61,6 +62,9 @@ def main() -> None:
       parser.add_argument('targets', nargs='*', default=default, help=help_msg)
     parsers[cmd] = parser
     return parser
+
+  add_parser('check-client-env', muck_client_env, builds=False, takes_ctx=False,
+    description='invoke `muck check-client-env` from within a client script to check that the environment is set up correctly.')
 
   add_parser('clean-all', muck_clean_all, builds=False, takes_ctx=False,
     description='clean the entire build directory, including the build database.')
@@ -137,13 +141,14 @@ def main() -> None:
   # Handle directory change first.
   if args.cd: change_dir(args.cd)
 
-  make_dirs(args.build_dir) # required to create new DB.
 
   with ExitOnKeyboardInterrupt(dbg=args.dbg):
 
     if not args.takes_ctx:
       args.fn(args)
       return
+
+    make_dirs(args.build_dir) # required to create new DB.
 
     build_dir_abs = abs_path(args.build_dir)
     ctx = Ctx(
@@ -167,6 +172,20 @@ def main() -> None:
 
 
 # Commands.
+
+
+def muck_client_env(args:Namespace) -> None:
+  '`muck check-client-env` command.'
+
+  if 'DYLD_INSERT_LIBRARIES' in environ:
+    errL('muck check-client-env: ok.')
+    exit(0)
+
+  errZ('muck check-client-env failed: ')
+  if 'MUCK_DYLD_INSERT_LIBRARIES' in environ:
+    exit('DYLD_INSERT_LIBRARIES was stripped by macOS; perhaps the invoked interpreter is protected by SIP?')
+  else:
+    exit('the environment was not passed.')
 
 
 def muck_build(ctx:Ctx) -> None:
