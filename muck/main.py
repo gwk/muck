@@ -8,7 +8,7 @@ This file was separated from __main__.py to make stack traces more consistent du
 import shlex
 import sys
 from argparse import ArgumentParser, Namespace
-from glob import iglob as walk_glob, has_magic as is_glob_pattern  # type: ignore # has_magic is private.
+from glob import iglob as walk_glob, has_magic as is_glob_pattern
 from os import environ
 from sys import argv
 from typing import Any, Callable, Dict, Optional, Set
