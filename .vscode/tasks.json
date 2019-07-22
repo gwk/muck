@@ -1,7 +1,6 @@
 {
   "version": "2.0.0",
   "echoCommand": false,
-  "type": "process",
   "presentation": {},
   "tasks": [
     {
@@ -9,13 +8,7 @@
       "command": "craft-py-check",
       "args": ["${relativeFile}", "-print-ok", "-deps", "hashing", "pithy", "wu"],
       "group": {"kind": "build", "isDefault": true},
-      "problemMatcher": "$craft"
-    },
-    {
-      "label": "typecheck",
-      "command": "craft-py-check",
-      "args": ["muck"],
-      "group": "build",
+      "presentation": {"showReuseMessage": false},
       "problemMatcher": "$craft"
     },
     {
