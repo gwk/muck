@@ -600,7 +600,7 @@ def sqlite3_dependencies(src_path:str, dir_entries:DirEntries) -> Iterator[str]:
 
 def pat_dependencies(src_path:str, dir_entries:DirEntries) -> List[str]:
   try: import pithy.pat as pat
-  except ImportError: raise BuildError(src_path, '`pat` is not installed; run `pip3 install pithy`.')
+  except ImportError as e: raise BuildError(src_path, '`pat` is not installed; run `pip3 install pithy`.') from e
   with open(src_path) as f:
     dep = pat.pat_dependency(src_path=src_path, src_lines=f)
   return [dep]
@@ -608,9 +608,7 @@ def pat_dependencies(src_path:str, dir_entries:DirEntries) -> List[str]:
 
 def writeup_dependencies(src_path:str, dir_entries:DirEntries) -> List[str]:
   try: import wu
-  except ImportError as e:
-    errL(e)
-    raise BuildError(src_path, '`writeup` is not installed; run `pip3 install wu`.')
+  except ImportError as e: raise BuildError(src_path, '`writeup` is not installed; run `pip3 install wu`.') from e
   with open(src_path) as f:
     return wu.writeup_dependencies(src_path=src_path, text_lines=f)
 
