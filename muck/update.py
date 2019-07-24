@@ -644,8 +644,8 @@ ext_tools: Dict[str, Tool] = {
   '.md'   : Tool(('cmark-gfm',), None, None),
   '.pat'  : Tool(('pat', 'apply'), pat_dependencies, None),
   '.py'   : Tool(('python3',), py_dependencies, py_env),
-  '.sh'   : Tool(('bash',), None, None), # TODO: change to `sh` once we get dash working.
-  '.sql'  : Tool(('sqlite3', '-batch'), sqlite3_dependencies, None, src_to_stdin=True),
+  '.sh'   : Tool(('sh',), None, None),
+  '.sqlite' : Tool(('sqlite3', '-batch'), sqlite3_dependencies, None, src_to_stdin=True),
   '.wu'   : Tool(('writeup',), writeup_dependencies, None),
 }
 
