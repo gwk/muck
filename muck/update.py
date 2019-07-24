@@ -637,16 +637,16 @@ class Tool(NamedTuple):
 
 
 ext_tools: Dict[str, Tool] = {
-  '.bash' : Tool(('bash',), None, None),
-  '.csv'  : Tool(('csv-to-html',), None, None),
-  '.dash' : Tool(('dash',), None, None),
-  '.list' : Tool((), list_dependencies, None),
-  '.md'   : Tool(('cmark-gfm',), None, None),
-  '.pat'  : Tool(('pat', 'apply'), pat_dependencies, None),
-  '.py'   : Tool(('python3',), py_dependencies, py_env),
-  '.sh'   : Tool(('sh',), None, None),
+  '.bash'   : Tool(('bash',), None, None),
+  '.csv'    : Tool(('csv-to-html',), None, None),
+  '.dash'   : Tool(('dash',), None, None),
+  '.list'   : Tool((), list_dependencies, None),
+  '.md'     : Tool(('cmark-gfm',), None, None),
+  '.pat'    : Tool(('pat', 'apply'), pat_dependencies, None),
+  '.py'     : Tool(('python3',), py_dependencies, py_env),
+  '.sh'     : Tool(('sh',), None, None),
   '.sqlite' : Tool(('sqlite3', '-batch'), sqlite3_dependencies, None, src_to_stdin=True),
-  '.wu'   : Tool(('writeup',), writeup_dependencies, None),
+  '.wu'     : Tool(('writeup',), writeup_dependencies, None),
 }
 
 ignored_dep_exts = {
