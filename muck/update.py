@@ -23,10 +23,13 @@ from .pithy.fs import (DirEntries, FileStatus, current_dir, dir_entry_type_char,
   is_file_executable_by_owner, is_link, make_dir, make_dirs, make_link, move_file, path_exists, read_link, remove_file,
   remove_path, remove_path_if_exists, scan_dir)
 from .pithy.io import AsyncLineReader, errL, errSL
-from .pithy.path import PathIsNotDescendantError, is_path_abs, path_descendants, path_dir, path_ext, path_rel_to_ancestor
+from .pithy.path import (PathIsNotDescendantError, is_path_abs, norm_path, path_descendants, path_dir, path_ext, path_join,
+  path_rel_to_ancestor)
 from .pithy.string import format_byte_count
 from .pithy.task import launch
+from .pithy.url import split_url
 from .py_deps import py_dependencies
+
 
 try:
   from hashing import Aquahash as Hasher
@@ -329,7 +332,7 @@ def update_deps_and_record(ctx, fifo:AsyncLineReader, target:str, is_target_dir:
 
   ctx.dbg(target, 'update_deps_and_record')
   if is_changed:
-    deps = calculate_dependencies(actual_path, ctx.dir_entries)
+    deps = calculate_dependencies(target=target, src_path=actual_path, dir_entries=ctx.dir_entries)
     for dep in deps:
       try: ctx.validate_target(dep) # Redundant with update_target below. TODO: remove?
       except InvalidTarget as e:
@@ -566,20 +569,33 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
 
 # Dependency inference.
 
-def calculate_dependencies(path:str, dir_entries:DirEntries) -> Tuple[str, ...]:
+def calculate_dependencies(target:str, src_path:str, dir_entries:DirEntries) -> Tuple[str, ...]:
   '''
   Infer the dependencies for the file at `path`.
   '''
-  ext = path_ext(path)
+  ext = path_ext(src_path)
   try: deps_fn = ext_tools[ext].deps_fn
   except KeyError: return ()
   if deps_fn is None: return ()
-  return tuple(deps_fn(path, dir_entries))
+  return tuple(deps_fn(target, src_path, dir_entries))
 
 
 # Type-specific dependency functions.
 
-def list_dependencies(src_path:str, dir_entries:DirEntries) -> Iterator[str]:
+def html_dependencies(target:str, src_path:str, dir_entries:DirEntries) -> Iterator[str]:
+  try: import pithy.html.loader as loader
+  except ImportError as e: raise BuildError(src_path, '`pithy` is not installed; run `pip3 install pithy.`') from e
+  html = loader.load_html(src_path)
+  dir = path_dir(target)
+  for url_str in html.attr_urls:
+    scheme, netloc, path, query, fragment = split_url(url_str)
+    if not scheme and not netloc: # Only return local urls.
+      if not path: continue
+      if path.endswith('.html'): continue # For now ignore other pages, which typically cause circular references.
+      yield norm_path(path_join(dir, path))
+
+
+def list_dependencies(target:str, src_path:str, dir_entries:DirEntries) -> Iterator[str]:
   'Calculate dependencies for .list files.'
   with open(src_path) as f:
     for line in f:
@@ -588,7 +604,7 @@ def list_dependencies(src_path:str, dir_entries:DirEntries) -> Iterator[str]:
         yield line
 
 
-def sqlite3_dependencies(src_path:str, dir_entries:DirEntries) -> Iterator[str]:
+def sqlite3_dependencies(target:str, src_path:str, dir_entries:DirEntries) -> Iterator[str]:
   'Calculate dependencies for .sql files (assumed to be sqlite3 commands).'
   with open(src_path) as f:
     for i, line in enumerate(f, 1):
@@ -598,7 +614,7 @@ def sqlite3_dependencies(src_path:str, dir_entries:DirEntries) -> Iterator[str]:
           yield tokens[j+1]
 
 
-def pat_dependencies(src_path:str, dir_entries:DirEntries) -> List[str]:
+def pat_dependencies(target:str, src_path:str, dir_entries:DirEntries) -> List[str]:
   try: import pithy.pat as pat
   except ImportError as e: raise BuildError(src_path, '`pat` is not installed; run `pip3 install pithy`.') from e
   with open(src_path) as f:
@@ -606,7 +622,7 @@ def pat_dependencies(src_path:str, dir_entries:DirEntries) -> List[str]:
   return [dep]
 
 
-def writeup_dependencies(src_path:str, dir_entries:DirEntries) -> List[str]:
+def writeup_dependencies(target:str, src_path:str, dir_entries:DirEntries) -> List[str]:
   try: import wu
   except ImportError as e: raise BuildError(src_path, '`writeup` is not installed; run `pip3 install wu`.') from e
   with open(src_path) as f:
@@ -624,7 +640,7 @@ def py_env(ctx:Ctx, env:Dict[str,str]) -> None:
   env['PYTHONPATH'] = ppath
 
 
-DependencyFn = Callable[[str,DirEntries], Iterable[str]]
+DependencyFn = Callable[[str,str,DirEntries], Iterable[str]]
 EnvModFn = Callable[[Ctx,Dict[str, str]],None]
 
 class Tool(NamedTuple):
@@ -638,6 +654,7 @@ ext_tools: Dict[str, Tool] = {
   '.bash'   : Tool(('bash',), None, None),
   '.csv'    : Tool(('csv-to-html',), None, None),
   '.dash'   : Tool(('dash',), None, None),
+  '.html'   : Tool((), html_dependencies, None),
   '.list'   : Tool((), list_dependencies, None),
   '.md'     : Tool(('cmark-gfm',), None, None),
   '.pat'    : Tool(('pat', 'apply'), pat_dependencies, None),

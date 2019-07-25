@@ -334,7 +334,7 @@ def muck_update_patch(ctx: Ctx) -> None:
   if path_ext(patch_path) != '.pat':
     exit(f'muck update-patch error: argument does not specify a .pat file: {patch_path!r}')
 
-  deps = pat_dependencies(patch_path, dir_entries=ctx.dir_entries)
+  deps = pat_dependencies(target=patch_path, src_path=patch_path, dir_entries=ctx.dir_entries)
   assert len(deps) == 1
   orig_path = deps[0]
   update_or_exit(ctx, orig_path)
