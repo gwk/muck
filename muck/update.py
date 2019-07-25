@@ -32,7 +32,7 @@ try:
   from hashing import Aquahash as Hasher
 except ImportError:
   from hashlib import blake2b
-  def Hasher() -> blake2b: return blake2b(digest_size=16)
+  def Hasher() -> blake2b: return blake2b(digest_size=16) # type: ignore
 
 
 def fake_update(ctx:Ctx, target:str) -> None:
