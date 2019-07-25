@@ -15,7 +15,7 @@ from time import sleep, time as now
 from typing import Callable, Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, TextIO, Tuple, cast
 
 from .constants import *
-from .ctx import BuildError, Ctx, Dpdt, InvalidTarget, TargetNotFound, TargetStatus, match_wilds
+from .ctx import BuildError, Ctx, Dpdt, InvalidTarget, TargetNotFound, TargetStatus, match_format
 from .db import DB, DBError, TargetRecord
 from .logging import error_msg, note, warn
 from .pithy.ansi import RST, TXT_G
@@ -397,7 +397,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
       return 0, (), set() # no product.
 
   # Extract args from the combination of wilds in the source and the matching target.
-  m = match_wilds(ctx.target_for_source(src_path), target)
+  m = match_format(ctx.target_for_source(src_path), target)
   if m is None:
     raise BuildError(target, f'internal error: match failed; src_path: {src_path!r}')
   args = tuple(m.groups())

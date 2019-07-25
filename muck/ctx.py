@@ -252,7 +252,7 @@ def filter_source_candidates(entries:Iterable[DirEntry], target_name:str) -> Lis
     name = entry.name
     src = name.split('.')
     if len(src) <= len(target): continue # src must have more components than target.
-    if all(match_wilds(*p) for p in zip(src, target)): # zip stops when target is exhausted.
+    if all(match_format(*p) for p in zip(src, target)): # zip stops when target is exhausted.
       candidates.append('.'.join(src[:len(target)+1])) # The immediate source name has just one extension added.
 
   if len(candidates) > 1: # Attempt to reduce candidates by minimum wildcards.
@@ -264,9 +264,9 @@ def filter_source_candidates(entries:Iterable[DirEntry], target_name:str) -> Lis
 
 
 
-def match_wilds(wildcard_path:str, string:str) -> Optional[Match[str]]:
+def match_format(format:str, string:str) -> Optional[Match[str]]:
   '''
   Match a string against a wildcard/format path.
   '''
-  r = format_to_re(wildcard_path)
+  r = format_to_re(format)
   return r.fullmatch(string)
