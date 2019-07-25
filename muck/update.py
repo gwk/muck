@@ -333,7 +333,7 @@ def update_deps_and_record(ctx, fifo:AsyncLineReader, target:str, is_target_dir:
     for dep in deps:
       try: ctx.validate_target(dep) # Redundant with update_target below. TODO: remove?
       except InvalidTarget as e:
-        raise BuildError(target, f'invalid dependency: {e.target!r}: {e.msg}')
+        raise BuildError(target, f'invalid dependency: {e.target!r}; {"".join(e.msg)}')
   else:
     assert old is not None
     deps = old.deps
