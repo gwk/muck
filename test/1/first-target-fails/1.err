@@ -1,6 +1,6 @@
 muck note: a.txt: `python3 '{name}.txt.py' a` running…
 muck note: a.txt: `python3 '{name}.txt.py' a` finished: (via stdout).
-muck note: a.txt: product changed; 6 B.
+muck note: a.txt: product [1mchanged[22m; 6 B.
 muck note: b.txt: `python3 '{name}.txt.py' b` running…
 muck note: b.txt: `python3 '{name}.txt.py' b` finished: (via stdout).
-muck note: b.txt: product changed; 6 B.
+muck note: b.txt: product [1mchanged[22m; 6 B.

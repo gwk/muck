@@ -1,6 +1,6 @@
 muck note: non-products-0.py: specified target is a source and not a product; building 'non-products-0'...
 muck note: non-products-0: `python3 non-products-0.py` running…
 muck note: non-products-0: `python3 non-products-0.py` finished: (via stdout).
-muck note: non-products-0: product is new; 0 B.
+muck note: non-products-0: product [1mis new[22m; 0 B.
 muck note: non-products-1.txt: specified target is a source and not a product.
 muck note: non-products-2: specified target is a source and not a product.

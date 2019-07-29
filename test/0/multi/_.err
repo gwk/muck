@@ -1,13 +1,13 @@
 muck note: c-many.txt: `python3 c-many.txt.py` running…
 muck note: a-to-many-0.txt: `python3 'a-to-many-{i}.txt.py' 0` running…
 muck note: a-to-many-0.txt: `python3 'a-to-many-{i}.txt.py' 0` finished: (via open).
-muck note: a-to-many-0.txt: product is new; 12 B.
-muck note: a-to-many-1.txt: product is new; 12 B.
+muck note: a-to-many-0.txt: product [1mis new[22m; 12 B.
+muck note: a-to-many-1.txt: product [1mis new[22m; 12 B.
 muck note: b-through-0.txt: `python3 'b-through-{i}.txt.py' 0` running…
 muck note: b-through-0.txt: `python3 'b-through-{i}.txt.py' 0` finished: (via stdout).
-muck note: b-through-0.txt: product is new; 12 B.
+muck note: b-through-0.txt: product [1mis new[22m; 12 B.
 muck note: b-through-1.txt: `python3 'b-through-{i}.txt.py' 1` running…
 muck note: b-through-1.txt: `python3 'b-through-{i}.txt.py' 1` finished: (via stdout).
-muck note: b-through-1.txt: product is new; 12 B.
+muck note: b-through-1.txt: product [1mis new[22m; 12 B.
 muck note: c-many.txt: `python3 c-many.txt.py` finished: (via stdout).
-muck note: c-many.txt: product is new; 0 B.
+muck note: c-many.txt: product [1mis new[22m; 0 B.

@@ -18,7 +18,7 @@ from .constants import *
 from .ctx import BuildError, Ctx, Dpdt, InvalidTarget, TargetNotFound, TargetStatus, match_format
 from .db import DB, DBError, TargetRecord
 from .logging import error_msg, note, warn
-from .pithy.ansi import RST, TXT_G
+from .pithy.ansi import BOLD, RST, RST_BOLD, TXT_G, sgr
 from .pithy.fs import (DirEntries, FileStatus, current_dir, dir_entry_type_char, file_size, file_status, is_dir,
   is_file_executable_by_owner, is_link, make_dir, make_dirs, make_link, move_file, path_exists, read_link, remove_file,
   remove_path, remove_path_if_exists, scan_dir)
@@ -243,6 +243,7 @@ def update_product_with_output(ctx:Ctx, fifo:AsyncLineReader, target:str, src:st
   if is_changed:
     change_time = update_time
     change_verb = 'is new' if old is None else 'changed'
+    change_verb = f'{sgr(BOLD)}{change_verb}{sgr(RST_BOLD)}'
   else:
     assert old is not None
     change_time = old.change_time
