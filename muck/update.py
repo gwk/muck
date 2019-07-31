@@ -434,7 +434,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
 
   # Get the source's inferred dependencies, to be ignored when observing target dependencies.
   ignored_deps = set(ctx.db.get_inferred_deps(target=src_path))
-  ignored_deps.update(['.', '__pycache__',  src_path])
+  ignored_deps.update(['.', src_path])
 
   depCtx = DepCtx(
     ignored_deps=ignored_deps,
