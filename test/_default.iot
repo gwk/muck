@@ -9,5 +9,5 @@
     'muck.paths',
     'muck.py_deps',
   ],
-  'env': {'MUCK': '$PROJ/muck/__main__.py'},
+  'env': {'MUCK': 'muck'},
 }

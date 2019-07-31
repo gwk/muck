@@ -8,7 +8,7 @@
   'cmd': '$MUCK -no-times a.txt b.txt',
   'code': 1,
   'env': {
-    'MUCK': '$PROJ/muck/__main__.py',
+    'MUCK': 'muck',
     'EXIT': '1',
   },
   'links': {
@@ -21,7 +21,7 @@
   'cmd': '$MUCK -no-times a.txt b.txt',
   'code': 0,
   'env': {
-    'MUCK': '$PROJ/muck/__main__.py',
+    'MUCK': 'muck',
     'EXIT': '0',
   },
 }

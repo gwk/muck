@@ -13,19 +13,19 @@ from os import environ
 from sys import argv
 from typing import Any, Callable, Dict, Optional, Set
 
-from .constants import tmp_ext
-from .ctx import Ctx
-from .db import DB
-from .logging import note
-from .pithy.ansi import RST, TXT_B, TXT_G, TXT_R
-from .pithy.fs import (abs_path, change_dir, clone, current_dir, is_dir, make_dirs, move_file, norm_path, path_dir,
+from ..constants import tmp_ext
+from ..ctx import Ctx
+from ..db import DB
+from ..logging import note
+from ..pithy.ansi import RST, TXT_B, TXT_G, TXT_R
+from ..pithy.fs import (abs_path, change_dir, clone, current_dir, is_dir, make_dirs, move_file, norm_path, path_dir,
   path_exists, path_ext, path_join, path_stem, remove_dir_contents, remove_path, remove_path_if_exists, split_stem_ext, walk_dirs, walk_paths)
-from .pithy.interactive import ExitOnKeyboardInterrupt
-from .pithy.io import errL, errSL, errZ, outL, outLL
-from .pithy.path_encode import path_for_url
-from .pithy.task import runC
-from .server import serve_build
-from .update import ext_tools, fake_update, pat_dependencies, update_or_exit
+from ..pithy.interactive import ExitOnKeyboardInterrupt
+from ..pithy.io import errL, errSL, errZ, outL, outLL
+from ..pithy.path_encode import path_for_url
+from ..pithy.task import runC
+from ..server import serve_build
+from ..update import ext_tools, fake_update, pat_dependencies, update_or_exit
 
 
 def main() -> None:
