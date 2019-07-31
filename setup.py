@@ -60,7 +60,7 @@ class BuildExtLibmuck(build_ext):
 
 
 setup(
-  python_requires='>=3.6',
+  python_requires='>=3.7',
   ext_modules=[Extension('muck._libmuck', sources=['muck/libmuck.c'])],
   cmdclass={
     'build_ext': BuildExtLibmuck,
