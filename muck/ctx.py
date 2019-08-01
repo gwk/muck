@@ -10,7 +10,7 @@ from typing import (Any, Callable, DefaultDict, Dict, FrozenSet, Iterable, Itera
 from .constants import *
 from .db import DB
 from .logging import error_msg, note
-from .pithy.format import FormatError, count_formatters, format_to_re, parse_formatters
+from .pithy.format import FormatError, count_formatters, format_to_re, has_formatter, parse_formatters
 from .pithy.fs import (DirEntries, DirEntry, file_status, is_link_to_dir, list_dir, make_dir, make_link, norm_path, path_exists,
   path_ext, path_join, path_name_stem, path_stem, read_link, split_dir_name)
 from .pithy.iterable import first_el
@@ -41,7 +41,8 @@ class Dpdt(NamedTuple):
   Dependent target tracking.
   Each recursive update creates a `Dpdt`, forming a linked list of targets.
   These are used for reporting circular dependency errors,
-  and for rendering dependency tree info
+  and for rendering dependency tree info.
+  TODO: make kind an enum.
   '''
   kind:str # 'source', 'inferred', or 'observed'.
   target:str
@@ -159,18 +160,18 @@ class Ctx:
     src_dir = src_dir or '.'
     try: entries = self.dir_entries[src_dir]
     except FileNotFoundError: raise BuildError(target, f'no such source directory: `{src_dir}`')
-    candidates = filter_source_candidates(entries, target_name)
-    if len(candidates) == 1:
-      return candidates[0]
-    # Error. Use the dependent to describe the error;
+    req_exact = (dpdt.kind == 'directory contents')
+    candidates = filter_source_candidates(entries=entries, target_name=target_name, req_exact=req_exact)
+    # Check for errors. Use the dependent to describe the error;
     # usually the dependent is requesting something that does not exist.
     # TODO: use source locations wherever possible.
     dpdt_name = dpdt.target or target
     if len(candidates) == 0:
       raise TargetNotFound(dpdt_name, f'no source candidates matching `{target}` in `{src_dir}`')
-    else:
+    if len(candidates) > 1:
       candidates.sort()
       raise TargetNotFound(dpdt_name, f'multiple source candidates matching `{target}`: {candidates}')
+    return candidates[0]
 
 
   def target_for_product(self, product_path:str) -> str:
@@ -231,7 +232,7 @@ target_invalids_re = re.compile(r'''(?x)
 ''')
 
 
-def filter_source_candidates(entries:Iterable[DirEntry], target_name:str) -> List[str]:
+def filter_source_candidates(entries:Iterable[DirEntry], target_name:str, req_exact:bool) -> List[str]:
   '''
   Given `target_name`, find all matching source names.
   There are several concerns that make this matching complex.
@@ -245,20 +246,29 @@ def filter_source_candidates(entries:Iterable[DirEntry], target_name:str) -> Lis
   * x.txt.py.py
   * {}.txt.py.py
   '''
-  # Note: naive splitting by '.' means that formats containing '.' will be broken.
-  target = target_name.split('.')
   candidates = []
-  for entry in entries:
-    name = entry.name
-    src = name.split('.')
-    if len(src) <= len(target): continue # src must have more components than target.
-    if all(match_format(*p) for p in zip(src, target)): # zip stops when target is exhausted.
-      candidates.append('.'.join(src[:len(target)+1])) # The immediate source name has just one extension added.
 
-  if len(candidates) > 1: # Attempt to reduce candidates by minimum wildcards.
-    cand_fmt_counts = [(cand, count_formatters(cand)) for cand in candidates]
-    min_count = min(count for _, count in cand_fmt_counts)
-    candidates = [cand for cand, count in cand_fmt_counts if count == min_count]
+  if req_exact:
+    for entry in entries:
+      name = entry.name
+      stem = path_stem(name)
+      if stem == target_name:
+        candidates.append(name)
+
+  else: # Allow formatter names to match.
+    # Note: naive splitting by '.' means that formats containing '.' will be broken.
+    target = target_name.split('.')
+    for entry in entries:
+      name = entry.name
+      src = name.split('.')
+      if len(src) <= len(target): continue # src must have more components than target.
+      if all(match_format(*p) for p in zip(src, target)): # zip stops when target is exhausted.
+        candidates.append('.'.join(src[:len(target)+1])) # The immediate source name has just one extension added.
+
+    if len(candidates) > 1: # Attempt to reduce candidates by minimum wildcards.
+      cand_fmt_counts = [(cand, count_formatters(cand)) for cand in candidates]
+      min_count = min(count for _, count in cand_fmt_counts)
+      candidates = [cand for cand, count in cand_fmt_counts if count == min_count]
 
   return candidates
 

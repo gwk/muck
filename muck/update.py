@@ -133,7 +133,7 @@ def update_target_status(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, f
   if is_product:
     target_dir = path_dir(target)
     if target_dir and not path_exists(target_dir, follow=True):
-      # Not possible to find a source; must be the contents of a built directory.
+      # Not possible to find a source; must be the contents of a built directory (or an erroneous dependency).
       update_target(ctx, fifo=fifo, target=target_dir, dpdt=dpdt.sub(kind='directory contents', target=target), force=force)
       if not target_status.is_updated: # build of parent did not create this product.
         raise BuildError(target, f'target resides in a product directory but was not created by building that directory')
@@ -303,8 +303,10 @@ def update_non_product(ctx:Ctx, fifo:AsyncLineReader, target:str, status:FileSta
           make_link(entry.path, link=entry_prod_path)
       # Remove remaining prod_entries, which did not match entries in source and are therefore stale.
       for entry in prod_entries.values():
-        assert entry.is_symlink(), entry
-        remove_file(entry.path)
+        if entry.is_symlink():
+          remove_file(entry.path)
+        else:
+          note(target, f'directory product contains preexisting non-symlink: {entry.path}')
 
     else: # target is regular file.
       if is_prod_link or prod_status: remove_path(prod_path)
