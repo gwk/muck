@@ -6,7 +6,7 @@
     {
       "label": "typecheck-current",
       "command": "craft-py-check",
-      "args": ["${relativeFile}", "-print-ok", "-deps", "hashing", "pithy", "wu"],
+      "args": ["${relativeFile}", "-print-ok", "-deps", "hashing", "wu"],
       "group": {"kind": "build", "isDefault": true},
       "presentation": {"showReuseMessage": false},
       "problemMatcher": "$craft"
