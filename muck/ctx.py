@@ -182,8 +182,11 @@ class Ctx:
 
   def target_for_source(self, source_path:str) -> str:
     'Return the target path for `source_path` (which may itself be a product).'
-    path = path_stem(source_path) # strip off source ext.
-    if self.is_product_path(path): # source might be a product.
+    return self.strip_opt_build_dir(path_stem(source_path)) # strip off source ext, then possibly strip leading build_dir.
+
+
+  def strip_opt_build_dir(self, path:str) -> str:
+    if self.is_product_path(path):
       return path[len(self.build_dir_slash):]
     else:
       return path

@@ -1,1 +1,1 @@
-muck update-patch note: diffing: `pat diff orig.txt patched.txt ../patched.txt.pat.tmp`
+muck update-patch note: diffing: `pat diff orig.txt patched.txt patched.txt.pat.tmp`

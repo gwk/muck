@@ -24,7 +24,7 @@ from .pithy.fs import (DirEntries, FileStatus, current_dir, dir_entry_type_char,
   remove_path, remove_path_if_exists, scan_dir)
 from .pithy.io import AsyncLineReader, errL, errSL
 from .pithy.path import (PathIsNotDescendantError, is_path_abs, norm_path, path_descendants, path_dir, path_ext, path_join,
-  path_rel_to_ancestor)
+  path_name, path_rel_to_ancestor)
 from .pithy.string import format_byte_count
 from .pithy.task import launch
 from .pithy.url import split_url
@@ -386,14 +386,17 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   Return a list of produced product paths.
   '''
   src_prod_path = ctx.product_path_for_target(src_path)
+  src_name = path_name(src_path)
   src_ext = path_ext(src_path)
   prod_dir = path_dir(prod_path)
   prod_path_out = prod_path + out_ext
 
   if is_dir(src_prod_path, follow=True):
     raise BuildError(target, f'source path is a directory: {src_prod_path!r}')
+
+  src_arg:Tuple[str,...] = () # Optional insertion of src_name as first arg.
   if is_file_executable_by_owner(src_prod_path):
-    tool = Tool(cmd=(), deps_fn=None, env_mod_fn=None)
+    tool = Tool(cmd=('./' + src_name,), deps_fn=None, env_mod_fn=None)
   else:
     # TODO: check for explicit deps file.
     try: tool = ext_tools[src_ext]
@@ -401,17 +404,17 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
     if not tool.cmd:
       note(target, 'no-op.')
       return 0, (), set() # no product.
+    if not tool.src_to_stdin:
+      src_arg = (src_name,)
 
   # Extract args from the combination of wilds in the source and the matching target.
   m = match_format(ctx.target_for_source(src_path), target)
   if m is None:
     raise BuildError(target, f'internal error: match failed; src_path: {src_path!r}')
   args = tuple(m.groups())
-  src_arg:Tuple[str,...] = ()
-  if not tool.src_to_stdin: src_arg = (src_path,)
   cmd = [*tool.cmd, *src_arg, *args]
 
-  msg_stdin = f' < {src_path}' if tool.src_to_stdin else ''
+  msg_stdin = f' < {src_name}' if tool.src_to_stdin else ''
   cmd_msg = f"`{' '.join(sh_quote(w) for w in cmd)}{msg_stdin}`"
   note(target, cmd_msg, ' running…')
 
@@ -421,10 +424,10 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
 
   env = environ.copy()
   # TODO: check that these variables are not already set.
-  env['MUCK_TARGET'] = target
+  env['PROJECT_DIR'] = ctx.proj_dir
+  env['TARGET'] = target
   if tool.env_mod_fn is not None:
     tool.env_mod_fn(ctx, env)
-  env['MUCK_PROJ_DIR'] = ctx.proj_dir
   env['MUCK_FIFO'] = ctx.fifo_path
   env['MUCK_PID'] = ctx.pid_str
   env['MUCK_DYLD_INSERT_LIBRARIES'] = libmuck_path
@@ -458,7 +461,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   in_cm = open(src_prod_path, 'rb') if tool.src_to_stdin else nullcontext(None)
   with in_cm as in_file, open(prod_path_out, 'wb') as out_file: # type: ignore
     time_start = now()
-    _, proc, _ = launch(cmd, cwd=ctx.build_dir, env=env, stdin=in_file, out=out_file, lldb=ctx.dbg_child_lldb)
+    _, proc, _ = launch(cmd, cwd=prod_dir, env=env, stdin=in_file, out=out_file, lldb=ctx.dbg_child_lldb)
     if in_file: in_file.close()
     out_file.close()
     targets_not_found: Set[Tuple[str, ...]] = set()
@@ -537,7 +540,7 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
     # we cannot sensibly prevent a script from accessing the project dir directly.
     # For example, Python accesses the parent directory during startup.
     # Therefore our only option is to ignore access to parent dirs.
-    # Libmuck will not send paths outside of the project directory as long as MUCK_PROJECT_DIR is set.
+    # Libmuck will not send paths outside of the project directory as long as PROJECT_DIR environment variable is set.
     if dep != ctx.proj_dir: ctx.dbg(target, f'requested dependency outside of build_dir: {dep}')
     return pid, dyn_time
 
@@ -574,40 +577,40 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
 
 def calculate_dependencies(target:str, src_path:str, dir_entries:DirEntries) -> Tuple[str, ...]:
   '''
-  Infer the dependencies for the file at `path`.
+  Infer the dependencies for the file at `src_path`.
   '''
   ext = path_ext(src_path)
   try: deps_fn = ext_tools[ext].deps_fn
   except KeyError: return ()
   if deps_fn is None: return ()
-  return tuple(deps_fn(target, src_path, dir_entries))
+  target_dir = path_dir(target)
+  return tuple(norm_path(dep) for dep in deps_fn(target_dir, src_path, dir_entries))
 
 
 # Type-specific dependency functions.
 
-def html_dependencies(target:str, src_path:str, dir_entries:DirEntries) -> Iterator[str]:
+def html_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -> Iterator[str]:
   try: import pithy.html.loader as loader
   except ImportError as e: raise BuildError(src_path, '`pithy` is not installed; run `pip3 install pithy.`') from e
   html = loader.load_html(src_path)
-  dir = path_dir(target)
   for url_str in html.attr_urls:
     scheme, netloc, path, query, fragment = split_url(url_str)
     if not scheme and not netloc: # Only return local urls.
       if not path: continue
       if path.endswith('.html'): continue # For now ignore other pages, which typically cause circular references.
-      yield norm_path(path_join(dir, path))
+      yield dep_path_for_url_path(target_dir, path)
 
 
-def list_dependencies(target:str, src_path:str, dir_entries:DirEntries) -> Iterator[str]:
+def list_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -> Iterator[str]:
   'Calculate dependencies for .list files.'
   with open(src_path) as f:
     for line in f:
       line = line.strip()
       if line and not line.startswith('#'):
-        yield line
+        yield dep_path_for_url_path(target_dir, line)
 
 
-def sqlite3_dependencies(target:str, src_path:str, dir_entries:DirEntries) -> Iterator[str]:
+def sqlite3_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -> Iterator[str]:
   'Calculate dependencies for .sql files (assumed to be sqlite3 commands).'
   with open(src_path) as f:
     for i, line in enumerate(f, 1):
@@ -617,26 +620,34 @@ def sqlite3_dependencies(target:str, src_path:str, dir_entries:DirEntries) -> It
           yield tokens[j+1]
 
 
-def pat_dependencies(target:str, src_path:str, dir_entries:DirEntries) -> List[str]:
+def pat_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -> List[str]:
   try: import pithy.pat as pat
   except ImportError as e: raise BuildError(src_path, '`pat` is not installed; run `pip3 install pithy`.') from e
   with open(src_path) as f:
     dep = pat.pat_dependency(src_path=src_path, src_lines=f)
-  return [dep]
+  return [dep_path_for_url_path(target_dir, dep)]
 
 
-def writeup_dependencies(target:str, src_path:str, dir_entries:DirEntries) -> List[str]:
+def writeup_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -> List[str]:
   try: import wu
   except ImportError as e: raise BuildError(src_path, '`writeup` is not installed; run `pip3 install wu`.') from e
   with open(src_path) as f:
-    return wu.writeup_dependencies(src_path=src_path, text_lines=f)
+    deps = wu.writeup_dependencies(src_path=src_path, text_lines=f)
+  return [dep_path_for_url_path(target_dir, dep) for dep in deps]
+
+
+def dep_path_for_url_path(target_dir:str, dep:str) -> str:
+  if dep.startswith('/'): # Relative to project.
+    return dep.lstrip('/')
+  else: # Relative to target.
+    return path_join(target_dir, dep)
 
 
 # Tools.
 
 def py_env(ctx:Ctx, env:Dict[str,str]) -> None:
-  # Directory of build source path is added automatically by python.
-  # Also add build dir so that modules/packages can be accessed relative to project root.
+  # Python automatically adds the directory of build source path, which when running under muck is also the CWD.
+  # Here we add the root build dir so that modules/packages can be accessed relative to project root.
   ppath = env.get('PYTHONPATH', '')
   if ppath: ppath += ':' + ctx.build_dir_abs
   else: ppath = ctx.build_dir_abs

@@ -321,10 +321,12 @@ def muck_create_patch(ctx:Ctx) -> None:
   if path_exists(patch, follow=False) or ctx.db.contains_record(patch):
     exit(f"muck create-patch error: patch is an existing target: {patch}")
   update_or_exit(ctx, original)
-  cmd = ['pat', 'create', original, modified, '../' + patch]
+  cmd = ['pat', 'create', original, modified, patch]
   cmd_str = ' '.join(shlex.quote(w) for w in cmd)
   errL(f'muck create-patch note: creating patch: `{cmd_str}`')
-  exit(runC(cmd, cwd=ctx.build_dir))
+  c = runC(cmd, cwd=ctx.build_dir)
+  if c: exit(c)
+  move_file(path_join(ctx.build_dir, patch), patch)
 
 
 def muck_update_patch(ctx: Ctx) -> None:
@@ -334,18 +336,18 @@ def muck_update_patch(ctx: Ctx) -> None:
   if path_ext(patch_path) != '.pat':
     exit(f'muck update-patch error: argument does not specify a .pat file: {patch_path!r}')
 
-  deps = pat_dependencies(target=patch_path, src_path=patch_path, dir_entries=ctx.dir_entries)
+  deps = pat_dependencies(target_dir=path_dir(patch_path), src_path=patch_path, dir_entries=ctx.dir_entries)
   assert len(deps) == 1
   orig_path = deps[0]
   update_or_exit(ctx, orig_path)
   target = path_stem(patch_path)
   patch_path_tmp = patch_path + tmp_ext
-  cmd = ['pat', 'diff', orig_path, target, '../' + patch_path_tmp]
+  cmd = ['pat', 'diff', orig_path, target, patch_path_tmp]
   cmd_str = ' '.join(shlex.quote(w) for w in cmd)
   errL(f'muck update-patch note: diffing: `{cmd_str}`')
   code = runC(cmd, cwd=ctx.build_dir)
   if code: exit(code)
-  move_file(patch_path_tmp, patch_path, overwrite=True)
+  move_file(path_join(ctx.build_dir, patch_path_tmp), patch_path, overwrite=True)
   ctx.db.delete_record(target=target) # no-op if does not exist.
   #^ need to remove or update the target record to avoid the 'did you mean to patch?' safeguard.
   #^ for now, just delete it to be safe; this makes the target look stale.

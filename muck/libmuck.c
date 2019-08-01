@@ -394,10 +394,10 @@ static void muck_init() {
   check(n_chars > 0 && n_chars < pid_cap, "failed to format PID.");
 
   // Get the project dir.
-  char* env_proj_dir = getenv("MUCK_PROJ_DIR");
+  char* env_proj_dir = getenv("PROJECT_DIR");
   if (env_proj_dir && *env_proj_dir) {
     Size buf_len = strlen(env_proj_dir) + 1;
-    check(buf_len <= MAXPATHLEN, "MUCK_PROJ_DIR is greater than maximum path length.")
+    check(buf_len <= MAXPATHLEN, "PROJECT_DIR is greater than maximum path length.")
     memcpy(proj_dir, env_proj_dir, buf_len);
   }
 
@@ -458,6 +458,9 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
       continue;
     }
     if (has_prefix(file_path, "../")) { // Drop back one level.
+      // First, need to clip trailing slash.
+      assert(str_last_char(&canon_path) == '/');
+      canon_path.len -= 1;
       str_truncate_to_char(&canon_path, '/');
       file_path += 3;
       continue;

@@ -1,1 +1,1 @@
-muck create-patch note: creating patch: `pat create orig.txt patched.txt ../patched.txt.pat`
+muck create-patch note: creating patch: `pat create orig.txt patched.txt patched.txt.pat`
