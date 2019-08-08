@@ -550,11 +550,16 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
   if dep.startswith(ctx.fetch_dir):
     ctx.create_fetch_dirs()
     return pid, dyn_time
-  if '__pycache__/' in dep:
+  if (
+    ('__pycache__/' in dep) or
     # This is now necessary because python3.7 appears to produce temporary files with extensions like `.pyc.4780302000`.
     # We can either regex for the extension pattern, or just test for the prefix.
     # In general, it seems like the smart approach would be to create one regex for left-to-right match/search,
     # and a separate test that extracts the multi-extension suffix and matches against that.
+    ('<frozen importlib._bootstrap' in dep)
+    # Both '<frozen importlib._bootstrap>' and '<frozen importlib._bootstrap_external>' appear as stats by python3.
+    # These occur in qthe local source dir after adding a local import to a python script.
+    ):
     return pid, dyn_time
   # TODO: further verifications? source dir, etc.
 
