@@ -306,8 +306,6 @@ def update_non_product(ctx:Ctx, fifo:AsyncLineReader, target:str, status:FileSta
       for entry in prod_entries.values():
         if entry.is_symlink():
           remove_file(entry.path)
-        else:
-          note(target, f'directory product contains preexisting non-symlink: {entry.path}')
 
     else: # target is regular file.
       if is_prod_link or prod_status: remove_path(prod_path)
