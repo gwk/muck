@@ -18,7 +18,7 @@ from ..ctx import Ctx
 from ..db import DB
 from ..logging import note
 from ..pithy.ansi import RST, TXT_B, TXT_G, TXT_R
-from ..pithy.fs import (abs_path, change_dir, clone, current_dir, is_dir, make_dirs, move_file, norm_path, path_dir,
+from ..pithy.fs import (abs_path, change_dir, copy_path, current_dir, is_dir, make_dirs, move_file, norm_path, path_dir,
   path_exists, path_ext, path_join, path_stem, remove_dir_contents, remove_path, remove_path_if_exists, split_stem_ext, walk_dirs, walk_paths)
 from ..pithy.interactive import ExitOnKeyboardInterrupt
 from ..pithy.io import errL, errSL, errZ, outL, outLL
@@ -388,15 +388,16 @@ def muck_publish(ctx:Ctx) -> None:
 
   # Remove existing files that match the glob patterns in the publishing destination.
   for pattern in ctx.args.files:
-    errSL('cleaning glob:', pattern)
-    for dst in walk_glob(path_join(dst_root, pattern), recursive=True):
+    dst_glob = path_join(dst_root, pattern)
+    errSL('cleaning glob:', dst_glob)
+    for dst in walk_glob(dst_glob, recursive=True):
       errSL('  remove:', dst)
       remove_path(dst)
 
   copied_products: Set[str] = set()
 
   # Need to copy product tree manually, or else published dir ends up with symlinks.
-  def clone_to_pub(product:str) -> None:
+  def copy_to_pub(product:str, *, overwrite:bool) -> None:
     for p in walk_paths(product):
       if p in copied_products: return
       target = ctx.target_for_product(p)
@@ -406,14 +407,15 @@ def muck_publish(ctx:Ctx) -> None:
         make_dirs(dst)
       else: # TODO: do we need a third case for when p is a symlink?
         make_dirs(path_dir(dst))
-        clone(src=p, dst=dst)
+        copy_path(src=p, dst=dst, overwrite=overwrite)
       copied_products.add(p)
 
+  errL(f'publishing targets:')
   for target in ctx.targets:
-    clone_to_pub(ctx.product_path_for_target(target))
+    copy_to_pub(ctx.product_path_for_target(target), overwrite=True)
 
   for pattern in ctx.args.files:
     errSL(f'publishing glob: {pattern}')
     # Walk over products, not targets, so that glob applies to products (which are not always globbable by user's shell).
     for product in walk_glob(ctx.product_path_for_target(pattern), recursive=True):
-      clone_to_pub(product)
+      copy_to_pub(product, overwrite=False)
