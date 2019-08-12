@@ -112,7 +112,8 @@ def update_target(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, force=Fa
       raise BuildError(target, 'target has circular dependency:', *(f'\n  {t}' for t in cycle))
     return target_status.change_time
 
-  target_status = ctx.statuses[target] = TargetStatus() # Update_deps_and_record updates the status upon completion.
+  target_status = ctx.statuses[target] = TargetStatus(dpdt=dpdt, expected=True)
+  #^ Note: update_deps_and_record updates the status upon completion.
   try:
     return update_target_status(ctx=ctx, fifo=fifo, target=target, dpdt=dpdt, force=force, target_status=target_status)
   except BuildError as e:
@@ -350,11 +351,13 @@ def update_deps_and_record(ctx, fifo:AsyncLineReader, target:str, is_target_dir:
 
   try: status = ctx.statuses[target]
   except KeyError:
-    status = TargetStatus()
+    status = TargetStatus(dpdt=dpdt, expected=False)
     ctx.statuses[target] = status
   else:
     if status.is_updated:
-      raise BuildError(target, f'target was updated by both a script and a dependency') # TODO: track updater in TargetStatus.
+      ctx.dbg(target, f'target was updated by both a script and a dependency; dependents:',
+        f'\n  {status.dpdt}; expected {status.expected}',
+        f'\n  {dpdt}')
 
   status.is_updated = True
   status.change_time = change_time

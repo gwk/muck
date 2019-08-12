@@ -67,6 +67,8 @@ class Dpdt(NamedTuple):
 
 @dataclass
 class TargetStatus:
+  dpdt:Dpdt
+  expected:bool
   change_time: int = 0 # Logical (monotonic) time.
   error: Optional[BuildError] = None
   is_updated: bool = False
