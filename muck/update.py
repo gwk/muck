@@ -627,20 +627,20 @@ def sqlite3_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -
           yield tokens[j+1]
 
 
-def pat_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -> List[str]:
+def pat_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -> Iterator[str]:
   try: import pithy.pat as pat
   except ImportError as e: raise BuildError(src_path, '`pat` is not installed; run `pip3 install pithy`.') from e
   with open(src_path) as f:
     dep = pat.pat_dependency(src_path=src_path, src_lines=f)
-  return [dep_path_for_url_path(target_dir, dep)]
+  yield dep_path_for_url_path(target_dir, dep)
 
 
-def writeup_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -> List[str]:
+def writeup_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -> Iterator[str]:
   try: import wu
   except ImportError as e: raise BuildError(src_path, '`writeup` is not installed; run `pip3 install wu`.') from e
   with open(src_path) as f:
     deps = wu.writeup_dependencies(src_path=src_path, text_lines=f)
-  return [dep_path_for_url_path(target_dir, dep) for dep in deps]
+  return (dep_path_for_url_path(target_dir, dep) for dep in deps)
 
 
 def dep_path_for_url_path(target_dir:str, dep:str) -> str:
