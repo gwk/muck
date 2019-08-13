@@ -20,8 +20,8 @@ from .db import DB, DBError, TargetRecord
 from .logging import error_msg, note, warn
 from .pithy.ansi import BOLD, RST, RST_BOLD, TXT_G, sgr
 from .pithy.fs import (DirEntries, FileStatus, current_dir, dir_entry_type_char, file_size, file_status, is_dir,
-  is_file_executable_by_owner, is_link, make_dir, make_dirs, make_link, move_file, path_exists, read_link, remove_file,
-  remove_path, remove_path_if_exists, scan_dir)
+  is_file_executable_by_owner, is_link, make_dir, make_dirs, make_link, move_file, path_dir_or_dot, path_exists, read_link,
+  remove_file, remove_path, remove_path_if_exists, scan_dir)
 from .pithy.io import AsyncLineReader, errL, errSL
 from .pithy.path import (PathIsNotDescendantError, is_path_abs, norm_path, path_descendants, path_dir, path_ext, path_join,
   path_name, path_rel_to_ancestor)
@@ -378,7 +378,16 @@ class DepCtx(NamedTuple):
   restricted_deps_wr: Set[str]
   dyn_deps: Set[str]
   all_outs: Set[str]
+  stale_out_dirs:Set[str] # Note: this is not effective unless we get rid of build_dir.
 
+  def add_out(self, target:str) -> None:
+    self.all_outs.add(target)
+    self.stale_out_dirs.add(path_dir_or_dot(target))
+
+  def refresh_out_dirs(self, dir_entries:DirEntries) -> None:
+    for out_dir in self.stale_out_dirs:
+      dir_entries.clear_dir(out_dir)
+    self.stale_out_dirs.clear()
 
 
 def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_path:str, dpdt:Dpdt) \
@@ -457,7 +466,8 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
       src_path,
     },
     dyn_deps=set(),
-    all_outs=set())
+    all_outs=set(),
+    stale_out_dirs=set())
 
   dyn_time = 0
   in_cm = open(src_prod_path, 'rb') if tool.src_to_stdin else nullcontext(None)
@@ -506,7 +516,8 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   else: # no new file; use captured stdout.
     via = 'stdout'
     move_file(prod_path_out, prod_path)
-  depCtx.all_outs.add(target)
+  depCtx.add_out(target)
+  depCtx.refresh_out_dirs(ctx.dir_entries)
   time_msg = '' if ctx.args.no_times else f'{time_elapsed:0.2f} seconds '
   note(target, cmd_msg, f' finished: {time_msg}(via {via}).')
   return dyn_time, tuple(sorted(depCtx.dyn_deps)), depCtx.all_outs
@@ -569,13 +580,14 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
     if mode == 'S' and dep == target:
       return pid, dyn_time # sqlite stats the db before opening. Imperfect, but better than nothing.
     if dep in depCtx.restricted_deps_rd: raise BuildError(target, f'attempted to open restricted file for reading: {dep!r}')
+    depCtx.refresh_out_dirs(ctx.dir_entries)
     dep_time = update_target(ctx, fifo=fifo, target=dep, dpdt=dpdt.sub(kind='observed', target=target))
     dyn_time = max(dyn_time, dep_time)
     depCtx.dyn_deps.add(dep)
   elif mode in 'AMUW':
     if dep in depCtx.restricted_deps_wr: raise BuildError(target, f'attempted to open restricted file for writing: {dep!r}')
     ctx.validate_target(dep) # Redundant with update_target in update_deps_and_record. TODO: remove?
-    depCtx.all_outs.add(dep)
+    depCtx.add_out(dep)
   else: raise ValueError(f'invalid mode received from libmuck: {mode}')
   return pid, dyn_time
 
