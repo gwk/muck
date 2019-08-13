@@ -644,6 +644,7 @@ def writeup_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -
 
 
 def dep_path_for_url_path(target_dir:str, dep:str) -> str:
+  'Convert a url path to a dependency path (a path relative to the project directory).'
   if dep.startswith('/'): # Relative to project.
     return dep.lstrip('/')
   else: # Relative to target.
