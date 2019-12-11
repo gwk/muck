@@ -88,6 +88,7 @@ class Ctx:
   build_dir_slash: str
   build_dir_abs: str
   fifo_path: str
+  fifo_path_abs: str
   reserved_names: FrozenSet
   reserved_prefixes: Tuple[str,...]
   dbg: Callable
