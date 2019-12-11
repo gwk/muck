@@ -11,7 +11,7 @@ import re
 def src_error(path:str, line1:int, col1:int, msg:str, text:str=None) -> SystemExit:
   pad = ' ' * (col1 - 1)
   if text is None:
-    text = read_line_from_path(path, line0=line1-1, default='<MISSING>')
+    text = read_line_from_path(path, line_index=line1-1, default='<MISSING>')
   return SystemExit(f'muck error: {path}:{line1}:{col1}: {msg}.\n  {text}\n  {pad}^')
 
 
