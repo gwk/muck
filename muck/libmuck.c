@@ -73,6 +73,7 @@ static char pid_str[24] = "<PID>"; // U64 max is 20 chars plus terminator.
 
 #define check(cond, fmt, ...) { if (!(cond)) {fail(fmt, ## __VA_ARGS__);} }
 
+#define errmsg strerror(errno)
 
 // Checked system operations.
 
@@ -88,7 +89,7 @@ static void* alloc(Size size) {
 
 static void write_bytes(int fd, const char* bytes, Size len) {
   ssize_t res = write(fd, bytes, len);
-  check((Size)res == len, "write failed: %s.\n", strerror(errno));
+  check((Size)res == len, "write failed: %s.\n", errmsg);
 }
 
 static void write_chars(int fd, const char* chars) {
@@ -355,19 +356,26 @@ static char proj_dir[MAXPATHLEN] = {};
 static char curr_dir[MAXPATHLEN] = {};
 
 
+static bool path_for_fd(char* path, int fd) {
+  if (fd < 0) return false; // Invalid file descriptor will always fail.
+#if __APPLE__
+  // This approach was extracted from the getcwd implementation in macOS Libc-1244.1.7.
+	int err = fcntl(fd, F_GETPATH, path);
+#else
+  #error "unsupported platform."
+#endif
+  //check(err != -1, "path_for_fd; fcntl F_GETPATH failed: fd: %d; error: %s.", fd, strerror(errno));
+  return (err != -1);
+}
+
+
 static void update_curr_dir() {
   // Update the current working directory buffer.
   // We cannot use getcwd, because it calls stat, which would put muck_communicate into infinite recursion.
   // Instead, we use a lower-level, platform specific approach.
   int fd = open(".", O_RDONLY); // Note: this does not trigger libmuck's own interposition.
   check(fd >= 0, "update_curr_dir: open failed.");
-  // This approach was extracted from the getcwd implementation in macOS Libc-1244.1.7.
-#if __APPLE__
-	int err = fcntl(fd, F_GETPATH, curr_dir);
-#else
-  #error "unsupported platform."
-#endif
-	check(!err, "update_curr_dir; fcntl failed.");
+  check(path_for_fd(curr_dir, fd), "update_curr_dir: path_for_fd failed: %s", errmsg);
   close(fd);
 }
 
@@ -510,22 +518,53 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
 }
 
 
+// Helpers.
+
+static char calc_mode_char(int oflag) {
+  if (oflag & O_RDWR) { return 'U'; }
+  if (oflag & O_WRONLY) {
+    if (oflag & O_TRUNC) { return 'W'; } // clean write.
+    if (oflag & O_APPEND) { return 'A'; } // append write.
+    return 'M'; // mutating write.
+  }
+  return 'R'; // read-only.
+}
+
+static bool get_full_path(char* full_path, int fd, const char* path) {
+  if (!path_for_fd(full_path, fd)) return false;
+  size_t pre_len = strlen(full_path);
+  size_t suf_len = strlen(path);
+  if (pre_len + 1 + suf_len >= MAXPATHLEN) {
+    fail("fstatat paths are too long:\n  %s\n  %s", full_path, path);
+  }
+  check(pre_len > 0, "get_full_path: empty fd path");
+  check(full_path[pre_len] == 0, "get_full_path: missing null terminator");
+  check(full_path[pre_len-1] != '/', "get_full_path: unexpected trailing slash");
+  size_t pos = pre_len;
+  full_path[pos++] = '/';
+  strcpy(full_path + pos, path);
+  return true;
+}
+
+
 // fcntl.h.
 
-static int muck_open(const char* filename, int oflag, int mode) {
-  char mode_char = '?';
-  if (oflag & O_RDWR) { mode_char = 'U'; }
-  else if (oflag & O_WRONLY) {
-    if (oflag & O_TRUNC) { mode_char = 'W'; } // clean write.
-    else if (oflag & O_APPEND) { mode_char = 'A'; } // append write.
-    else { mode_char = 'M'; } // mutating write.
-  }
-  else { mode_char = 'R'; } // read-only.
-
-  COMMUNICATE(mode_char, filename);
-  return open(filename, oflag, mode);
+static int muck_open(const char* path, int oflag, int mode) {
+  char mode_char = calc_mode_char(oflag);
+  COMMUNICATE(mode_char, path);
+  return open(path, oflag, mode);
 }
 INTERPOSE(open);
+
+static int muck_openat(int fd, const char* path, int oflag, int mode) {
+  char full_path[MAXPATHLEN] = {};
+  if (get_full_path(full_path, fd, path)) {
+    char mode_char = calc_mode_char(oflag);
+    COMMUNICATE(mode_char, full_path);
+  }
+  return openat(fd, path, oflag, mode);
+}
+INTERPOSE(openat);
 
 
 // sys/stat.h.
@@ -542,8 +581,21 @@ static int muck_lstat(const char* restrict path, struct stat* restrict buf) {
 }
 INTERPOSE(lstat);
 
+static int muck_fstat(int fd, struct stat *buf) {
+  char path[MAXPATHLEN] = {};
+  if (path_for_fd(path, fd)) {
+    COMMUNICATE('S', path);
+  }
+  return fstat(fd, buf);
+}
+INTERPOSE(fstat);
+
 static int muck_fstatat(int fd, const char* path, struct stat* buf, int flag) {
-  fail("fstatat is not yet supported; fd=%d, path=%s, buf=%p, flag=0x%x", fd, path, (void*)buf, flag)
+  char full_path[MAXPATHLEN] = {};
+  if (get_full_path(full_path, fd, path)) {
+    COMMUNICATE('S', full_path);
+  }
+  return fstatat(fd, path, buf, flag);
 }
 INTERPOSE(fstatat);
 
