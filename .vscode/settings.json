@@ -1,6 +1,9 @@
 {
-  "search.exclude": {
+  "files.exclude": {
     "_build": true,
+    ".vscode/tags": true
+  },
+  "search.exclude": {
     "_misc": true
   }
 }
