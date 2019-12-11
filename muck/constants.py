@@ -5,8 +5,8 @@ Muck constants.
 '''
 
 
-old_ext = '.old'
-out_ext = '.out'
+old_ext = '.muck_old'
+out_ext = '.muck_out'
 tmp_ext = '.tmp'
 
 ignored_exts = frozenset({
