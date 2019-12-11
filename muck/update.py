@@ -19,12 +19,12 @@ from .ctx import BuildError, Ctx, Dpdt, InvalidTarget, TargetNotFound, TargetSta
 from .db import DB, DBError, TargetRecord
 from .logging import error_msg, note, warn
 from .pithy.ansi import BOLD, RST, RST_BOLD, TXT_G, sgr
-from .pithy.fs import (DirEntries, FileStatus, current_dir, dir_entry_type_char, file_size, file_status, is_dir,
-  is_file_executable_by_owner, is_link, make_dir, make_dirs, make_link, move_file, path_dir_or_dot, path_exists, read_link,
-  remove_file, remove_path, remove_path_if_exists, scan_dir)
+from .pithy.filestatus import FileStatus, dir_entry_type_char
+from .pithy.fs import (DirEntries, file_size, file_status, is_dir, is_file_executable_by_owner, is_link, make_dir, make_dirs,
+  make_link, move_file, path_exists, read_link, remove_file, remove_path, remove_path_if_exists, scan_dir)
 from .pithy.io import AsyncLineReader, errL, errSL
-from .pithy.path import (PathIsNotDescendantError, is_path_abs, norm_path, path_descendants, path_dir, path_ext, path_join,
-  path_name, path_rel_to_ancestor)
+from .pithy.path import (PathIsNotDescendantError, current_dir, is_path_abs, norm_path, path_descendants, path_dir,
+  path_dir_or_dot, path_ext, path_join, path_name, path_rel_to_ancestor, path_split)
 from .pithy.string import format_byte_count
 from .pithy.task import launch
 from .pithy.url import split_url

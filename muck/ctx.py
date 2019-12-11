@@ -7,14 +7,14 @@ from os import getpid
 from typing import (Any, Callable, DefaultDict, Dict, FrozenSet, Iterable, Iterator, List, Match, NamedTuple, Optional, Pattern,
   Set, Tuple)
 
-from .constants import *
+from .constants import reserved_exts, reserved_or_ignored_exts
 from .db import DB
 from .logging import error_msg, note
 from .pithy.format import FormatError, count_formatters, format_to_re, has_formatter, parse_formatters
 from .pithy.fs import (DirEntries, DirEntry, file_status, is_link_to_dir, list_dir, make_dir, make_link, norm_path, path_exists,
-  path_ext, path_join, path_name_stem, path_stem, read_link, split_dir_name)
+  path_ext, path_join, read_link, split_dir_name)
 from .pithy.iterable import first_el
-
+from .pithy.path import path_name_stem, path_stem
 
 class BuildError(Exception):
   def __init__(self, target:str, *msg:Any) -> None:

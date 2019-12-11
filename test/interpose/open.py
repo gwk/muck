@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.7
+#!/usr/bin/env python3
 
 # NOTE: /usr/bin/env will strip the DYLD_ variables from the environment, resulting in test failure.
 
