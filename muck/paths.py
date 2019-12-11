@@ -6,10 +6,11 @@ Muck target path functions.
 
 import re
 from itertools import product
-from .pithy.format import parse_formatters
-from .pithy.fs import path_stem
-from .pithy.string import pluralize
 from typing import Dict, Tuple
+
+from .pithy.format import parse_formatters
+from .pithy.path import path_stem
+from .pithy.string import pluralize
 
 
 def dflt_prod_path_for_source(source_path:str) -> str: # TODO: rename? this is confusing compared to ctx.product_path

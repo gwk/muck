@@ -8,7 +8,7 @@ This file was separated from __main__.py to make stack traces more consistent du
 import shlex
 import sys
 from argparse import ArgumentParser, Namespace
-from glob import iglob as walk_glob, has_magic as is_glob_pattern
+from glob import has_magic as is_glob_pattern, iglob as walk_glob
 from os import environ
 from sys import argv
 from typing import Any, Callable, Dict, Optional, Set
@@ -18,10 +18,11 @@ from ..ctx import Ctx
 from ..db import DB
 from ..logging import note
 from ..pithy.ansi import RST, TXT_B, TXT_G, TXT_R
-from ..pithy.fs import (abs_path, change_dir, copy_path, current_dir, is_dir, make_dirs, move_file, norm_path, path_dir,
-  path_exists, path_ext, path_join, path_stem, remove_dir_contents, remove_path, remove_path_if_exists, split_stem_ext, walk_dirs, walk_paths)
+from ..pithy.fs import (abs_path, change_dir, copy_path, is_dir, make_dirs, move_file, norm_path, path_dir, path_exists,
+  path_ext, path_join, remove_dir_contents, remove_path, remove_path_if_exists, walk_dirs, walk_paths)
 from ..pithy.interactive import ExitOnKeyboardInterrupt
 from ..pithy.io import errL, errSL, errZ, outL, outLL
+from ..pithy.path import current_dir, path_stem, split_stem_ext
 from ..pithy.path_encode import path_for_url
 from ..pithy.task import runC
 from ..server import serve_build
