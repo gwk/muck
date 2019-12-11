@@ -376,6 +376,7 @@ class DepCtx(NamedTuple):
   ignored_deps: Set[str]
   restricted_deps_rd: Set[str]
   restricted_deps_wr: Set[str]
+  restricted_deps_all: Set[str]
   dyn_deps: Set[str]
   all_outs: Set[str]
   stale_out_dirs:Set[str] # Note: this is not effective unless we get rid of build_dir.
@@ -439,7 +440,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   env['TARGET'] = target
   if tool.env_mod_fn is not None:
     tool.env_mod_fn(ctx, env)
-  env['MUCK_FIFO'] = ctx.fifo_path
+  env['MUCK_FIFO'] = ctx.fifo_path_abs
   env['MUCK_PID'] = ctx.pid_str
   env['MUCK_DYLD_INSERT_LIBRARIES'] = libmuck_path
   env['DYLD_INSERT_LIBRARIES'] = libmuck_path
@@ -452,19 +453,18 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   ignored_deps = set(ctx.db.get_inferred_deps(target=src_path))
   ignored_deps.update(['.', src_path])
 
+  restricted_deps_rd = {
+    ctx.db.path,
+    ctx.fifo_path,
+    prod_path_out,
+  }
+  restricted_deps_wr = restricted_deps_rd | { src_path }
+
   depCtx = DepCtx(
     ignored_deps=ignored_deps,
-    restricted_deps_rd={
-      ctx.db.path,
-      ctx.fifo_path,
-      prod_path_out,
-    },
-    restricted_deps_wr={
-      ctx.db.path,
-      ctx.fifo_path,
-      prod_path_out, # muck process opens this for the child.
-      src_path,
-    },
+    restricted_deps_rd=restricted_deps_rd,
+    restricted_deps_wr=restricted_deps_wr,
+    restricted_deps_all=restricted_deps_rd | restricted_deps_wr,
     dyn_deps=set(),
     all_outs=set(),
     stale_out_dirs=set())
@@ -507,7 +507,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
 
   if path_exists(prod_path, follow=False):
     via = 'open'
-    if target not in depCtx.all_outs:
+    if target not in depCtx.all_outs and not is_dir(prod_path, follow=False):
       warn(target, f'wrote data to {prod_path}, but muck did not observe `open` system call.')
     if file_size(prod_path_out) == 0:
       remove_file(prod_path_out)
@@ -538,16 +538,17 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
   '''
   try:
     dep_line_parts = dep_line.split('\t')
-    pid_str, call, mode, dep = dep_line_parts
+    pid_str, call, mode, dep_nl = dep_line_parts
     pid = int(pid_str)
-    if not (dep and dep[-1] == '\n'): raise ValueError
-    dep = dep[:-1] # remove final newline.
+    if not (dep_nl and dep_nl[-1] == '\n'): raise ValueError
   except ValueError as e:
     raise BuildError(target, f'child process sent bad dependency line:\n{dep_line!r}') from e
 
-  if not is_path_abs(dep): # libmuck converts all paths to absolute, because only the child knows its own current directory.
-    raise ValueError(f'libmuck sent relative path: {dep}')
-  try: dep = path_rel_to_ancestor(dep, ancestor=ctx.build_dir_abs, dot=True)
+  dep_abs = dep_nl[:-1] # Remove final newline.
+
+  if not is_path_abs(dep_abs): # libmuck converts all paths to absolute, because only the child knows its current directory.
+    raise ValueError(f'libmuck sent relative path: {dep_abs}')
+  try: dep = path_rel_to_ancestor(dep_abs, ancestor=ctx.build_dir_abs, dot=True)
   except PathIsNotDescendantError:
     # We cannot differentiate between harmless and ill-advised accesses outside of the build directory.
     # In particular, as long as the project dir is the parent of build_dir,
@@ -555,7 +556,7 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
     # For example, Python accesses the parent directory during startup.
     # Therefore our only option is to ignore access to parent dirs.
     # Libmuck will not send paths outside of the project directory as long as PROJECT_DIR environment variable is set.
-    if dep != ctx.proj_dir: ctx.dbg(target, f'requested dependency outside of build_dir: {dep}')
+    if dep_abs != ctx.proj_dir: ctx.dbg(target, f'requested dependency outside of build_dir: {dep_abs}')
     return pid, dyn_time
 
   if (dep in depCtx.ignored_deps) or (path_ext(dep) in ignored_dep_exts):
@@ -578,8 +579,16 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
 
   ctx.dbg(target, f'{mode} dep: {dep}')
   if mode in 'RS':
-    if mode == 'S' and dep == target:
-      return pid, dyn_time # sqlite stats the db before opening. Imperfect, but better than nothing.
+    if mode == 'S':
+      # If the dependency is a stat and appears to be a product, then return.
+      # For example, sqlite stats the product before opening it, as do file high level copy operations like pithy.fs.copy_path.
+      # This is an imperfect heuristic; we are just guessing whether to treat the stat as a 'read' dependency.
+      dep_comps = path_split(dep)
+      if (dep == target
+       or dep.startswith(target + '/')
+       or dep in depCtx.restricted_deps_all
+       or path_ext(dep) in reserved_or_ignored_exts):
+        return pid, dyn_time
     if dep in depCtx.restricted_deps_rd: raise BuildError(target, f'attempted to open restricted file for reading: {dep!r}')
     depCtx.refresh_out_dirs(ctx.dir_entries)
     dep_time = update_target(ctx, fifo=fifo, target=dep, dpdt=dpdt.sub(kind='observed', target=target))
