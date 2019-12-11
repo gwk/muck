@@ -221,7 +221,7 @@ def update_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:bool,
     # For `.list` and any other no-op targets, there is no output, so change_time will be zero.
     change_time = 0
     product_change_time = 0
-    for product in sorted(all_outs):
+    for product in all_outs:
       product_change_time = update_product_with_output(ctx, fifo=fifo, target=product, src=src, dyn_deps=dyn_deps,
         update_time=update_time, dpdt=dpdt)
       if product == target:
@@ -391,7 +391,7 @@ class DepCtx(NamedTuple):
 
 
 def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_path:str, dpdt:Dpdt) \
- -> Tuple[int, Tuple[str, ...], Set[str]]:
+ -> Tuple[int, Tuple[str, ...], List[str]]:
   '''
   Run a source file, producing zero or more products.
   Return a list of produced product paths.
@@ -414,7 +414,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
     except KeyError as e: raise BuildError(target, f'unsupported source file extension: {src_ext!r}') from e
     if not tool.cmd:
       note(target, 'no-op.')
-      return 0, (), set() # no product.
+      return 0, (), [] # no product.
     if not tool.src_to_stdin:
       src_arg = (src_name,)
 
@@ -520,7 +520,8 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   depCtx.refresh_out_dirs(ctx.dir_entries)
   time_msg = '' if ctx.args.no_times else f'{time_elapsed:0.2f} seconds '
   note(target, cmd_msg, f' finished: {time_msg}(via {via}).')
-  return dyn_time, tuple(sorted(depCtx.dyn_deps)), depCtx.all_outs
+  all_outs = sorted(out for out in depCtx.all_outs if path_exists(ctx.product_path_for_target(out), follow=False))
+  return dyn_time, tuple(sorted(depCtx.dyn_deps)), all_outs
 
 
 def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, dep_line:str, dyn_time:int, dpdt:Dpdt) \
