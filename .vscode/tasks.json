@@ -9,14 +9,14 @@
       "args": ["${relativeFile}", "-print-ok", "-deps", "hashing", "wu"],
       "group": {"kind": "build", "isDefault": true},
       "presentation": {"showReuseMessage": false},
-      "problemMatcher": "$craft"
+      "problemMatcher": "$crafts"
     },
     {
       "label": "test and typecheck",
       "command": "make",
       "args": [],
       "group": {"kind": "test", "isDefault": true},
-      "problemMatcher": "$craft"
+      "problemMatcher": "$crafts"
     }
   ]
 }
