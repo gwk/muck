@@ -63,17 +63,17 @@ def serve_build(ctx:Ctx, main_target:str) -> None:
       '''Serve a GET request.'''
       if self.path == '/favicon.ico':
         self.send_header('Content-type', 'image/x-icon')
-        self.send_header('Content-Length', 0)
+        self.send_header('Content-Length', '0')
         self.end_headers()
         return
 
-      f = self.send_head()
+      f = self.send_head() # type: ignore
       if not f: return
-      try: self.copyfile(f, self.wfile)
+      try: self.copyfile(f, self.wfile) # type: ignore
       finally: f.close()
 
 
-    def target_for_url_path(self):
+    def target_for_url_path(self) -> str:
       '''
       Special case maps directories to index.html; based on the beginning of super's implementation of `send_head`.
       Note: this assumes that any directory is a source directory and not a generated product.
