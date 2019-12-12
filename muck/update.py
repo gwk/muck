@@ -229,7 +229,7 @@ def update_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:bool,
     return change_time
   else: # not needs_update.
     assert old is not None
-    return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=False, actual_path=prod_path, is_changed=False,
+    return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=is_prod_dir, actual_path=prod_path, is_changed=False,
       size=old.size, mtime=mtime, change_time=old.change_time, update_time=update_time, file_hash=old.hash, src=src,
       dyn_deps=old.dyn_deps, old=old, dpdt=dpdt)
 
@@ -322,7 +322,7 @@ def update_non_product(ctx:Ctx, fifo:AsyncLineReader, target:str, status:FileSta
     if mtime != old.mtime:
       note(target, f'source modification time changed but contents did not.')
 
-  return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=False, actual_path=target, is_changed=is_changed,
+  return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=is_target_dir, actual_path=target, is_changed=is_changed,
     size=size, mtime=mtime, change_time=change_time, update_time=change_time, file_hash=target_hash, src=None, dyn_deps=(),
     old=old, dpdt=dpdt)
   # TODO: non_product update_time is meaningless? mark as -1?
