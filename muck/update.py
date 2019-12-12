@@ -31,6 +31,7 @@ from .pithy.url import split_url
 from .py_deps import py_dependencies
 
 
+# Try to use a fast hashing algorithm; fall back on the system algorithm.
 try:
   from hashing import Aquahash as Hasher
 except ImportError:
@@ -60,13 +61,14 @@ def fake_update(ctx:Ctx, target:str) -> None:
 
 
 def update_or_exit(ctx:Ctx, target:str) -> int:
+  'Call update_top; on error, print and exit.'
   try: return update_top(ctx, target)
   except BuildError as e: exit(e)
 
 
 def update_top(ctx:Ctx, target:str) -> int:
 
-  # Create the FIFO.
+  # Create the FIFO that we use to communicate with interposed child processes.
   try:
     mkfifo(ctx.fifo_path, mode=0o600)
   except OSError as e:
@@ -93,8 +95,8 @@ def update_top(ctx:Ctx, target:str) -> int:
 
 def update_target(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, force=False) -> int:
   '''
-  The central function of the Muck.
-  returns transitive change_time.
+  The central function of Muck's build algorithm.
+  Returns transitive change_time.
   '''
   ctx.validate_target(target)
 
@@ -227,7 +229,7 @@ def update_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:bool,
       if product == target:
         change_time = product_change_time
     return change_time
-  else: # not needs_update.
+  else: # Does not needs_update.
     assert old is not None
     return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=is_prod_dir, actual_path=prod_path, is_changed=False,
       size=old.size, mtime=mtime, change_time=old.change_time, update_time=update_time, file_hash=old.hash, src=src,
