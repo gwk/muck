@@ -15,7 +15,8 @@ from .pithy.string import pluralize
 
 
 def is_target_product(path:str) -> bool:
-  return is_sticky(path, follow=False) is not False # Target is a product if it does not exist, or if the sticky bit is set.
+  'Target is a product if it does not exist, or if the sticky bit is set.'
+  return is_sticky(path, follow=False) is not False
 
 
 def dflt_prod_path_for_source(source_path:str) -> str:

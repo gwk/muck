@@ -19,8 +19,8 @@ from .db import TargetRecord
 from .logging import note, warn
 from .paths import set_prod_perms
 from .pithy.ansi import BOLD, RST, RST_BOLD, TXT_G, sgr
-from .pithy.filestatus import FileStatus, dir_entry_type_char
-from .pithy.fs import (DirEntries, file_size, file_status, is_dir, is_file_executable_by_owner, is_link, make_dirs, move_file,
+from .pithy.filestatus import dir_entry_type_char
+from .pithy.fs import (DirEntries, file_size, file_status, is_dir, is_file_executable_by_owner, make_dirs, move_file,
   path_exists, read_link, remove_file, remove_path_if_exists, scan_dir)
 from .pithy.io import AsyncLineReader, errL
 from .pithy.path import (PathIsNotDescendantError, is_path_abs, norm_path, path_dir, path_dir_or_dot, path_ext, path_join,
@@ -120,8 +120,8 @@ def update_target(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, force=Fa
 def update_target_status(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, force:bool, target_status:TargetStatus) -> int:
   ctx.dbg(target, f'{TXT_G}update; {dpdt}{RST}')
 
-  status = file_status(target, follow=True) # follows symlinks.
-  if status is None and is_link(target):
+  status = file_status(target, follow=False)
+  if status and status.is_link and not path_exists(target, follow=True):
     raise BuildError(target, f'target is a dangling symlink to: {read_link(target)}')
 
   is_product = status is None or status.is_sticky # Note: this logic must match muck.paths.is_target_product.
@@ -134,7 +134,7 @@ def update_target_status(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, f
       update_target(ctx, fifo=fifo, target=target_dir, dpdt=dpdt.sub(kind='directory contents', target=target), force=force)
       if not target_status.is_updated: # build of parent did not create this product.
         raise BuildError(target, f'target resides in a product directory but was not created by building that directory')
-      return target_status.change_time # TODO: verify that we should be returning this change_time and not the result of target_dir update.
+      return target_status.change_time
 
   old = ctx.db.get_record(target=target)
   needs_update = force or (old is None)
@@ -148,8 +148,8 @@ def update_target_status(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, f
   if is_product:
     return update_product(ctx, fifo=fifo, target=target, needs_update=needs_update, old=old, dpdt=dpdt)
   else:
-    assert status
-    return update_non_product(ctx, fifo=fifo, target=target, status=status, needs_update=needs_update, old=old, dpdt=dpdt)
+    assert status is not None
+    return update_non_product(ctx, fifo=fifo, target=target, needs_update=needs_update, old=old, dpdt=dpdt)
 
 
 def check_product_not_modified(ctx:Ctx, target:str, is_target_dir:bool, size:int, mtime:float, old:TargetRecord) -> None:
@@ -248,27 +248,21 @@ def update_product_with_output(ctx:Ctx, fifo:AsyncLineReader, target:str, src:st
     old=old, dpdt=dpdt)
 
 
-def update_non_product(ctx:Ctx, fifo:AsyncLineReader, target:str, status:FileStatus, needs_update:bool,
- old:Optional[TargetRecord], dpdt:Dpdt) -> int:
-  'returns transitive change_time.'
+def update_non_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:bool, old:Optional[TargetRecord], dpdt:Dpdt) \
+ -> int:
+  'Returns transitive change_time.'
   ctx.dbg(target, 'update_non_product')
 
-  is_target_dir = status.is_dir
-  size = status.size
-  mtime = status.mtime
-  prod_status = file_status(target, follow=False) # TODO: is follow=False correct?
+  is_target_dir, size, mtime = file_stats(target)
 
-  if needs_update or prod_status is None or (is_target_dir != prod_status.is_dir):
-    is_changed = True
-    target_hash = hash_for_path(target)
-  elif (old is None or is_target_dir or size != old.size or mtime != old.mtime):
+  if (old is None or is_target_dir or old.is_dir or size != old.size or mtime != old.mtime):
     # All we know so far is that the asset exists, dir/file is not changed, and product/non-product is not changed.
     # Note that if the target is a directory, then we must recalculate the hash, because mtime will not reflect changes.
     target_hash = hash_for_path(target)
     is_changed = (old is None or old.hash != target_hash)
   else: # assume not changed based on size/mtime; otherwise we constantly recalculate hashes for large sources.
-    is_changed = False
     target_hash = old.hash
+    is_changed = False
 
   if is_changed:
     if not needs_update: note(target, 'source changed.') # only want to report this on subsequent changes.

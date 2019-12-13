@@ -18,7 +18,7 @@ from ..db import DB
 from ..logging import note
 from ..paths import is_target_product
 from ..pithy.ansi import RST, TXT_B, TXT_G, TXT_R
-from ..pithy.filestatus import is_sticky
+from ..pithy.filestatus import is_link, is_sticky
 from ..pithy.fs import (change_dir, copy_path, is_dir, make_dirs, move_file, norm_path, path_dir, path_exists, path_ext,
   path_join, remove_path, walk_dirs, walk_paths)
 from ..pithy.interactive import ExitOnKeyboardInterrupt
@@ -375,8 +375,8 @@ def muck_publish(ctx:Ctx) -> None:
     if pattern.startswith('/'): exit(f'muck publish error: invalid glob pattern: leading slash: {pattern!r}')
 
   for target in ctx.targets:
-    if is_dir(target, follow=False): # Non-product directory needs to be recursed.
-      #^ TODO: rethink how built directories work and the usage of symlinks.
+    if is_link(target): exit(f'muck publish error: symlinks not yet supported: {target!r}')
+    if is_dir(target, follow=False):
       for d in walk_dirs(target):
         update_or_exit(ctx, d)
     else:
@@ -398,6 +398,7 @@ def muck_publish(ctx:Ctx) -> None:
   def copy_to_pub(target:str, *, overwrite:bool) -> None:
     for src in walk_paths(target):
       if src in copied_targets: return
+      if is_link(target): exit(f'muck publish error: symlinks not yet supported: {src!r}')
       dst = path_join(dst_root, src)
       errL(f'  publish: {src} -> {dst}')
       if is_dir(src, follow=False):
