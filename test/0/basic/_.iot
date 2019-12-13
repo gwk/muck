@@ -3,7 +3,7 @@
   'cmd': '$MUCK -no-times',
   'code': 0,
   'files': {
-    '_build/index.html' : {
+    'index.html' : {
       'path': 'test/0/basic/index-exp.html'
     },
   },

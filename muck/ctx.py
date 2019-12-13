@@ -11,10 +11,11 @@ from .constants import reserved_exts, reserved_or_ignored_exts
 from .db import DB
 from .logging import error_msg, note
 from .pithy.format import FormatError, count_formatters, format_to_re, has_formatter, parse_formatters
-from .pithy.fs import (DirEntries, DirEntry, file_status, is_link_to_dir, list_dir, make_dir, make_link, norm_path, path_exists,
-  path_ext, path_join, read_link, split_dir_name)
+from .pithy.fs import (DirEntries, DirEntry, file_status, is_link_to_dir, list_dir, make_dir, make_link, norm_path,
+  path_exists, path_ext, path_join, read_link, split_dir_name)
 from .pithy.iterable import first_el
 from .pithy.path import path_name_stem, path_stem
+
 
 class BuildError(Exception):
   def __init__(self, target:str, *msg:Any) -> None:
@@ -84,9 +85,6 @@ class Ctx:
   args: argparse.Namespace
   db: DB
   proj_dir: str
-  build_dir: str
-  build_dir_slash: str
-  build_dir_abs: str
   fifo_path: str
   fifo_path_abs: str
   reserved_names: FrozenSet
@@ -129,24 +127,6 @@ class Ctx:
     elif not s.is_dir:
       exit(f'muck fatal error: fetch directory {self.fetch_dir} exists but is not a directory.')
 
-    fetch_link = path_join(self.build_dir, self.fetch_dir)
-    s = file_status(fetch_link, follow=False)
-    if not s: make_link(self.fetch_dir, link=fetch_link)
-    else:
-      if not s.is_link:
-        exit(f'muck fatal error: fetch directory link {fetch_link} exists but is not a symlink.')
-      dst = read_link(fetch_link)
-      if dst != self.fetch_dir:
-        exit(f'muck fatal error: fetch directory link {fetch_link} exists but points to the wrong location: {dst}.')
-
-
-  def is_product_path(self, path:str) -> bool:
-    return path.startswith(self.build_dir_slash)
-
-
-  def product_path_for_target(self, target:str) -> str:
-    return path_join(self.build_dir, target)
-
 
   def source_for_target(self, target:str, dpdt:Dpdt) -> str:
     '''
@@ -177,22 +157,9 @@ class Ctx:
     return candidates[0]
 
 
-  def target_for_product(self, product_path:str) -> str:
-    'Return the target path for `product_path`.'
-    assert self.is_product_path(product_path)
-    return product_path[len(self.build_dir_slash):]
-
-
   def target_for_source(self, source_path:str) -> str:
-    'Return the target path for `source_path` (which may itself be a product).'
-    return self.strip_opt_build_dir(path_stem(source_path)) # strip off source ext, then possibly strip leading build_dir.
-
-
-  def strip_opt_build_dir(self, path:str) -> str:
-    if self.is_product_path(path):
-      return path[len(self.build_dir_slash):]
-    else:
-      return path
+    'Return the target path for `source_path`.'
+    return path_stem(source_path) # Strip off source ext.
 
 
   def validate_target(self, target:str) -> None:
@@ -205,8 +172,6 @@ class Ctx:
       raise InvalidTarget(target, "cannot begin with '-'.")
     if target.startswith('.') or target.endswith('.'):
       raise InvalidTarget(target, "cannot begin or end with '.'.")
-    if target == self.build_dir or self.is_product_path(target):
-      raise InvalidTarget(target, f'target path is prefixed with build dir.')
     if path_name_stem(target) in self.reserved_names:
       reserved_desc = ', '.join(sorted(self.reserved_names))
       raise InvalidTarget(target, f'name is reserved; please rename the target.\n(reserved names: {reserved_desc}.)')
@@ -252,32 +217,31 @@ def filter_source_candidates(entries:Iterable[DirEntry], target_name:str, req_ex
   * x.txt.py.py
   * {}.txt.py.py
   '''
-  candidates = []
+  candidates:Set[str] = set()
 
   if req_exact:
     for entry in entries:
       name = entry.name
       stem = path_stem(name)
       if stem == target_name:
-        candidates.append(name)
+        candidates.add(name)
 
   else: # Allow formatter names to match.
     # Note: naive splitting by '.' means that formats containing '.' will be broken.
-    target = target_name.split('.')
+    target_words = target_name.split('.')
     for entry in entries:
       name = entry.name
-      src = name.split('.')
-      if len(src) <= len(target): continue # src must have more components than target.
-      if all(match_format(*p) for p in zip(src, target)): # zip stops when target is exhausted.
-        candidates.append('.'.join(src[:len(target)+1])) # The immediate source name has just one extension added.
+      src_words = name.split('.')
+      if len(src_words) <= len(target_words): continue # src must have more components than target.
+      if all(match_format(*p) for p in zip(src_words, target_words)): # zip stops when target is exhausted.
+        candidates.add('.'.join(src_words[:len(target_words)+1])) # The immediate source name has just one extension added.
 
     if len(candidates) > 1: # Attempt to reduce candidates by minimum wildcards.
       cand_fmt_counts = [(cand, count_formatters(cand)) for cand in candidates]
       min_count = min(count for _, count in cand_fmt_counts)
-      candidates = [cand for cand, count in cand_fmt_counts if count == min_count]
+      candidates = set(cand for cand, count in cand_fmt_counts if count == min_count)
 
-  return candidates
-
+  return sorted(candidates)
 
 
 def match_format(format:str, string:str) -> Optional[Match[str]]:

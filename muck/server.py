@@ -10,7 +10,7 @@ from .pithy.task import run
 from .update import update_top
 
 
-def serve_build(ctx:Ctx, main_target:str) -> None:
+def serve_project(ctx:Ctx, main_target:str) -> None: # TODO: rename.
   address = ('localhost', 8000)
   host, port = address
   addr_str = f'http://{host}:{port}/{main_target}'
@@ -21,17 +21,6 @@ def serve_build(ctx:Ctx, main_target:str) -> None:
   }
 
   class Handler(SimpleHTTPRequestHandler):
-
-    def translate_path(self, path):
-      '''
-      Translate a URL path to the appropriate file system path.
-      This gets called by super's send_head (and also run_cgi, which we can ignore).
-      super's implementation returns an absolute path based on cwd; we want one relative to build_dir.
-      Note: we could reimplement necessary URL parsing logic here and not call super().translate_path, but this is easier.
-      '''
-      target = rel_path(super().translate_path(path)) # type: ignore # this is technically a private method.
-      return ctx.product_path_for_target(target)
-
 
     def send_head(self):
       '''

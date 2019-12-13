@@ -6,14 +6,21 @@ Muck target path functions.
 
 import re
 from itertools import product
+from os import chmod
+from stat import S_ISVTX, S_IWGRP, S_IWOTH, S_IWUSR
 from typing import Dict, Tuple
 
+from .pithy.filestatus import file_permissions, is_sticky
 from .pithy.format import parse_formatters
 from .pithy.path import path_stem
 from .pithy.string import pluralize
 
 
-def dflt_prod_path_for_source(source_path:str) -> str: # TODO: rename? this is confusing compared to ctx.product_path
+def is_target_product(path:str) -> bool:
+  return is_sticky(path, follow=False) is not False # Target is a product if it does not exist, or if the sticky bit is set.
+
+
+def dflt_prod_path_for_source(source_path:str) -> str:
   '''
   Return the default product path for `source_path` (which may itself be a product),
   as implied by the source stem.
@@ -46,3 +53,18 @@ def dst_path(src:str, args:Tuple[str, ...], override_bindings:Dict[str, str]) ->
   except KeyError as e:
      raise Exception(f'format {fmt!r} requires field name {e.args[0]!r}; provided bindings: {bindings}') from e
 
+
+def set_prod_perms(path:str, *, is_product:bool, is_patched:bool=False) -> None:
+  old_perms = file_permissions(path, follow=False)
+  readonly = old_perms & nonwriteable
+  if is_product:
+    new_perms = readonly | S_ISVTX
+    if is_patched:
+      new_perms = new_perms | user_writeable
+  else:
+    new_perms = (readonly & ~S_ISVTX) | user_writeable
+  chmod(path, new_perms, follow_symlinks=False)
+
+
+user_writeable = S_IWUSR
+nonwriteable = ~(S_IWGRP|S_IWOTH|S_IWUSR)

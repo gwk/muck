@@ -7,7 +7,7 @@
     'test/0/multi/c-many.txt.py',
   },
   'files': {
-    '_build/c-many.txt' : {
+    'c-many.txt' : {
       'val': '',
     },
   },

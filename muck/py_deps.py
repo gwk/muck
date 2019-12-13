@@ -19,7 +19,7 @@ def node_error(path:str, node:ast.AST, msg:str) -> SystemExit:
   return src_error(path, node.lineno, node.col_offset + 1, msg)
 
 
-def py_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -> Iterable[str]:
+def py_dependencies(src_path:str, dir_entries:DirEntries) -> Iterable[str]:
   'Calculate dependencies for a .py (python3 source) file.'
   src_dir = path_dir(src_path)
   src_dir_parts = path_split(src_dir)
