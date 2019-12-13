@@ -1,7 +1,6 @@
 # Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
 
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-from typing import Callable
 
 from .ctx import BuildError, Ctx
 from .pithy.fs import is_dir, path_join, rel_path

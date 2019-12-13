@@ -6,11 +6,11 @@ However the database could be replaced with a key-value store.
 '''
 
 from marshal import dumps as to_marshalled, loads as from_marshalled
-from sqlite3 import Cursor, DatabaseError, IntegrityError, OperationalError, connect, sqlite_version, version as module_version
-from typing import *
-from .pithy.fs import path_join
-from .pithy.io import errL, errSL
+from sqlite3 import Cursor, DatabaseError, IntegrityError, OperationalError, connect
+from typing import Any, List, NamedTuple, Optional, Set, Tuple
+
 from .pithy.encodings import enc_lep62
+from .pithy.io import errL, errSL
 
 
 class TargetRecord(NamedTuple):
@@ -173,7 +173,6 @@ class DB:
     rows = c.fetchall()
     dependents:Set[str] = set()
     for path, deps_blob, dyn_deps_blob in rows:
-      d = from_marshalled(dyn_deps_blob)
       if (target in from_marshalled(deps_blob)) or (target in from_marshalled(dyn_deps_blob)):
         dependents.add(path)
     return dependents
