@@ -358,7 +358,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, dpdt:
   '''
   src_name = path_name(src_path)
   src_ext = path_ext(src_path)
-  target_out = target + out_ext
+  target_out = target + muck_out_ext
   target_dir = path_dir_or_dot(target)
   is_patched = (src_ext == '.pat')
 
