@@ -17,7 +17,9 @@ from ..constants import tmp_ext
 from ..ctx import Ctx
 from ..db import DB
 from ..logging import note
+from ..paths import is_target_product
 from ..pithy.ansi import RST, TXT_B, TXT_G, TXT_R
+from ..pithy.filestatus import is_sticky
 from ..pithy.fs import (abs_path, change_dir, copy_path, is_dir, make_dirs, move_file, norm_path, path_dir, path_exists,
   path_ext, path_join, remove_dir_contents, remove_path, remove_path_if_exists, walk_dirs, walk_paths)
 from ..pithy.interactive import ExitOnKeyboardInterrupt
@@ -25,14 +27,17 @@ from ..pithy.io import errL, errSL, errZ, outL, outLL
 from ..pithy.path import current_dir, path_stem, split_stem_ext
 from ..pithy.path_encode import path_for_url
 from ..pithy.task import runC
-from ..server import serve_build
+from ..paths import set_prod_perms
+from ..server import serve_project
 from ..update import ext_tools, fake_update, pat_dependencies, update_or_exit
+
+
+db_name = '_muck.db'
+fifo_name = '_muck.fifo'
 
 
 def main() -> None:
 
-  db_name = '_muck'
-  fifo_name = '_muck.fifo'
   reserved_names = { 'muck', }
   reserved_prefixes = ('_fetch', '_muck')
 
@@ -48,7 +53,6 @@ def main() -> None:
     reserved_names.add(cmd)
     parser = ArgumentParser(prog='muck ' + cmd, **kwargs)
     parser.set_defaults(cmd=cmd, fn=fn, builds=builds, targets_dflt=targets_dflt, takes_ctx=takes_ctx)
-    parser.add_argument('-build-dir', default='_build', help="specify build directory; defaults to '_build'.")
     parser.add_argument('-cd', help='change to this working directory before taking any further action.')
     parser.add_argument('-dbg', action='store_true', help='log lots of details to stderr.')
     if builds:
@@ -68,7 +72,7 @@ def main() -> None:
     description='invoke `muck check-client-env` from within a client script to check that the environment is set up correctly.')
 
   add_parser('clean-all', muck_clean_all, builds=False, takes_ctx=False,
-    description='clean the entire build directory, including the build database.')
+    description='clean the entire project, including the build database.')
 
   add_parser('clean', muck_clean, builds=False, targets_dflt=False,
     description='clean the specified targets.')
@@ -129,9 +133,7 @@ def main() -> None:
   parser = parsers[cmd]
 
   args = parser.parse_args(cmd_args)
-  args.build_dir = args.build_dir.rstrip('/')
-  reserved_names.add(args.build_dir)
-  db_path = path_join(args.build_dir, db_name)
+  db_path = db_name
 
   if args.dbg:
     def dbg(path:str, *items:Any) -> None:
@@ -142,6 +144,7 @@ def main() -> None:
   # Handle directory change first.
   if args.cd: change_dir(args.cd)
 
+  proj_dir = current_dir()
 
   with ExitOnKeyboardInterrupt(dbg=args.dbg):
 
@@ -149,18 +152,12 @@ def main() -> None:
       args.fn(args)
       return
 
-    make_dirs(args.build_dir) # required to create new DB.
-
-    build_dir_abs = abs_path(args.build_dir)
     ctx = Ctx(
       args=args,
       db=DB(path=db_path),
-      proj_dir=current_dir(),
-      build_dir=args.build_dir,
-      build_dir_slash=args.build_dir + '/',
-      build_dir_abs=build_dir_abs,
-      fifo_path=path_join(args.build_dir, fifo_name),
-      fifo_path_abs=path_join(build_dir_abs, fifo_name),
+      proj_dir=proj_dir,
+      fifo_path=fifo_name,
+      fifo_path_abs=path_join(proj_dir, fifo_name),
       reserved_names=frozenset(reserved_names),
       reserved_prefixes=reserved_prefixes,
       dbg=dbg,
@@ -194,7 +191,7 @@ def muck_build(ctx:Ctx) -> None:
   '`muck build` (default) command: update each specified target.'
 
   for target in ctx.targets:
-    if path_exists(target, follow=True):
+    if not is_target_product(target):
       stem, ext = split_stem_ext(target)
       if ext in ext_tools:
         note(target, f'specified target is a source and not a product; building {stem!r}...')
@@ -203,12 +200,15 @@ def muck_build(ctx:Ctx) -> None:
         note(target, 'specified target is a source and not a product.')
     update_or_exit(ctx, target)
   if ctx.args.serve:
-    serve_build(ctx, main_target=ctx.targets[0])
+    serve_project(ctx, main_target=ctx.targets[0])
 
 
 def muck_clean_all(args:Namespace) -> None:
   '`muck clean-all` command.'
-  remove_dir_contents(args.build_dir)
+  remove_path(db_name)
+  for path in walk_paths('.'):
+    if is_sticky(path, follow=False):
+      remove_path(path)
 
 
 def muck_clean(ctx:Ctx) -> None:
@@ -217,13 +217,11 @@ def muck_clean(ctx:Ctx) -> None:
   if not targets:
     exit('muck clean: no targets specified; did you mean `muck clean-all`?')
   for target in targets:
-    if target.startswith(ctx.build_dir_slash):
-      target = target[len(ctx.build_dir_slash):]
     if not ctx.db.contains_record(target=target):
       errL(f'muck clean note: {target}: skipping unknown target.')
       continue
-    prod_path = ctx.product_path_for_target(target)
-    remove_path_if_exists(prod_path)
+    if is_sticky(target, follow=False):
+      remove_path(target)
     ctx.db.delete_record(target=target)
 
 
@@ -298,7 +296,7 @@ def muck_prod_list(ctx:Ctx) -> None:
   '`muck prod-list` command.'
   for target in ctx.targets:
     update_or_exit(ctx, target)
-  outLL(*sorted(ctx.product_path_for_target(t) for t in ctx.statuses.keys()))
+  outLL(*sorted(ctx.statuses.keys()))
 
 
 def muck_fake(ctx:Ctx) -> None:
@@ -326,9 +324,9 @@ def muck_create_patch(ctx:Ctx) -> None:
   cmd = ['pat', 'create', original, modified, patch]
   cmd_str = ' '.join(shlex.quote(w) for w in cmd)
   errL(f'muck create-patch note: creating patch: `{cmd_str}`')
-  c = runC(cmd, cwd=ctx.build_dir)
+  c = runC(cmd)
+  set_prod_perms(modified, is_product=True, is_patched=True)
   if c: exit(c)
-  move_file(path_join(ctx.build_dir, patch), patch)
 
 
 def muck_update_patch(ctx: Ctx) -> None:
@@ -338,7 +336,7 @@ def muck_update_patch(ctx: Ctx) -> None:
   if path_ext(patch_path) != '.pat':
     exit(f'muck update-patch error: argument does not specify a .pat file: {patch_path!r}')
 
-  deps = list(pat_dependencies(target_dir=path_dir(patch_path), src_path=patch_path, dir_entries=ctx.dir_entries))
+  deps = list(pat_dependencies(target=patch_path, dir_entries=ctx.dir_entries))
   assert len(deps) == 1
   orig_path = deps[0]
   update_or_exit(ctx, orig_path)
@@ -347,13 +345,13 @@ def muck_update_patch(ctx: Ctx) -> None:
   cmd = ['pat', 'diff', orig_path, target, patch_path_tmp]
   cmd_str = ' '.join(shlex.quote(w) for w in cmd)
   errL(f'muck update-patch note: diffing: `{cmd_str}`')
-  code = runC(cmd, cwd=ctx.build_dir)
+  code = runC(cmd)
   if code: exit(code)
-  move_file(path_join(ctx.build_dir, patch_path_tmp), patch_path, overwrite=True)
+  move_file(patch_path_tmp, patch_path, overwrite=True)
   ctx.db.delete_record(target=target) # no-op if does not exist.
-  #^ need to remove or update the target record to avoid the 'did you mean to patch?' safeguard.
-  #^ for now, just delete it to be safe; this makes the target look stale.
-  #^ TODO: update target instead.
+  #^ Need to remove or update the target record to avoid the 'did you mean to patch?' safeguard.
+  #^ For now, just delete it to be safe; this makes the target look stale.
+  #^ TODO: update target record instead.
 
 
 def muck_move_to_fetched_url(args:Namespace) -> None:
@@ -396,28 +394,28 @@ def muck_publish(ctx:Ctx) -> None:
       errSL('  remove:', dst)
       remove_path(dst)
 
-  copied_products: Set[str] = set()
+  copied_targets: Set[str] = set()
 
-  # Need to copy product tree manually, or else published dir ends up with symlinks.
-  def copy_to_pub(product:str, *, overwrite:bool) -> None:
-    for p in walk_paths(product):
-      if p in copied_products: return
-      target = ctx.target_for_product(p)
-      dst = path_join(dst_root, target)
-      errL(f'  publish: {p} -> {dst}')
-      if is_dir(p, follow=False):
+  def copy_to_pub(target:str, *, overwrite:bool) -> None:
+    for src in walk_paths(target):
+      if src in copied_targets: return
+      dst = path_join(dst_root, src)
+      errL(f'  publish: {src} -> {dst}')
+      if is_dir(src, follow=False):
         make_dirs(dst)
-      else: # TODO: do we need a third case for when p is a symlink?
+      else:
         make_dirs(path_dir(dst))
-        copy_path(src=p, dst=dst, overwrite=overwrite)
-      copied_products.add(p)
+        # TODO: do we need a special case for when target is a symlink?
+        copy_path(src=src, dst=dst, overwrite=overwrite)
+        set_prod_perms(target, is_product=False)
+      copied_targets.add(src)
 
   errL(f'publishing targets:')
   for target in ctx.targets:
-    copy_to_pub(ctx.product_path_for_target(target), overwrite=True)
+    copy_to_pub(target, overwrite=True)
 
   for pattern in ctx.args.files:
     errSL(f'publishing glob: {pattern}')
     # Walk over products, not targets, so that glob applies to products (which are not always globbable by user's shell).
-    for product in walk_glob(ctx.product_path_for_target(pattern), recursive=True):
+    for product in walk_glob(pattern, recursive=True):
       copy_to_pub(product, overwrite=False)

@@ -13,7 +13,7 @@
   'cmd': '$MUCK -no-times patched.txt',
   'code': 0,
   'files': {
-    '_build/patched.txt' : {
+    'patched.txt' : {
       'val': 'original text.\n'
     },
   },
@@ -22,8 +22,7 @@
 {
   'desc': '2: modify file.',
   'compile': [
-    # for file systems with poor timestamp resolution, e.g. HFS+, a `sleep 1` is necessary for consistent testing.
-    "sh -c 'echo modified text. > _build/patched.txt'",
+    "sh -c 'echo modified text. > patched.txt'",
     ],
   'cmd': '$MUCK patched.txt',
 },
@@ -52,7 +51,7 @@ orig.txt
   'cmd': '$MUCK -no-times patched.txt',
   'code': 0,
   'files': {
-    '_build/patched.txt': {
+    'patched.txt': {
       'val': 'modified text.\n'
     }
   }

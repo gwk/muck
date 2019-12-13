@@ -7,10 +7,11 @@ Muck's core update algorithm.
 from contextlib import nullcontext
 from datetime import datetime as DateTime
 from importlib.util import find_spec as find_module_spec
-from os import (O_NONBLOCK, O_RDONLY, close as os_close, environ, kill, mkfifo, open as os_open, read as os_read,
+from os import (O_NONBLOCK, O_RDONLY, chmod, close as os_close, environ, kill, mkfifo, open as os_open, read as os_read,
   remove as os_remove)
 from shlex import quote as sh_quote, split as sh_split
 from signal import SIGCONT
+from stat import S_ISVTX, S_IWGRP, S_IWOTH, S_IWUSR
 from time import sleep, time as now
 from typing import Callable, Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, TextIO, Tuple, cast
 
@@ -28,6 +29,7 @@ from .pithy.path import (PathIsNotDescendantError, current_dir, is_path_abs, nor
 from .pithy.string import format_byte_count
 from .pithy.task import launch
 from .pithy.url import split_url
+from .paths import set_prod_perms
 from .py_deps import py_dependencies
 
 
@@ -42,14 +44,8 @@ except ImportError:
 def fake_update(ctx:Ctx, target:str) -> None:
   'Fake an update to the target by mutating the build record.'
   try:
-
-    is_product = not path_exists(target, follow=True)
-    if is_product and is_link(target):
-      BuildError(target, f'target is a dangling symlink to: {read_link(target)}')
-
-    path = ctx.product_path_for_target(target) if is_product else target
-    is_dir, size, mtime = file_stats(path)
-    if size < 0: raise BuildError(target, f'product does not exist: {path!r}')
+    is_dir, size, mtime = file_stats(target)
+    if size < 0: raise BuildError(target, f'product does not exist: {target!r}')
 
     record = ctx.db.get_record(target)
     if not record: raise BuildError(target, f'unknown target')
@@ -123,18 +119,17 @@ def update_target(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, force=Fa
     raise
 
 
-def update_target_status(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, force:bool, target_status:TargetStatus) \
- -> int:
+def update_target_status(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, force:bool, target_status:TargetStatus) -> int:
   ctx.dbg(target, f'{TXT_G}update; {dpdt}{RST}')
 
   status = file_status(target, follow=True) # follows symlinks.
   if status is None and is_link(target):
     raise BuildError(target, f'target is a dangling symlink to: {read_link(target)}')
 
-  is_product = status is None # A target is a product if it does not exist in the source tree.
+  is_product = status is None or status.is_sticky # Note: this logic must match muck.paths.is_target_product.
 
   if is_product:
-    target_dir = path_dir(target)
+    target_dir = path_dir_or_dot(target)
     if target_dir and not path_exists(target_dir, follow=True):
       note(target, f'directory does not exist: {target_dir}')
       # Not possible to find a source; must be the contents of a built directory (or an erroneous dependency).
@@ -159,14 +154,14 @@ def update_target_status(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, f
     return update_non_product(ctx, fifo=fifo, target=target, status=status, needs_update=needs_update, old=old, dpdt=dpdt)
 
 
-def check_product_not_modified(ctx:Ctx, target:str, prod_path:str, is_prod_dir:int, size:int, mtime:float, old:TargetRecord) -> None:
+def check_product_not_modified(ctx:Ctx, target:str, is_target_dir:bool, size:int, mtime:float, old:TargetRecord) -> None:
   # Existing product should not have been modified since record was stored.
   # If is_dir or size changed then it was definitely modified.
-  if is_prod_dir == old.is_dir and size == old.size:
+  if is_target_dir == old.is_dir and size == old.size:
     # Otherwise, if the mtime is unchanged, assume that the contents are unchanged, for speed.
     if mtime == old.mtime: return
     # if mtime is changed but contents are not, the user might have made an accidental edit and then reverted it.
-    if hash_for_path(prod_path) == old.hash:
+    if hash_for_path(target) == old.hash:
       note(target, f'product mtime changed but contents did not: {disp_mtime(old.mtime)} -> {disp_mtime(mtime)}.')
       # TODO: revert mtime?
       return
@@ -181,15 +176,14 @@ def update_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:bool,
   Note: we must pass the just-retrieved mtime, in case it has changed but product contents have not.
   '''
   ctx.dbg(target, 'update_product')
-  prod_path = ctx.product_path_for_target(target)
 
-  is_prod_dir, size, mtime = file_stats(prod_path)
+  is_target_dir, size, mtime = file_stats(target)
 
   if old is not None: # Old record exists.
     if size < 0: # Old file was deleted.
       needs_update = True
     else:
-      check_product_not_modified(ctx, target, prod_path=prod_path, is_prod_dir=is_prod_dir, size=size, mtime=mtime, old=old)
+      check_product_not_modified(ctx, target, is_target_dir=is_target_dir, size=size, mtime=mtime, old=old)
 
   src = ctx.source_for_target(target, dpdt=dpdt)
   ctx.validate_target(src) # Redundant with update_target below. TODO: remove?
@@ -216,8 +210,7 @@ def update_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:bool,
   needs_update = needs_update or last_update_time < update_time
 
   if needs_update: # must rebuild product.
-    dyn_change_time, dyn_deps, all_outs = build_product(ctx, fifo=fifo, target=target, src_path=src, prod_path=prod_path,
-      dpdt=dpdt)
+    dyn_change_time, dyn_deps, all_outs = build_product(ctx, fifo=fifo, target=target, src_path=src, dpdt=dpdt)
     update_time = max(update_time, dyn_change_time)
     ctx.dbg(target, f'all_outs: {all_outs}')
     # For `.list` and any other no-op targets, there is no output, so change_time will be zero.
@@ -231,7 +224,7 @@ def update_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:bool,
     return change_time
   else: # Does not needs_update.
     assert old is not None
-    return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=is_prod_dir, actual_path=prod_path, is_changed=False,
+    return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=is_target_dir, is_changed=False,
       size=old.size, mtime=mtime, change_time=old.change_time, update_time=update_time, file_hash=old.hash, src=src,
       dyn_deps=old.dyn_deps, old=old, dpdt=dpdt)
 
@@ -240,9 +233,8 @@ def update_product_with_output(ctx:Ctx, fifo:AsyncLineReader, target:str, src:st
  dpdt:Dpdt) -> int:
   'Returns (target, change_time).'
   old = ctx.db.get_record(target=target)
-  path = ctx.product_path_for_target(target)
-  is_target_dir, size, mtime = file_stats(path)
-  file_hash = hash_for_path(path)
+  is_target_dir, size, mtime = file_stats(target)
+  file_hash = hash_for_path(target)
   is_changed = (old is None or size != old.size or file_hash != old.hash)
   if is_changed:
     change_time = update_time
@@ -253,7 +245,7 @@ def update_product_with_output(ctx:Ctx, fifo:AsyncLineReader, target:str, src:st
     change_time = old.change_time
     change_verb = 'did not change'
   note(target, f"product {change_verb}; {format_byte_count(size)}.")
-  return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=is_target_dir, actual_path=path, is_changed=is_changed,
+  return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=is_target_dir, is_changed=is_changed,
     size=size, mtime=mtime, change_time=change_time, update_time=update_time, file_hash=file_hash, src=src, dyn_deps=dyn_deps,
     old=old, dpdt=dpdt)
 
@@ -266,9 +258,7 @@ def update_non_product(ctx:Ctx, fifo:AsyncLineReader, target:str, status:FileSta
   is_target_dir = status.is_dir
   size = status.size
   mtime = status.mtime
-  prod_path = ctx.product_path_for_target(target)
-  is_prod_link = is_link(prod_path)
-  prod_status = file_status(prod_path, follow=True)
+  prod_status = file_status(target, follow=False) # TODO: is follow=False correct?
 
   if needs_update or prod_status is None or (is_target_dir != prod_status.is_dir):
     is_changed = True
@@ -283,40 +273,8 @@ def update_non_product(ctx:Ctx, fifo:AsyncLineReader, target:str, status:FileSta
     target_hash = old.hash
 
   if is_changed:
-
-    if is_target_dir:
-      if prod_status and not prod_status.is_dir: # Old product is not a true directory.
-        remove_file(prod_path)
-      if not (prod_status and prod_status.is_dir):
-        make_dirs(prod_path)
-      # Link contents of source dir into prod dir.
-      prod_entries = {e.path : e for e in scan_dir(prod_path)}
-      for entry in scan_dir(target):
-        entry_prod_path = ctx.product_path_for_target(entry.path)
-        prod_entry = prod_entries.pop(entry_prod_path, None)
-        if entry.is_dir():
-          if not prod_entry:
-            make_dir(entry_prod_path)
-          elif not prod_entry.is_dir(follow_symlinks=False): # Child already exists, but not a directory.
-            remove_file(entry_prod_path)
-            make_dir(entry_prod_path)
-        else: # asset is a file.
-          # For now just always rewrite the links.
-          # Could try to optimize this, but would need to read_link and compare which is tricky.
-          if prod_entry: remove_path(entry_prod_path)
-          make_link(entry.path, link=entry_prod_path)
-      # Remove remaining prod_entries, which did not match entries in source and are therefore stale.
-      for entry in prod_entries.values():
-        if entry.is_symlink():
-          remove_file(entry.path)
-
-    else: # target is regular file.
-      if is_prod_link or prod_status: remove_path(prod_path)
-      make_link(target, link=prod_path, create_dirs=True)
-
     if not needs_update: note(target, 'source changed.') # only want to report this on subsequent changes.
     change_time = ctx.db.inc_ptime()
-
   else: # not changed.
     assert old is not None
     change_time = old.change_time
@@ -324,20 +282,20 @@ def update_non_product(ctx:Ctx, fifo:AsyncLineReader, target:str, status:FileSta
     if mtime != old.mtime:
       note(target, f'source modification time changed but contents did not.')
 
-  return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=is_target_dir, actual_path=target, is_changed=is_changed,
+  return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=is_target_dir, is_changed=is_changed,
     size=size, mtime=mtime, change_time=change_time, update_time=change_time, file_hash=target_hash, src=None, dyn_deps=(),
     old=old, dpdt=dpdt)
   # TODO: non_product update_time is meaningless? mark as -1?
 
 
-def update_deps_and_record(ctx, fifo:AsyncLineReader, target:str, is_target_dir:bool, actual_path:str, is_changed:bool,
+def update_deps_and_record(ctx, fifo:AsyncLineReader, target:str, is_target_dir:bool, is_changed:bool,
  size:int, mtime:float, change_time:int, update_time:int, file_hash:bytes, src:Optional[str], dyn_deps:Tuple[str, ...],
  old:Optional[TargetRecord], dpdt:Dpdt) -> int:
   'returns transitive change_time.'
 
   ctx.dbg(target, 'update_deps_and_record')
   if is_changed:
-    deps = calculate_dependencies(target=target, src_path=actual_path, dir_entries=ctx.dir_entries)
+    deps = calculate_dependencies(target=target, dir_entries=ctx.dir_entries)
     for dep in deps:
       try: ctx.validate_target(dep) # Redundant with update_target below. TODO: remove?
       except InvalidTarget as e:
@@ -381,7 +339,7 @@ class DepCtx(NamedTuple):
   restricted_deps_all: Set[str]
   dyn_deps: Set[str]
   all_outs: Set[str]
-  stale_out_dirs:Set[str] # Note: this is not effective unless we get rid of build_dir.
+  stale_out_dirs:Set[str] # Note: this is not effective unless we get rid of build_dir. TODO!!!
 
   def add_out(self, target:str) -> None:
     self.all_outs.add(target)
@@ -393,23 +351,22 @@ class DepCtx(NamedTuple):
     self.stale_out_dirs.clear()
 
 
-def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_path:str, dpdt:Dpdt) \
- -> Tuple[int, Tuple[str, ...], List[str]]:
+def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, dpdt:Dpdt) -> Tuple[int, Tuple[str, ...], List[str]]:
   '''
   Run a source file, producing zero or more products.
   Return a list of produced product paths.
   '''
-  src_prod_path = ctx.product_path_for_target(src_path)
   src_name = path_name(src_path)
   src_ext = path_ext(src_path)
-  prod_dir = path_dir(prod_path)
-  prod_path_out = prod_path + out_ext
+  target_out = target + out_ext
+  target_dir = path_dir_or_dot(target)
+  is_patched = (src_ext == '.pat')
 
-  if is_dir(src_prod_path, follow=True):
-    raise BuildError(target, f'source path is a directory: {src_prod_path!r}')
+  if is_dir(src_path, follow=True):
+    raise BuildError(target, f'source path is a directory: {src_path!r}')
 
   src_arg:Tuple[str,...] = () # Optional insertion of src_name as first arg.
-  if is_file_executable_by_owner(src_prod_path):
+  if is_file_executable_by_owner(src_path):
     tool = Tool(cmd=('./' + src_name,), deps_fn=None, env_mod_fn=None)
   else:
     # TODO: check for explicit deps file.
@@ -432,9 +389,9 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   cmd_msg = f"`{' '.join(sh_quote(w) for w in cmd)}{msg_stdin}`"
   note(target, cmd_msg, ' running…')
 
-  make_dirs(prod_dir)
-  remove_path_if_exists(prod_path_out)
-  remove_path_if_exists(prod_path)
+  make_dirs(target_dir)
+  remove_path_if_exists(target_out)
+  remove_path_if_exists(target)
 
   env = environ.copy()
   # TODO: check that these variables are not already set.
@@ -458,7 +415,7 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
   restricted_deps_rd = {
     ctx.db.path,
     ctx.fifo_path,
-    prod_path_out,
+    target_out,
   }
   restricted_deps_wr = restricted_deps_rd | { src_path }
 
@@ -472,10 +429,10 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
     stale_out_dirs=set())
 
   dyn_time = 0
-  in_cm = open(src_prod_path, 'rb') if tool.src_to_stdin else nullcontext(None)
-  with in_cm as in_file, open(prod_path_out, 'wb') as out_file: # type: ignore
+  in_cm = open(src_path, 'rb') if tool.src_to_stdin else nullcontext(None)
+  with in_cm as in_file, open(target_out, 'wb') as out_file: # type: ignore
     time_start = now()
-    _, proc, _ = launch(cmd, cwd=prod_dir, env=env, stdin=in_file, out=out_file, lldb=ctx.dbg_child_lldb)
+    _, proc, _ = launch(cmd, cwd=target_dir, env=env, stdin=in_file, out=out_file, lldb=ctx.dbg_child_lldb)
     if in_file: in_file.close()
     out_file.close()
     targets_not_found: Set[Tuple[str, ...]] = set()
@@ -502,27 +459,33 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, prod_
       #^ While this is not desirable in terms of reproducible builds,
       #^ at the moment it seems too verbose to issue a warning every time it happens.
       raise
+    finally:
+      for out in depCtx.all_outs:
+        try: set_prod_perms(out, is_product=True, is_patched=False)
+        except FileNotFoundError: continue
+
     code = proc.returncode
     time_elapsed = now() - time_start
 
   if code != 0: raise BuildError(target, cmd_msg, f' failed with code: {code}')
 
-  if path_exists(prod_path, follow=False):
+  if path_exists(target, follow=False):
     via = 'open'
-    if target not in depCtx.all_outs and not is_dir(prod_path, follow=False):
-      warn(target, f'wrote data to {prod_path}, but muck did not observe `open` system call.')
-    if file_size(prod_path_out) == 0:
-      remove_file(prod_path_out)
+    if target not in depCtx.all_outs and not is_dir(target, follow=False):
+      warn(target, f'wrote data to {target}, but muck did not observe `open` system call.')
+    if file_size(target_out) == 0:
+      remove_file(target_out)
     else:
-      warn(target, f'wrote data to {prod_path} via `open`; ignoring output captured in `{prod_path_out}`')
+      warn(target, f'wrote data to {target} via `open`; ignoring output captured in `{target_out}`.')
   else: # no new file; use captured stdout.
     via = 'stdout'
-    move_file(prod_path_out, prod_path)
+    set_prod_perms(target_out, is_product=True, is_patched=is_patched)
+    move_file(target_out, target)
   depCtx.add_out(target)
   depCtx.refresh_out_dirs(ctx.dir_entries)
   time_msg = '' if ctx.args.no_times else f'{time_elapsed:0.2f} seconds '
   note(target, cmd_msg, f' finished: {time_msg}(via {via}).')
-  all_outs = sorted(out for out in depCtx.all_outs if path_exists(ctx.product_path_for_target(out), follow=False))
+  all_outs = sorted(out for out in depCtx.all_outs if path_exists(out, follow=False))
   return dyn_time, tuple(sorted(depCtx.dyn_deps)), all_outs
 
 
@@ -550,15 +513,13 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
 
   if not is_path_abs(dep_abs): # libmuck converts all paths to absolute, because only the child knows its current directory.
     raise ValueError(f'libmuck sent relative path: {dep_abs}')
-  try: dep = path_rel_to_ancestor(dep_abs, ancestor=ctx.build_dir_abs, dot=True)
+  try: dep = path_rel_to_ancestor(dep_abs, ancestor=ctx.proj_dir, dot=True)
   except PathIsNotDescendantError:
-    # We cannot differentiate between harmless and ill-advised accesses outside of the build directory.
-    # In particular, as long as the project dir is the parent of build_dir,
-    # we cannot sensibly prevent a script from accessing the project dir directly.
+    # We cannot differentiate between harmless and ill-advised accesses outside of the project directory.
     # For example, Python accesses the parent directory during startup.
     # Therefore our only option is to ignore access to parent dirs.
     # Libmuck will not send paths outside of the project directory as long as PROJECT_DIR environment variable is set.
-    if dep_abs != ctx.proj_dir: ctx.dbg(target, f'requested dependency outside of build_dir: {dep_abs}')
+    if dep_abs != ctx.proj_dir: raise BuildError(target, f'requested dependency outside of proj_dir: {dep_abs}')
     return pid, dyn_time
 
   if (dep in depCtx.ignored_deps) or (path_ext(dep) in ignored_dep_exts):
@@ -606,24 +567,24 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
 
 # Dependency inference.
 
-def calculate_dependencies(target:str, src_path:str, dir_entries:DirEntries) -> Tuple[str, ...]:
+def calculate_dependencies(target:str, dir_entries:DirEntries) -> Tuple[str, ...]:
   '''
-  Infer the dependencies for the file at `src_path`.
+  Infer the dependencies for the target.
   '''
-  ext = path_ext(src_path)
+  ext = path_ext(target)
   try: deps_fn = ext_tools[ext].deps_fn
   except KeyError: return ()
   if deps_fn is None: return ()
-  target_dir = path_dir(target)
-  return tuple(norm_path(dep) for dep in deps_fn(target_dir, src_path, dir_entries))
+  return tuple(norm_path(dep) for dep in deps_fn(target, dir_entries))
 
 
 # Type-specific dependency functions.
 
-def html_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -> Iterator[str]:
+def html_dependencies(target:str, dir_entries:DirEntries) -> Iterator[str]:
   try: import pithy.html.loader as loader
-  except ImportError as e: raise BuildError(src_path, '`pithy` is not installed; run `pip3 install pithy.`') from e
-  html = loader.load_html(src_path)
+  except ImportError as e: raise BuildError(target, '`pithy` is not installed; run `pip3 install pithy.`') from e
+  html = loader.load_html(target)
+  target_dir = path_dir(target)
   for url_str in html.attr_urls:
     scheme, netloc, path, query, fragment = split_url(url_str)
     if not scheme and not netloc: # Only return local urls.
@@ -632,18 +593,19 @@ def html_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -> I
       yield dep_path_for_url_path(target_dir, path)
 
 
-def list_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -> Iterator[str]:
+def list_dependencies(target:str, dir_entries:DirEntries) -> Iterator[str]:
   'Calculate dependencies for .list files.'
-  with open(src_path) as f:
+  target_dir = path_dir(target)
+  with open(target) as f:
     for line in f:
       line = line.strip()
       if line and not line.startswith('#'):
         yield dep_path_for_url_path(target_dir, line)
 
 
-def sqlite3_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -> Iterator[str]:
+def sqlite3_dependencies(target:str, dir_entries:DirEntries) -> Iterator[str]:
   'Calculate dependencies for .sql files (assumed to be sqlite3 commands).'
-  with open(src_path) as f:
+  with open(target) as f:
     for i, line in enumerate(f, 1):
       tokens = sh_split(line)
       for j, token in enumerate(tokens):
@@ -651,42 +613,43 @@ def sqlite3_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -
           yield tokens[j+1]
 
 
-def pat_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -> Iterator[str]:
+def pat_dependencies(target:str, dir_entries:DirEntries) -> Iterator[str]:
   try: import pithy.pat as pat
-  except ImportError as e: raise BuildError(src_path, '`pat` is not installed; run `pip3 install pithy`.') from e
-  with open(src_path) as f:
-    dep = pat.pat_dependency(src_path=src_path, src_lines=f)
-  yield dep_path_for_url_path(target_dir, dep)
+  except ImportError as e: raise BuildError(target, '`pat` is not installed; run `pip3 install pithy`.') from e
+  with open(target) as f:
+    dep = pat.pat_dependency(src_path=target, src_lines=f)
+  yield dep_path_for_url_path(path_dir(target), dep)
 
 
-def writeup_dependencies(target_dir:str, src_path:str, dir_entries:DirEntries) -> Iterator[str]:
+def writeup_dependencies(target:str, dir_entries:DirEntries) -> Iterator[str]:
   try: import wu
-  except ImportError as e: raise BuildError(src_path, '`writeup` is not installed; run `pip3 install wu`.') from e
-  with open(src_path) as f:
-    deps = wu.writeup_dependencies(src_path=src_path, text_lines=f)
-  return (dep_path_for_url_path(target_dir, dep) for dep in deps)
+  except ImportError as e: raise BuildError(target, '`writeup` is not installed; run `pip3 install wu`.') from e
+  with open(target) as f:
+    url_deps = wu.writeup_dependencies(src_path=target, text_lines=f)
+  target_dir = path_dir(target)
+  return (dep_path_for_url_path(target_dir, url_dep) for url_dep in url_deps)
 
 
-def dep_path_for_url_path(target_dir:str, dep:str) -> str:
+def dep_path_for_url_path(target_dir:str, url_dep:str) -> str:
   'Convert a url path to a dependency path (a path relative to the project directory).'
-  if dep.startswith('/'): # Relative to project.
-    return dep.lstrip('/')
+  if url_dep.startswith('/'): # Relative to project.
+    return url_dep.lstrip('/')
   else: # Relative to target.
-    return path_join(target_dir, dep)
+    return path_join(target_dir, url_dep)
 
 
 # Tools.
 
 def py_env(ctx:Ctx, env:Dict[str,str]) -> None:
-  # Python automatically adds the directory of build source path, which when running under muck is also the CWD.
-  # Here we add the root build dir so that modules/packages can be accessed relative to project root.
+  # Python automatically adds the script's directory path, which when running under muck is also the CWD.
+  # Here we add the project root dir as well so that modules/packages can be accessed relative to project root.
   ppath = env.get('PYTHONPATH', '')
-  if ppath: ppath += ':' + ctx.build_dir_abs
-  else: ppath = ctx.build_dir_abs
+  if ppath: ppath += ':' + ctx.proj_dir
+  else: ppath = ctx.proj_dir
   env['PYTHONPATH'] = ppath
 
 
-DependencyFn = Callable[[str,str,DirEntries], Iterable[str]]
+DependencyFn = Callable[[str,DirEntries], Iterable[str]]
 EnvModFn = Callable[[Ctx,Dict[str, str]],None]
 
 class Tool(NamedTuple):
