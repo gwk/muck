@@ -12,7 +12,7 @@ from os import environ
 from sys import argv
 from typing import Any, Callable, Dict, Optional, Set
 
-from ..constants import muck_tmp_ext
+from ..constants import muck_out_ext
 from ..ctx import Ctx
 from ..db import DB
 from ..logging import note
@@ -340,7 +340,7 @@ def muck_update_patch(ctx: Ctx) -> None:
   orig_path = deps[0]
   update_or_exit(ctx, orig_path)
   target = path_stem(patch_path)
-  patch_path_tmp = patch_path + muck_tmp_ext
+  patch_path_tmp = patch_path + muck_out_ext
   cmd = ['pat', 'diff', orig_path, target, patch_path_tmp]
   cmd_str = ' '.join(shlex.quote(w) for w in cmd)
   errL(f'muck update-patch note: diffing: `{cmd_str}`')
