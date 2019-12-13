@@ -371,8 +371,8 @@ def muck_publish(ctx:Ctx) -> None:
   # TODO: rewrite walk_glob to support shell-style {x,y} expansions.
 
   for pattern in ctx.args.files:
-    if not is_glob_pattern(pattern): exit(f'muck error: not a glob pattern: {pattern!r}')
-    if pattern.startswith('/'): exit(f'muck error: invalid glob pattern: leading slash: {pattern!r}')
+    if not is_glob_pattern(pattern): exit(f'muck publish error: not a glob pattern: {pattern!r}')
+    if pattern.startswith('/'): exit(f'muck publish error: invalid glob pattern: leading slash: {pattern!r}')
 
   for target in ctx.targets:
     if is_dir(target, follow=False): # Non-product directory needs to be recursed.
