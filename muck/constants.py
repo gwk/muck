@@ -5,18 +5,16 @@ Muck constants.
 '''
 
 
-old_ext = '.muck_old'
-out_ext = '.muck_out'
-tmp_ext = '.tmp'
+muck_out_ext = '.muck_out'
+muck_tmp_ext = '.tmp'
 
 ignored_exts = frozenset({
   '.err', '.iot', '.out', '.expected', # iotest extensions.
 })
 
 reserved_exts = frozenset({
-  old_ext,
-  out_ext,
-  tmp_ext,
+  muck_out_ext,
+  muck_tmp_ext,
 })
 
 reserved_or_ignored_exts = reserved_exts | ignored_exts
