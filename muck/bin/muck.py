@@ -6,7 +6,6 @@ This file was separated from __main__.py to make stack traces more consistent du
 '''
 
 import shlex
-import sys
 from argparse import ArgumentParser, Namespace
 from glob import has_magic as is_glob_pattern, iglob as walk_glob
 from os import environ
@@ -20,8 +19,8 @@ from ..logging import note
 from ..paths import is_target_product
 from ..pithy.ansi import RST, TXT_B, TXT_G, TXT_R
 from ..pithy.filestatus import is_sticky
-from ..pithy.fs import (abs_path, change_dir, copy_path, is_dir, make_dirs, move_file, norm_path, path_dir, path_exists,
-  path_ext, path_join, remove_dir_contents, remove_path, remove_path_if_exists, walk_dirs, walk_paths)
+from ..pithy.fs import (change_dir, copy_path, is_dir, make_dirs, move_file, norm_path, path_dir, path_exists, path_ext,
+  path_join, remove_path, walk_dirs, walk_paths)
 from ..pithy.interactive import ExitOnKeyboardInterrupt
 from ..pithy.io import errL, errSL, errZ, outL, outLL
 from ..pithy.path import current_dir, path_stem, split_stem_ext
@@ -252,7 +251,7 @@ def muck_deps(ctx:Ctx) -> None:
     src = record.src
     observed_deps = record.dyn_deps
     inferred_deps = record.deps
-    some = bool(src) or bool(observed_deps) or bool(inferred_deps)
+    #some = bool(src) or bool(observed_deps) or bool(inferred_deps)
     if not indents and len(dependents) > 0:
       dpdt_names = ', '.join(f'{dependent_colors[d.kind]}{d.target}{RST}' for d in sorted(dependents, key=lambda d: d.target))
       suffix = f' (⇠ {dpdt_names})'

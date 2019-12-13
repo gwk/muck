@@ -7,29 +7,27 @@ Muck's core update algorithm.
 from contextlib import nullcontext
 from datetime import datetime as DateTime
 from importlib.util import find_spec as find_module_spec
-from os import (O_NONBLOCK, O_RDONLY, chmod, close as os_close, environ, kill, mkfifo, open as os_open, read as os_read,
-  remove as os_remove)
+from os import environ, kill, mkfifo, remove as os_remove
 from shlex import quote as sh_quote, split as sh_split
 from signal import SIGCONT
-from stat import S_ISVTX, S_IWGRP, S_IWOTH, S_IWUSR
 from time import sleep, time as now
-from typing import Callable, Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, TextIO, Tuple, cast
+from typing import Callable, Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, Tuple
 
-from .constants import *
+from .constants import muck_out_ext, reserved_or_ignored_exts
 from .ctx import BuildError, Ctx, Dpdt, InvalidTarget, TargetNotFound, TargetStatus, match_format
-from .db import DB, DBError, TargetRecord
-from .logging import error_msg, note, warn
+from .db import TargetRecord
+from .logging import note, warn
+from .paths import set_prod_perms
 from .pithy.ansi import BOLD, RST, RST_BOLD, TXT_G, sgr
 from .pithy.filestatus import FileStatus, dir_entry_type_char
-from .pithy.fs import (DirEntries, file_size, file_status, is_dir, is_file_executable_by_owner, is_link, make_dir, make_dirs,
-  make_link, move_file, path_exists, read_link, remove_file, remove_path, remove_path_if_exists, scan_dir)
-from .pithy.io import AsyncLineReader, errL, errSL
-from .pithy.path import (PathIsNotDescendantError, current_dir, is_path_abs, norm_path, path_descendants, path_dir,
-  path_dir_or_dot, path_ext, path_join, path_name, path_rel_to_ancestor, path_split)
+from .pithy.fs import (DirEntries, file_size, file_status, is_dir, is_file_executable_by_owner, is_link, make_dirs, move_file,
+  path_exists, read_link, remove_file, remove_path_if_exists, scan_dir)
+from .pithy.io import AsyncLineReader, errL
+from .pithy.path import (PathIsNotDescendantError, is_path_abs, norm_path, path_dir, path_dir_or_dot, path_ext, path_join,
+  path_name, path_rel_to_ancestor)
 from .pithy.string import format_byte_count
 from .pithy.task import launch
 from .pithy.url import split_url
-from .paths import set_prod_perms
 from .py_deps import py_dependencies
 
 
@@ -67,7 +65,7 @@ def update_top(ctx:Ctx, target:str) -> int:
   # Create the FIFO that we use to communicate with interposed child processes.
   try:
     mkfifo(ctx.fifo_path, mode=0o600)
-  except OSError as e:
+  except OSError:
     if path_exists(ctx.fifo_path, follow=False):
       exit(f'muck fatal error: {ctx.fifo_path}: '
         'FIFO path already exists; another `muck` process is either running or previously failed.')
@@ -75,7 +73,7 @@ def update_top(ctx:Ctx, target:str) -> int:
 
   try:
     try: fifo = AsyncLineReader(ctx.fifo_path)
-    except Exception as e:
+    except Exception:
       exit(f'muck fatal error: {ctx.fifo_path}: FIFO path could not be opened for reading.')
 
     with fifo:
@@ -85,7 +83,7 @@ def update_top(ctx:Ctx, target:str) -> int:
   finally: # Remove the FIFO.
     try:
       os_remove(ctx.fifo_path)
-    except Exception as e:
+    except Exception:
       exit(f'muck fatal error: {ctx.fifo_path}: fifo could not be removed.')
 
 
@@ -546,7 +544,6 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
       # If the dependency is a stat and appears to be a product, then return.
       # For example, sqlite stats the product before opening it, as do file high level copy operations like pithy.fs.copy_path.
       # This is an imperfect heuristic; we are just guessing whether to treat the stat as a 'read' dependency.
-      dep_comps = path_split(dep)
       if (dep == target
        or dep.startswith(target + '/')
        or dep in depCtx.restricted_deps_all

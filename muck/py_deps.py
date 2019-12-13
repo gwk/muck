@@ -1,9 +1,9 @@
 # Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
 
-from .pithy.fs import DirEntries, is_file, path_dir, path_join, norm_path
+from .pithy.fs import DirEntries, path_dir, path_join, norm_path
 from .pithy.io import read_line_from_path
 from .pithy.path import path_split
-from typing import Any, Dict, Iterable, Optional, TextIO, Tuple
+from typing import Iterable, Optional
 import ast
 import re
 

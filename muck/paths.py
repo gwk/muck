@@ -4,8 +4,6 @@
 Muck target path functions.
 '''
 
-import re
-from itertools import product
 from os import chmod
 from stat import S_ISVTX, S_IWGRP, S_IWOTH, S_IWUSR
 from typing import Dict, Tuple
