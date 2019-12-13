@@ -461,9 +461,10 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, dpdt:
 
   if code != 0: raise BuildError(target, cmd_msg, f' failed with code: {code}')
 
-  if path_exists(target, follow=False):
+  s = file_status(target, follow=False)
+  if s:
     via = 'open'
-    if target not in depCtx.all_outs and not is_dir(target, follow=False):
+    if target not in depCtx.all_outs and not s.is_dir:
       warn(target, f'wrote data to {target}, but muck did not observe `open` system call.')
     if file_size(target_out) == 0:
       remove_file(target_out)
