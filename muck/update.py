@@ -316,8 +316,9 @@ def update_deps_and_record(ctx, fifo:AsyncLineReader, target:str, is_target_dir:
   # always update record, because even if is_changed=False, mtime may have changed.
   record = TargetRecord(path=target, is_dir=is_target_dir, size=size, mtime=mtime,
     change_time=change_time, update_time=update_time, hash=file_hash, src=src, deps=deps, dyn_deps=dyn_deps)
-  ctx.dbg(target, f'updated: ', record)
-  ctx.db.insert_or_replace_record(record)
+  if old != record:
+    ctx.db.insert_or_replace_record(record)
+    ctx.dbg(target, f'updated: ', record)
   return change_time
 
 
