@@ -20,7 +20,7 @@ from ..paths import is_target_product
 from ..pithy.ansi import RST, TXT_B, TXT_G, TXT_R
 from ..pithy.filestatus import is_link, is_sticky
 from ..pithy.fs import (change_dir, copy_path, is_dir, make_dirs, move_file, norm_path, path_dir, path_exists, path_ext,
-  path_join, remove_path, walk_dirs, walk_paths)
+  path_join, remove_path, remove_path_if_exists, walk_dirs, walk_paths)
 from ..pithy.interactive import ExitOnKeyboardInterrupt
 from ..pithy.io import errL, errSL, errZ, outL, outLL
 from ..pithy.path import current_dir, path_stem, split_stem_ext
@@ -204,7 +204,7 @@ def muck_build(ctx:Ctx) -> None:
 
 def muck_clean_all(args:Namespace) -> None:
   '`muck clean-all` command.'
-  remove_path(db_name)
+  remove_path_if_exists(db_name)
   for path in walk_paths('.'):
     if is_sticky(path, follow=False):
       remove_path(path)
