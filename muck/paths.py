@@ -65,5 +65,13 @@ def set_prod_perms(path:str, *, is_product:bool, is_patched:bool=False) -> None:
   chmod(path, new_perms, follow_symlinks=False)
 
 
+def set_write_perm(path:str) -> None:
+  try: old_perms = file_permissions(path, follow=False)
+  except FileNotFoundError: return
+  if old_perms & user_writeable: return
+  if not (old_perms & S_ISVTX): return # Not marked as a product; we should not alter write permissions.
+  chmod(path, old_perms|user_writeable, follow_symlinks=False)
+
+
 user_writeable = S_IWUSR
 nonwriteable = ~(S_IWGRP|S_IWOTH|S_IWUSR)

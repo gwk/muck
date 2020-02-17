@@ -17,7 +17,7 @@ from .constants import muck_out_ext, reserved_or_ignored_exts
 from .ctx import BuildError, Ctx, Dpdt, InvalidTarget, TargetNotFound, TargetStatus, match_format
 from .db import TargetRecord
 from .logging import note, warn
-from .paths import set_prod_perms
+from .paths import set_prod_perms, set_write_perm
 from .pithy.ansi import BOLD, RST, RST_BOLD, TXT_G, sgr
 from .pithy.filestatus import dir_entry_type_char
 from .pithy.fs import (DirEntries, file_size, file_status, is_dir, is_file_executable_by_owner, make_dirs, move_file,
@@ -554,6 +554,7 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
     if dep in depCtx.restricted_deps_wr: raise BuildError(target, f'attempted to open restricted file for writing: {dep!r}')
     ctx.validate_target(dep) # Redundant with update_target in update_deps_and_record. TODO: remove?
     depCtx.add_out(dep)
+    set_write_perm(dep)
   else: raise ValueError(f'invalid mode received from libmuck: {mode}')
   return pid, dyn_time
 
