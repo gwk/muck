@@ -529,7 +529,7 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
     # and a separate test that extracts the multi-extension suffix and matches against that.
     ('<frozen importlib._bootstrap' in dep)
     # Both '<frozen importlib._bootstrap>' and '<frozen importlib._bootstrap_external>' appear as stats by python3.
-    # These occur in qthe local source dir after adding a local import to a python script.
+    # These occur in the local source dir after adding a local import to a python script.
     ):
     return pid, dyn_time
   # TODO: further verifications? source dir, etc.
