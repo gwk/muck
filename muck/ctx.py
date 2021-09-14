@@ -46,12 +46,13 @@ class Dpdt(NamedTuple):
   kind:str # 'source', 'inferred', or 'observed'.
   target:str
   parent:OptDpdt
+  depth:int = 0
 
   def __str__(self) -> str:
-    return f'Dpdt: {self.target} ({self.kind})'
+    return f'Dpdt: {self.target} ({self.kind}, depth={self.depth})'
 
   def sub(self, kind:str, target:str) -> 'Dpdt':
-    return Dpdt(kind=kind, target=target, parent=self)
+    return Dpdt(kind=kind, target=target, parent=self, depth=self.depth+1)
 
   def cycle(self, target:str) -> Iterator[str]:
     'Yield the sequence of targets creating a dependency cycle.'
