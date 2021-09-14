@@ -542,6 +542,8 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
       # This is an imperfect heuristic; we are just guessing whether to treat the stat as a 'read' dependency.
       if (dep == target
        or dep.startswith(target + '/')
+       or dep in depCtx.all_outs # This stat is getting metadata on something we just wrote out.
+       #^ TODO: handle the reverse order, where we stat something first, then write it.
        or dep in depCtx.restricted_deps_all
        or path_ext(dep) in reserved_or_ignored_exts):
         return pid, dyn_time
