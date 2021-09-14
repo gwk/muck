@@ -1,0 +1,19 @@
+{
+  'compile': [
+    '$MUCK compile-then-clean-all-src.txt',
+    '$MUCK clean-all',
+  ],
+  'cmd': ['ls', '-A'],
+  'links': {
+    'test/1/compile-then-clean-all-src.txt.py'
+  },
+  'out_val': '''\
+compile-then-clean-all-src.txt.py
+compile-then-clean-all.compile-err-00
+compile-then-clean-all.compile-err-01
+compile-then-clean-all.compile-out-00
+compile-then-clean-all.compile-out-01
+compile-then-clean-all.err
+compile-then-clean-all.out
+''',
+}
