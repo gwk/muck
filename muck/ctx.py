@@ -43,7 +43,7 @@ class Dpdt(NamedTuple):
   and for rendering dependency tree info.
   TODO: make kind an enum.
   '''
-  kind:str # 'source', 'inferred', or 'observed'.
+  kind:str # {'source', 'inferred', 'observed'}.
   target:str
   parent:OptDpdt
   depth:int = 0
