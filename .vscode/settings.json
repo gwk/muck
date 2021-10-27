@@ -4,6 +4,7 @@
     "**/.vscode/tags": true
   },
   "search.exclude": {
-    "_misc": true
+    "_misc": true,
+    "pithy": true
   }
 }
