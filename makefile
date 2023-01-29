@@ -59,4 +59,4 @@ test:
 	iotest -fail-fast
 
 typecheck:
-	craft-py-check muck -deps hashing wu
+	craft-py-check muck -deps wu

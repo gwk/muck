@@ -33,7 +33,7 @@ from .py_deps import py_dependencies
 
 # Try to use a fast hashing algorithm; fall back on the system algorithm.
 try:
-  from hashing import Aquahash as Hasher
+  from blake3 import blake3 as Hasher
 except ImportError:
   from hashlib import blake2b
   def Hasher() -> blake2b: return blake2b(digest_size=16) # type: ignore
