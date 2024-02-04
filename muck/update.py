@@ -18,7 +18,7 @@ from .ctx import BuildError, Ctx, Dpdt, InvalidTarget, TargetNotFound, TargetSta
 from .db import TargetRecord
 from .logging import note, warn
 from .paths import set_prod_perms, set_write_perm
-from .pithy.ansi import BOLD, RST, RST_BOLD, TXT_G, sgr
+from .pithy.ansi import BOLD, RST, RST_BOLD, TXT_G
 from .pithy.filestatus import dir_entry_type_char
 from .pithy.fs import (DirEntries, file_size, file_status, is_dir, is_file_executable_by_owner, make_dirs, move_file,
   path_exists, read_link, remove_file, remove_path_if_exists, scan_dir)
@@ -27,7 +27,7 @@ from .pithy.path import (PathIsNotDescendantError, is_path_abs, norm_path, path_
   path_name, path_rel_to_ancestor)
 from .pithy.string import format_byte_count
 from .pithy.task import launch
-from .pithy.url import split_url
+from .pithy.url import url_split
 from .py_deps import py_dependencies
 
 
@@ -237,7 +237,7 @@ def update_product_with_output(ctx:Ctx, fifo:AsyncLineReader, target:str, src:st
   if is_changed:
     change_time = update_time
     change_verb = 'is new' if old is None else 'changed'
-    change_verb = f'{sgr(BOLD)}{change_verb}{sgr(RST_BOLD)}'
+    change_verb = f'{BOLD}{change_verb}{RST_BOLD}'
   else:
     assert old is not None
     change_time = old.change_time
@@ -582,7 +582,7 @@ def html_dependencies(target:str, dir_entries:DirEntries) -> Iterator[str]:
   html = loader.load_html(target)
   target_dir = path_dir(target)
   for url_str in html.attr_urls:
-    scheme, netloc, path, query, fragment = split_url(url_str)
+    scheme, netloc, path, query, fragment = url_split(url_str)
     if not scheme and not netloc: # Only return local urls.
       if not path: continue
       if path.endswith('.html'): continue # For now ignore other pages, which typically cause circular references.
