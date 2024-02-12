@@ -239,7 +239,7 @@ static U8 hash_secret[16] = {};
 static bool hash_secret_initialized = false;
 
 
-static void hash_init() {
+static void hash_init(void) {
   assert(!hash_secret_initialized);
   #if MUCK_USE_SECURE_HASH
     arc4random_buf(hash_secret, sizeof(hash_secret));
@@ -264,7 +264,7 @@ static Hash hash_for_chars(char* chars) {
 }
 
 
-static void set_resize() {
+static void set_resize(void) {
   table_cap_idx += 1;
   check(table_cap_idx < prime_caps_count, "set_resize: insane table_cap_idx.")
   Size new_table_cap = prime_caps[table_cap_idx];
@@ -369,7 +369,7 @@ static bool path_for_fd(char* path, int fd) {
 }
 
 
-static void update_curr_dir() {
+static void update_curr_dir(void) {
   // Update the current working directory buffer.
   // We cannot use getcwd, because it calls stat, which would put muck_communicate into infinite recursion.
   // Instead, we use a lower-level, platform specific approach.
@@ -380,7 +380,7 @@ static void update_curr_dir() {
 }
 
 
-static void muck_init() {
+static void muck_init(void) {
   // Initialize.
 
   is_setup = true;

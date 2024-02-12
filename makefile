@@ -33,10 +33,13 @@ help: # Summarize the targets of this makefile.
 
 lib-check:
 	clang -fsyntax-only \
+	-std=c17 \
 	-Werror \
 	-Weverything \
-	-Wno-gnu-zero-variadic-macro-arguments \
+	-Wno-declaration-after-statement \
 	-Wno-gnu-empty-initializer \
+	-Wno-gnu-zero-variadic-macro-arguments \
+	-Wno-poison-system-directories \
 	-Wno-unused-function \
 	muck/libmuck.c
 
