@@ -2,12 +2,11 @@
 
 
 import sys
-from distutils import log
-from distutils.dep_util import newer_group
-from distutils.command.build_scripts import build_scripts  # type: ignore
+from setuptools.modified import newer_group # type: ignore
 from os import chmod, listdir as list_dir, mkdir as make_dir, makedirs as make_dirs
 from os.path import (dirname as path_dir, exists as path_exists, isdir as is_dir, join as path_join, normpath as norm_path,
   splitext as split_ext)
+from logging import getLogger
 
 from setuptools import Command, Extension, setup # type: ignore
 from setuptools.command.build_ext import build_ext # type: ignore
@@ -20,6 +19,7 @@ from typing import Any
 
 if sys.version_info < (3, 12): exit('error: muck requires Python3.12 or later. Make sure to install with `pip3` or `pip3.X`.')
 
+log = getLogger()
 
 base_dir = path_dir(norm_path(__file__)) or '.' # When run from pip, this is a temp dir.
 assert not base_dir.endswith('/'), base_dir
@@ -78,11 +78,6 @@ class BuildExtLibmuck(build_ext): # type: ignore
     self.spawn(cmd)
 
 
-class BuildScripts(build_scripts): # type: ignore
-  def run(self) -> None:
-    super().run()
-
-
 class Develop(develop): # type: ignore
   def run(self) -> None:
     super().run()
@@ -114,7 +109,7 @@ def install_bins(dst_dir:str) -> None:
     msg('note: no bin directory.')
     return
   if not path_exists(dst_dir): make_dir(dst_dir)
-  py_path = path_join(dst_dir, 'python3')
+  py_path = sys.executable
 
   for name in list_dir(bin_src_dir):
     stem, ext = split_ext(name)
@@ -140,7 +135,6 @@ setup(
   ext_modules=[Extension('muck._libmuck', sources=['muck/libmuck.c'])],
   cmdclass={
     'build_ext': BuildExtLibmuck,
-    'build_scripts': BuildScripts,
     'develop': Develop,
     'install': Install,
     'install_scripts': InstallScripts,
