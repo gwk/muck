@@ -62,4 +62,4 @@ test:
 	iotest -fail-fast
 
 typecheck:
-	craft-py-check muck -deps wu
+	mypy muck

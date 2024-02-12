@@ -18,7 +18,7 @@ from setuptools.config import read_configuration  # type: ignore
 
 from typing import Any
 
-if sys.version_info < (3, 7): exit('error: muck requires Python3.7 or later. Make sure to install with `pip3` or `pip3.X`.')
+if sys.version_info < (3, 12): exit('error: muck requires Python3.12 or later. Make sure to install with `pip3` or `pip3.X`.')
 
 
 base_dir = path_dir(norm_path(__file__)) or '.' # When run from pip, this is a temp dir.
@@ -136,7 +136,7 @@ main()
 
 
 setup(
-  python_requires='>=3.7',
+  python_requires='>=3.12',
   ext_modules=[Extension('muck._libmuck', sources=['muck/libmuck.c'])],
   cmdclass={
     'build_ext': BuildExtLibmuck,
