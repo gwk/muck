@@ -7,7 +7,8 @@ from .pithy.fs import is_dir, path_join, rel_path
 from .pithy.io import errL
 from .pithy.task import run
 from .update import update_top
-
+from io import BytesIO
+from typing import BinaryIO
 
 def serve_project(ctx:Ctx, main_target:str) -> None: # TODO: rename.
   address = ('localhost', 8000)
@@ -21,7 +22,7 @@ def serve_project(ctx:Ctx, main_target:str) -> None: # TODO: rename.
 
   class Handler(SimpleHTTPRequestHandler):
 
-    def send_head(self):
+    def send_head(self) -> BytesIO|BinaryIO|None:
       '''
       SimpleHTTPRequestHandler.send_head does the work for both HEAD and GET requests.
       We override it to detect dependencies and build them before sending the header.
@@ -39,7 +40,7 @@ def serve_project(ctx:Ctx, main_target:str) -> None: # TODO: rename.
         try: update_top(ctx, target)
         except BuildError as e: errL(e)
 
-      return super().send_head() # type: ignore # this is technically a private method.
+      return super().send_head()
 
 
     def send_response(self, code, message=None):
@@ -55,9 +56,9 @@ def serve_project(ctx:Ctx, main_target:str) -> None: # TODO: rename.
         self.end_headers()
         return
 
-      f = self.send_head() # type: ignore
+      f:BinaryIO|None = self.send_head()
       if not f: return
-      try: self.copyfile(f, self.wfile) # type: ignore
+      try: self.copyfile(f, self.wfile) # type: ignore[misc]
       finally: f.close()
 
 
@@ -68,7 +69,7 @@ def serve_project(ctx:Ctx, main_target:str) -> None: # TODO: rename.
       Not sure how this will generalize, but seems like an obscure case.
       Note: muck does not support 'index.htm', only 'index.html', nor does it support the fallback directory listing.
       '''
-      target = rel_path(super().translate_path(self.path)) # type: ignore # this is technically a private method.
+      target = rel_path(super().translate_path(self.path))
       return path_join(target, 'index.html') if is_dir(target, follow=True) else target
 
 

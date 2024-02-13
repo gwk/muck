@@ -11,7 +11,7 @@ from os import environ, kill, mkfifo, remove as os_remove
 from shlex import quote as sh_quote, split as sh_split
 from signal import SIGCONT
 from time import sleep, time as now
-from typing import Callable, Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, Tuple
+from typing import Callable, Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, Tuple, BinaryIO, cast
 
 from .constants import muck_out_ext, reserved_or_ignored_exts
 from .ctx import BuildError, Ctx, Dpdt, InvalidTarget, TargetNotFound, TargetStatus, match_format
@@ -29,14 +29,14 @@ from .pithy.string import format_byte_count
 from .pithy.task import launch
 from .pithy.url import url_split
 from .py_deps import py_dependencies
-
+from contextlib import AbstractContextManager
 
 # Try to use a fast hashing algorithm; fall back on the system algorithm.
 try:
   from blake3 import blake3 as Hasher
 except ImportError:
   from hashlib import blake2b
-  def Hasher() -> blake2b: return blake2b(digest_size=16) # type: ignore
+  def Hasher() -> blake2b: return blake2b(digest_size=16) # type: ignore[no-redef]
 
 
 def fake_update(ctx:Ctx, target:str) -> None:
@@ -51,13 +51,13 @@ def fake_update(ctx:Ctx, target:str) -> None:
     fake = record._replace(size=size, mtime=mtime)
     ctx.db.insert_or_replace_record(fake)
 
-  except BuildError as e: exit(e)
+  except BuildError as e: exit(str(e))
 
 
 def update_or_exit(ctx:Ctx, target:str) -> int:
   'Call update_top; on error, print and exit.'
   try: return update_top(ctx, target)
-  except BuildError as e: exit(e)
+  except BuildError as e: exit(str(e))
 
 
 def update_top(ctx:Ctx, target:str) -> int:
@@ -422,8 +422,15 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, dpdt:
     stale_out_dirs=set())
 
   dyn_time = 0
-  in_cm = open(src_path, 'rb') if tool.src_to_stdin else nullcontext(None)
-  with in_cm as in_file, open(target_out, 'wb') as out_file: # type: ignore
+
+  # The typing here leaves much to be desired.
+  in_cm:AbstractContextManager[BinaryIO|None]
+  if tool.src_to_stdin:
+    in_cm = cast(AbstractContextManager[BinaryIO], open(src_path, 'rb'))
+  else:
+    in_cm = cast(AbstractContextManager[None], nullcontext(None))
+
+  with in_cm as in_file, open(target_out, 'wb') as out_file:
     time_start = now()
     _, proc, _ = launch(cmd, cwd=target_dir, env=env, stdin=in_file, out=out_file, lldb=ctx.dbg_child_lldb)
     if in_file: in_file.close()

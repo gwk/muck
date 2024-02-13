@@ -8,7 +8,7 @@ import ast
 import re
 
 
-def src_error(path:str, line1:int, col1:int, msg:str, text:str=None) -> SystemExit:
+def src_error(path:str, line1:int, col1:int, msg:str, text:str|None=None) -> SystemExit:
   pad = ' ' * (col1 - 1)
   if text is None:
     text = read_line_from_path(path, line_index=line1-1, default='<MISSING>')
@@ -28,7 +28,7 @@ def py_dependencies(src_path:str, dir_entries:DirEntries) -> Iterable[str]:
     src_text = f.read()
   try: tree = ast.parse(src_text, filename=src_path)
   except SyntaxError as e:
-    raise src_error(src_path, e.lineno, e.offset or 0, 'syntax error', (e.text or '').rstrip('\n')) from e
+    raise src_error(src_path, e.lineno or 0, e.offset or 0, 'syntax error', (e.text or '').rstrip('\n')) from e
 
   def extract_import(module_str:Optional[str]) -> Optional[str]:
     if module_str is None: raise ValueError

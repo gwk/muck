@@ -362,7 +362,7 @@ def muck_move_to_fetched_url(args:Namespace) -> None:
     exit(f'muck move-to-fetched-url error: file already exists at destination fetch path: {fetch_path}')
     # TODO: offer to remove.
   try: move_file(path, fetch_path)
-  except OSError as e: exit(e)
+  except OSError as e: exit(str(e))
 
 
 def muck_publish(ctx:Ctx) -> None:

@@ -88,7 +88,7 @@ class DB:
 
 
   def fetch_opt(self, query:str, **args:Any) -> Optional[List[Any]]:
-    return self.run(query, **args).fetchone() # type: ignore
+    return self.run(query, **args).fetchone() # type: ignore[no-any-return]
 
 
   def create(self, type:str, name:str, *words:str) -> None:

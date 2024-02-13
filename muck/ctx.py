@@ -90,7 +90,7 @@ class Ctx:
   reserved_prefixes: Tuple[str,...]
   dbg: Callable
   dbg_child: bool
-  dbg_child_lldb: List[str]
+  dbg_child_lldb: bool
   statuses: Dict[str, TargetStatus] = field(default_factory=dict)
   dir_entries: DirEntries = field(default_factory=DirEntries)
   dependents: DefaultDict[str, Set[Dpdt]] = field(default_factory=lambda:DefaultDict(set))
@@ -190,7 +190,7 @@ class Ctx:
 
   def validate_target_or_exit(self, target:str) -> None:
     try: self.validate_target(target)
-    except InvalidTarget as e: exit(e)
+    except InvalidTarget as e: exit(str(e))
 
 
 target_invalids_re = re.compile(r'''(?x)
