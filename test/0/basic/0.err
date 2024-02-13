@@ -12,4 +12,4 @@ muck note: c.txt: `python3 c.txt.py` finished: (via stdout).
 muck note: c.txt: product [1mis new[22m; 19 B.
 muck note: index.html: `writeup index.html.wu` running…
 muck note: index.html: `writeup index.html.wu` finished: (via stdout).
-muck note: index.html: product [1mis new[22m; 5.660 kB.
+muck note: index.html: product [1mis new[22m; 5.644 kB.
