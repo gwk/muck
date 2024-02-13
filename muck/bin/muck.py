@@ -397,8 +397,8 @@ def muck_publish(ctx:Ctx) -> None:
 
   def copy_to_pub(target:str, *, overwrite:bool) -> None:
     for src in walk_paths(target):
-      if src in copied_targets: return
-      if is_link(target): exit(f'muck publish error: symlinks not yet supported: {src!r}')
+      if src in copied_targets: continue
+      if is_link(src): exit(f'muck publish error: symlinks not yet supported: {src!r}')
       dst = path_join(dst_root, src)
       errL(f'  publish: {src} -> {dst}')
       if is_dir(src, follow=False):
@@ -407,7 +407,7 @@ def muck_publish(ctx:Ctx) -> None:
         make_dirs(path_dir(dst))
         # TODO: do we need a special case for when target is a symlink?
         copy_path(src=src, dst=dst, overwrite=overwrite)
-        set_prod_perms(target, is_product=False)
+        set_prod_perms(dst, is_product=False)
       copied_targets.add(src)
 
   errL('publishing targets:')
