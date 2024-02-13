@@ -46,7 +46,7 @@ def fake_update(ctx:Ctx, target:str) -> None:
     if size < 0: raise BuildError(target, f'product does not exist: {target!r}')
 
     record = ctx.db.get_record(target)
-    if not record: raise BuildError(target, f'unknown target')
+    if not record: raise BuildError(target, 'unknown target')
     if record.is_dir != is_dir: raise BuildError(target, f'cannot fake is_dir change: {record.is_dir} -> {is_dir}')
     fake = record._replace(size=size, mtime=mtime)
     ctx.db.insert_or_replace_record(fake)
@@ -133,7 +133,7 @@ def update_target_status(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, f
       # Not possible to find a source; must be the contents of a built directory (or an erroneous dependency).
       update_target(ctx, fifo=fifo, target=target_dir, dpdt=dpdt.sub(kind='directory contents', target=target), force=force)
       if not target_status.is_updated: # build of parent did not create this product.
-        raise BuildError(target, f'target resides in a product directory but was not created by building that directory')
+        raise BuildError(target, 'target resides in a product directory but was not created by building that directory')
       return target_status.change_time
 
   old = ctx.db.get_record(target=target)
@@ -185,7 +185,7 @@ def update_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:bool,
 
   src = ctx.source_for_target(target, dpdt=dpdt)
   ctx.validate_target(src) # Redundant with update_target below. TODO: remove?
-  ctx.dbg(target, f'src: ', src)
+  ctx.dbg(target, 'src: ', src)
   if old is not None and old.src != src:
     needs_update = True
     note(target, f'source path of target product changed\n  was: {old.src}\n  now: {src}')
@@ -272,7 +272,7 @@ def update_non_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:b
     change_time = old.change_time
     target_hash = old.hash
     if mtime != old.mtime:
-      note(target, f'source modification time changed but contents did not.')
+      note(target, 'source modification time changed but contents did not.')
 
   return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=is_target_dir, is_changed=is_changed,
     size=size, mtime=mtime, change_time=change_time, update_time=change_time, file_hash=target_hash, src=None, dyn_deps=(),
@@ -307,7 +307,7 @@ def update_deps_and_record(ctx, fifo:AsyncLineReader, target:str, is_target_dir:
     ctx.statuses[target] = status
   else:
     if status.is_updated:
-      ctx.dbg(target, f'target was updated by both a script and a dependency; dependents:',
+      ctx.dbg(target, 'target was updated by both a script and a dependency; dependents:',
         f'\n  {status.dpdt}; expected {status.expected}',
         f'\n  {dpdt}')
 
@@ -318,7 +318,7 @@ def update_deps_and_record(ctx, fifo:AsyncLineReader, target:str, is_target_dir:
     change_time=change_time, update_time=update_time, hash=file_hash, src=src, deps=deps, dyn_deps=dyn_deps)
   if old != record:
     ctx.db.insert_or_replace_record(record)
-    ctx.dbg(target, f'updated: ', record)
+    ctx.dbg(target, 'updated: ', record)
   return change_time
 
 

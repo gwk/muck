@@ -103,7 +103,7 @@ class Ctx:
     reserved_names = self.reserved_names # Do not create circular reference between self and pred.
     self.dir_entries.pred = lambda entry: \
       entry.is_file() and (entry.name not in reserved_names and path_ext(entry.name) not in reserved_or_ignored_exts)
-    self.state.reserved_prefixes_pattern = re.compile('(' + f'|'.join(self.reserved_prefixes) + ')')
+    self.state.reserved_prefixes_pattern = re.compile('(' + '|'.join(self.reserved_prefixes) + ')')
 
 
   def reset(self) -> None:

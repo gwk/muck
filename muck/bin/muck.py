@@ -62,7 +62,7 @@ def main() -> None:
       parser.add_argument('-dbg-child-lldb', action='store_true', help='run child processes in LLDB.')
     if targets_dflt is not None:
       default = ['index.html'] if targets_dflt else None
-      help_msg = f'target file names' + ("; defaults to 'index.html'." if targets_dflt else '.')
+      help_msg = 'target file names' + ("; defaults to 'index.html'." if targets_dflt else '.')
       parser.add_argument('targets', nargs='*', default=default, help=help_msg)
     parsers[cmd] = parser
     return parser
@@ -410,7 +410,7 @@ def muck_publish(ctx:Ctx) -> None:
         set_prod_perms(target, is_product=False)
       copied_targets.add(src)
 
-  errL(f'publishing targets:')
+  errL('publishing targets:')
   for target in ctx.targets:
     copy_to_pub(target, overwrite=True)
 
