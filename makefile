@@ -9,7 +9,7 @@
 .PHONY: _default clean cov docs lib pip-develop pip-uninstall pypi-dist pypi-upload test typecheck
 
 # First target of a makefile is the default.
-_default: test typecheck lint
+_default: typecheck lint test
 
 clean:
 	rm -rf _build/* muck/libmuck.*.so
