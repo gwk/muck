@@ -32,7 +32,7 @@ def py_dependencies(src_path:str, dir_entries:DirEntries) -> Iterable[str]:
 
   def extract_import(module_str:Optional[str]) -> Optional[str]:
     if module_str is None: raise ValueError
-    lead_dots = re.match('\.+', module_str)
+    lead_dots = re.match(r'\.+', module_str)
     if lead_dots: # Relative import.
       leading_dots_count = lead_dots.end()
       back_parts = ['..'] * leading_dots_count
