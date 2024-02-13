@@ -79,7 +79,7 @@ class DB:
 
     self.create('UNIQUE INDEX', 'globals_keys', 'ON globals(key)')
 
-    self.run('INSERT OR IGNORE INTO globals (key, val) VALUES ("ptime", 0)')
+    self.run("INSERT OR IGNORE INTO globals (key, val) VALUES ('ptime', 0)")
 
 
 
@@ -153,8 +153,8 @@ class DB:
 
 
   def inc_ptime(self) -> int:
-    self.run('UPDATE globals SET val = val + 1 WHERE key = "ptime"')
-    c = self.run('SELECT val FROM globals WHERE key="ptime"')
+    self.run("UPDATE globals SET val = val + 1 WHERE key = 'ptime'")
+    c = self.run("SELECT val FROM globals WHERE key='ptime'")
     rows = c.fetchall()
     assert len(rows) == 1
     val = rows[0][0]
