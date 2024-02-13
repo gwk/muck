@@ -17,7 +17,7 @@ clean:
 cov:
 	iotest -fail-fast -coverage
 
-dev: lib-check
+develop: muck/libmuck.so
 	pip3 install -e .
 
 docs:
@@ -29,7 +29,6 @@ docs:
 
 help: # Summarize the targets of this makefile.
 	@GREP_COLOR="1;32" egrep --color=always '^\w[^ :]+:' makefile | sort
-
 
 lib-check:
 	clang -fsyntax-only \
@@ -46,8 +45,9 @@ lib-check:
 lint:
 	pyflakes muck
 
-pip-install:
+pip-install: muck/libmuck.so
 	pip3 install .
+	echo "TODO: install libmuck into python package."
 
 pip-uninstall:
 	pip3 uninstall --yes muck
@@ -63,3 +63,6 @@ test:
 
 typecheck:
 	mypy muck
+
+muck/libmuck.so: muck/libmuck.c
+	sh/build-libmuck.bash $@ $^

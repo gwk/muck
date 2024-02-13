@@ -1,0 +1,59 @@
+[project]
+
+name = "muck"
+description = "Muck is a build tool for data projects."
+license = "CC0-1.0"
+requires-python = ">=3.12"
+
+
+dependencies = [
+]
+
+readme = "readme.md"
+
+authors = [
+  { name = "George King", email = "george@theorypractice.dev" },
+]
+dynamic = [
+  "version",
+]
+
+
+[project.urls]
+Issues = "https://github.com/gwk/muck/issues"
+Source = "https://github.com/gwk/muck"
+Documentation = "https://github.com/gwk/muck/blob/main/readme.md"
+
+
+[project.scripts]
+muck = "muck.bin.muck:main"
+
+[build-system]
+requires = [
+  "hatchling",
+]
+build-backend = "hatchling.build"
+
+
+[tool.hatch.build]
+include = [
+]
+exclude = [
+]
+
+
+[tool.hatch.version]
+path = "muck/__about__.py"
+
+
+[tool.isort]
+atomic = true
+combine_as_imports = true
+default_section = "FIRSTPARTY"
+indent = "  "
+lines_after_imports = 2
+lines_between_sections = 1
+line_length = 128
+multi_line_output = "HANGING_INDENT_WITH_PARENTHESES"
+order_by_type = false
+use_parentheses = true

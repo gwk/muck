@@ -13,6 +13,6 @@ python3="$(which python3)"
 
 set -x
 
-DYLD_INSERT_LIBRARIES=$PWD/muck/_libmuck.cpython-37m-darwin.so \
+DYLD_INSERT_LIBRARIES=$PWD/muck/libmuck.so \
 MUCK_DEPS_DBG= \
 $python3 test/interpose/open.py pithy/pithy/ansi.py

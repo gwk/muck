@@ -6,7 +6,6 @@ Muck's core update algorithm.
 
 from contextlib import nullcontext
 from datetime import datetime as DateTime
-from importlib.util import find_spec as find_module_spec
 from os import environ, kill, mkfifo, remove as os_remove
 from shlex import quote as sh_quote, split as sh_split
 from signal import SIGCONT
@@ -21,7 +20,7 @@ from .paths import set_prod_perms, set_write_perm
 from .pithy.ansi import BOLD, RST, RST_BOLD, TXT_G
 from .pithy.filestatus import dir_entry_type_char
 from .pithy.fs import (DirEntries, file_size, file_status, is_dir, is_file_executable_by_owner, make_dirs, move_file,
-  path_exists, read_link, remove_file, remove_path_if_exists, scan_dir)
+  path_exists, read_link, remove_file, remove_path_if_exists, scan_dir, is_file)
 from .pithy.io import AsyncLineReader, errL
 from .pithy.path import (PathIsNotDescendantError, is_path_abs, norm_path, path_dir, path_dir_or_dot, path_ext, path_join,
   path_name, path_rel_to_ancestor)
@@ -687,13 +686,13 @@ ignored_dep_exts = {
 }
 
 
-# Currently libmuck is installed as a Python C extension,
-# which allows us to easily determine the path to the shared library.
-_libmuck_modspec = find_module_spec('muck._libmuck')
-if _libmuck_modspec is None: exit('error: muck._libmuck is not installed.')
-_libmuck_path = _libmuck_modspec.origin
-if _libmuck_path is None: exit('error: muck._libmuck path could not be determined.')
-libmuck_path = _libmuck_path
+# Currently libmuck is built by the makefile.
+# For development installs, it is built inside the package source directory.
+# For production installs, it is installed to the package directory.
+_muck_pkg_dir = path_dir(__file__)
+libmuck_path = path_join(_muck_pkg_dir, 'libmuck.so')
+if not is_file(libmuck_path, follow=True):
+  exit(f'error: libmuck.so not found in {libmuck_path!r}; must be built and installed from source.')
 
 
 # Utilities.

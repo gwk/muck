@@ -11,7 +11,7 @@ _, *args  = argv
 print('run-open.py:', executable)
 
 env = environ.copy()
-env['DYLD_INSERT_LIBRARIES'] = abs_path('muck/_libmuck.cpython-37m-darwin.so')
+env['DYLD_INSERT_LIBRARIES'] = abs_path('muck/libmuck.so')
 env['MUCK_DEPS_DBG'] = 'TRUE'
 
 code = runC(['python3', 'test/interpose/open.py', *args], env=env, lldb=True)
