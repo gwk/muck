@@ -569,17 +569,46 @@ INTERPOSE(openat);
 
 // sys/stat.h.
 
+static int muck_chmod(const char *path, mode_t mode) {
+  COMMUNICATE('C', path);
+  return chmod(path, mode);
+}
+INTERPOSE(chmod);
+
+
+static int muck_fchmod(int fd, mode_t mode) {
+  char path[MAXPATHLEN] = {};
+  if (path_for_fd(path, fd)) {
+    COMMUNICATE('C', path);
+  }
+  return fchmod(fd, mode);
+}
+INTERPOSE(fchmod);
+
+
+static int muck_fchmodat(int fd, const char *path, mode_t mode, int flag) {
+  char full_path[MAXPATHLEN] = {};
+  if (get_full_path(full_path, fd, path)) {
+    COMMUNICATE('C', full_path);
+  }
+  return fchmodat(fd, path, mode, flag);
+}
+INTERPOSE(fchmodat);
+
+
 static int muck_stat(const char* restrict path, struct stat* restrict buf) {
   COMMUNICATE('S', path);
   return stat(path, buf);
 }
 INTERPOSE(stat);
 
+
 static int muck_lstat(const char* restrict path, struct stat* restrict buf) {
   COMMUNICATE('S', path);
   return lstat(path, buf);
 }
 INTERPOSE(lstat);
+
 
 static int muck_fstat(int fd, struct stat *buf) {
   char path[MAXPATHLEN] = {};
@@ -589,6 +618,7 @@ static int muck_fstat(int fd, struct stat *buf) {
   return fstat(fd, buf);
 }
 INTERPOSE(fstat);
+
 
 static int muck_fstatat(int fd, const char* path, struct stat* buf, int flag) {
   char full_path[MAXPATHLEN] = {};
@@ -607,7 +637,7 @@ static FILE* muck_fopen(const char* __restrict __filename, const char* __restric
   const char* m = __mode;
   while (*m) {
     switch (*m++) {
-      case '+': mode_char = 'U'; break;
+      case '+': mode_char = 'U'; break; // "Updating"; both read and write/append.
       case 'r': mode_char = 'R'; continue;
       case 'w': mode_char = 'W'; continue;
       case 'a': mode_char = 'A'; continue;

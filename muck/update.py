@@ -540,7 +540,7 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
     return pid, dyn_time
   # TODO: further verifications? source dir, etc.
 
-  ctx.dbg(target, f'{mode} dep: {dep}')
+  ctx.dbg(target, f'{mode} {call:8}  dep: {dep}')
   if mode in 'RS':
     if mode == 'S':
       # If the dependency is a stat and appears to be a product, then return.
@@ -558,8 +558,8 @@ def handle_dep_line(ctx:Ctx, fifo:AsyncLineReader, depCtx:DepCtx, target:str, de
     dep_time = update_target(ctx, fifo=fifo, target=dep, dpdt=dpdt.sub(kind='observed', target=target))
     dyn_time = max(dyn_time, dep_time)
     depCtx.dyn_deps.add(dep)
-  elif mode in 'AMUW':
-    if dep in depCtx.restricted_deps_wr: raise BuildError(target, f'attempted to open restricted file for writing: {dep!r}')
+  elif mode in 'ACMUW':
+    if dep in depCtx.restricted_deps_wr: raise BuildError(target, f'attempted to open/modify restricted file for writing: {dep!r}')
     ctx.validate_target(dep) # Redundant with update_target in update_deps_and_record. TODO: remove?
     depCtx.add_out(dep)
     set_write_perm(dep)
