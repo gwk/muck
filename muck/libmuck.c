@@ -39,7 +39,7 @@
 #include <sys/param.h>
 
 // macOS interposition macro.
-// source: https://opensource.apple.com/source/dyld/dyld-519.2.1/include/mach-o/dyld-interposing.h
+// source: https://github.com/apple-oss-distributions/dyld/blob/main/include/mach-o/dyld-interposing.h
 #define DYLD_INTERPOSE(_replacement, _replacee) \
 __attribute__((used)) static struct{ const void* replacement; const void* replacee; } _interpose_##_replacee \
 __attribute__ ((section ("__DATA,__interpose"))) = \
@@ -531,6 +531,7 @@ static char calc_mode_char(int oflag) {
 }
 
 static bool get_full_path(char* full_path, int fd, const char* path) {
+  // Returns true for success, false for failure.
   if (!path_for_fd(full_path, fd)) return false;
   size_t pre_len = strlen(full_path);
   size_t suf_len = strlen(path);
