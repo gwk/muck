@@ -73,6 +73,7 @@ def set_prod_perms(path:str, *, is_product:bool, is_patched:bool=False) -> None:
 def set_write_perm(path:str) -> None:
   '''
   Modify the permissions of the file at `path` to make it user-writeable.
+  If the file does not exist, do nothing.
   '''
   try: old_perms = file_permissions(path, follow=False)
   except FileNotFoundError: return
