@@ -1,4 +1,4 @@
-from utest import *
+from utest import utest
 
 for i in range(2):
   utest(f'a-to-many {i}\n', open(f'a-to-many-{i}.txt').read)
