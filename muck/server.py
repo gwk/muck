@@ -59,7 +59,7 @@ def serve_project(ctx:Ctx, main_target:str) -> None: # TODO: rename.
 
       f:BinaryIO|None = self.send_head()
       if not f: return
-      try: self.copyfile(f, self.wfile) # type: ignore[misc]
+      try: self.copyfile(f, self.wfile)
       finally: f.close()
 
 
