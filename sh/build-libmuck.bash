@@ -6,12 +6,21 @@ set -e
 
 fail() { echo "Error: $1" >&2; exit 1; }
 
-out_file="$1"
-shift
+while getopts "ho:" arg; do
+  echo "arg: $arg; OPTIND: $OPTIND; OPTARG: $OPTARG"
+  case "$arg" in
+    h) echo "Usage: $0 [-o out_file] [source_files...]" >&2 && exit 0;;
+    o) out_file="$OPTARG";;
+    *) fail "Invalid argument: $arg";;
+  esac
+done
+
+shift $((OPTIND-1)) # Remove processed options.
+inputs=("$@")
 
 [[ -z "$out_file" ]] && fail "No output file specified."
 
-cc="${CC:-cc}"
+cc="${CC:-cc}" # Default to "cc" if CC is not set.
 [[ -z "$cc" ]] && fail "No compiler specified."
 
 _uname=$(uname -s)
@@ -28,19 +37,22 @@ case $_uname in
 esac
 
 echo "Compiler: $cc; OS: $os; flags: '$flags'"
-echo "output: $out_file; args: $@"
+echo "output: $out_file; inputs: $inputs"
 
 set -x
 
 $cc \
--std=c17 \
+-std=c2x \
 -Werror \
 -Weverything \
+-Wno-pre-c2x-compat \
 -Wno-declaration-after-statement \
--Wno-gnu-empty-initializer \
 -Wno-gnu-zero-variadic-macro-arguments \
 -Wno-poison-system-directories \
 -Wno-unused-function \
--o "$out_file" \
+-fPIC \
 $flags \
-$@
+-o "$out_file" \
+$inputs
+
+chmod -x "$out_file"

@@ -64,5 +64,5 @@ test:
 typecheck:
 	mypy muck
 
-muck/libmuck.so: muck/libmuck.c
-	sh/build-libmuck.bash $@ $^
+muck/libmuck.so: sh/build-libmuck.bash muck/libmuck.c
+	$< -o $@ $(filter-out $<,$^)
