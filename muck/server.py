@@ -1,14 +1,15 @@
 # Dedicated to the public domain under CC0: https://creativecommons.org/publicdomain/zero/1.0/.
 
 from http.server import HTTPServer, SimpleHTTPRequestHandler
+from io import BytesIO
+from typing import BinaryIO
 
 from .ctx import BuildError, Ctx
 from .pithy.fs import is_dir, path_join, rel_path
 from .pithy.io import errL
 from .pithy.task import run
 from .update import update_top
-from io import BytesIO
-from typing import BinaryIO
+
 
 def serve_project(ctx:Ctx, main_target:str) -> None: # TODO: rename.
   address = ('localhost', 8000)
