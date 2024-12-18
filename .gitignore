@@ -13,6 +13,7 @@ __pycache__/
 # Project.
 _build/
 _misc/
+_notes.md
 docs/_muck
 docs/*.wu
 todo.txt
