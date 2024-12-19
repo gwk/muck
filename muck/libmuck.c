@@ -33,9 +33,10 @@
 
 // macOS interposition macro.
 // source: https://github.com/apple-oss-distributions/dyld/blob/main/include/mach-o/dyld-interposing.h
+// Last updated 2024-12-19.
 #define DYLD_INTERPOSE(_replacement, _replacee) \
 __attribute__((used)) static struct{ const void* replacement; const void* replacee; } _interpose_##_replacee \
-__attribute__ ((section ("__DATA,__interpose"))) = \
+__attribute__ ((section ("__DATA,__interpose,interposing"))) = \
 { (const void*)(unsigned long)&_replacement, (const void*)(unsigned long)&_replacee }
 
 #define INTERPOSE(name) DYLD_INTERPOSE(muck_##name, name)
