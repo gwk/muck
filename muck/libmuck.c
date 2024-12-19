@@ -11,13 +11,6 @@
 
 // For a list of system calls on a unix system, try `apropos . | grep '(2)'`.
 
-// Currently, libmuck is installed as a Python C extension dynamic library.
-// This is something of a hack, because it is not a legitimate Python extension.
-// If you try to import it you will get: `ImportError: dynamic module does not define module export function (PyInit_libmuck)`.
-// We could make it behave like a real python module, but there is no real benefit.
-// The downside would be that a real module might cause extra dynamic linking whenever this library is loaded for every client process.
-//PyMODINIT_FUNC PyInit_libmuck(void) { return PyModule_Create(&libmuck); }
-
 // If we use secret initialization, then siphash becomes resistant to collision attacks
 // but hash table bugs become harder to reproduce.
 #define MUCK_USE_SECURE_HASH 0
