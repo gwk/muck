@@ -4,31 +4,31 @@
 Muck's core update algorithm.
 '''
 
-from contextlib import nullcontext
+from contextlib import AbstractContextManager, nullcontext
 from datetime import datetime as DateTime
 from os import environ, kill, mkfifo, remove as os_remove
 from shlex import quote as sh_quote, split as sh_split
 from signal import SIGCONT
 from time import sleep, time as now
-from typing import Callable, Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, Tuple, BinaryIO, cast
+from typing import BinaryIO, Callable, cast, Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, Tuple
 
 from .constants import muck_out_ext, reserved_or_ignored_exts
-from .ctx import BuildError, Ctx, Dpdt, InvalidTarget, TargetNotFound, TargetStatus, match_format
+from .ctx import BuildError, Ctx, Dpdt, InvalidTarget, match_format, TargetNotFound, TargetStatus
 from .db import TargetRecord
 from .logging import note, warn
 from .paths import set_prod_perms, set_write_perm
 from .pithy.ansi import BOLD, RST, RST_BOLD, TXT_G
 from .pithy.filestatus import dir_entry_type_char
-from .pithy.fs import (DirEntries, file_size, file_status, is_dir, is_file_executable_by_owner, make_dirs, move_file,
-  path_exists, read_link, remove_file, remove_path_if_exists, scan_dir, is_file)
+from .pithy.fs import (DirEntries, file_size, file_status, is_dir, is_file, is_file_executable_by_owner, make_dirs, move_file,
+  path_exists, read_link, remove_file, remove_path_if_exists, scan_dir)
 from .pithy.io import AsyncLineReader, errL
-from .pithy.path import (PathIsNotDescendantError, is_path_abs, norm_path, path_dir, path_dir_or_dot, path_ext, path_join,
-  path_name, path_rel_to_ancestor)
+from .pithy.path import (is_path_abs, norm_path, path_dir, path_dir_or_dot, path_ext, path_join, path_name,
+  path_rel_to_ancestor, PathIsNotDescendantError)
 from .pithy.string import format_byte_count
 from .pithy.task import launch
 from .pithy.url import url_split
 from .py_deps import py_dependencies
-from contextlib import AbstractContextManager
+
 
 # Try to use a fast hashing algorithm; fall back on the system algorithm.
 try:
