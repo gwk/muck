@@ -18,7 +18,7 @@ from .db import TargetRecord
 from .logging import note, warn
 from .paths import set_prod_perms, set_write_perm
 from .pithy.ansi import BOLD, RST, RST_BOLD, TXT_G
-from .pithy.filestatus import dir_entry_type_char
+from .pithy.filestatus import dir_entry_type_char, file_perms_desc
 from .pithy.fs import (DirEntries, file_size, file_status, is_dir, is_file, is_file_executable_by_owner, make_dirs, move_file,
   path_exists, read_link, remove_file, remove_path_if_exists, scan_dir)
 from .pithy.io import AsyncLineReader, errL
@@ -717,7 +717,11 @@ def hash_for_file_contents(path:str) -> bytes:
   hash_chunk_size = 1 << 16
   #^ a quick timing experiment suggested that chunk sizes larger than this are not faster.
   try: f = open(path, 'rb')
-  except IsADirectoryError: raise BuildError(path, 'expected a file but found a directory')
+  except IsADirectoryError as e: raise BuildError(path, 'expected a file but found a directory') from e
+  except PermissionError as e:
+    try: desc = file_perms_desc(path)
+    except Exception: desc = 'unknown'
+    raise BuildError(path, f'permission denied: {desc}') from e
 
   try:
     h = Hasher()
