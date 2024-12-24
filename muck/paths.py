@@ -79,7 +79,8 @@ def set_write_perm(path:str) -> None:
   except FileNotFoundError: return
   if old_perms & _user_writeable: return # Already set.
   if not (old_perms & S_ISVTX): return # Not marked as a product; we should not alter write permissions.
-  chmod(path, old_perms|_user_writeable, follow_symlinks=False)
+  new_perms = old_perms | _user_writeable
+  chmod(path, new_perms, follow_symlinks=False)
 
 
 _user_writeable = S_IWUSR
