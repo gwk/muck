@@ -473,7 +473,8 @@ def build_product(ctx:Ctx, fifo:AsyncLineReader, target:str, src_path:str, dpdt:
     via = 'open'
     if target not in depCtx.all_outs and not s.is_dir:
       warn(target, f'wrote data to {target}, but muck did not observe `open` system call.')
-    if file_size(target_out) == 0:
+      set_prod_perms(target, is_product=True, is_patched=is_patched)
+    if file_size(target_out) == 0: # Captured output is empty and meaningless; remove it.
       remove_file(target_out)
     else:
       warn(target, f'wrote data to {target} via `open`; ignoring output captured in `{target_out}`.')
