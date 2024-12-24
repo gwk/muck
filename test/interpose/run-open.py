@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-from sys import argv, executable
 from os import environ
 from os.path import abspath as abs_path
-from pprint import pprint
+from sys import argv, executable
+
 from pithy.task import runC
 
 _, *args  = argv

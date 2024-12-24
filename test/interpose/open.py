@@ -2,9 +2,9 @@
 
 # NOTE: /usr/bin/env will strip the DYLD_ variables from the environment, resulting in test failure.
 
-from sys import argv, executable
 from os import environ
-from pprint import pprint
+from sys import argv, executable
+
 
 print('open.py executable:', executable)
 
