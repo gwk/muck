@@ -16,7 +16,7 @@ from ..constants import muck_out_ext
 from ..ctx import Ctx
 from ..db import DB
 from ..logging import note
-from ..paths import is_target_product
+from ..paths import is_target_product, set_prod_perms
 from ..pithy.ansi import RST, TXT_B, TXT_G, TXT_R
 from ..pithy.filestatus import is_link, is_sticky
 from ..pithy.fs import (change_dir, copy_path, is_dir, make_dirs, move_file, norm_path, path_dir, path_exists, path_ext,
@@ -26,7 +26,6 @@ from ..pithy.io import errL, errSL, errZ, outL, outLL
 from ..pithy.path import current_dir, path_stem, split_stem_ext
 from ..pithy.path_encode import path_for_url
 from ..pithy.task import runC
-from ..paths import set_prod_perms
 from ..server import serve_project
 from ..update import ext_tools, fake_update, pat_dependencies, update_or_exit
 
