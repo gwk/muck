@@ -16,9 +16,9 @@ from ..constants import muck_out_ext
 from ..ctx import Ctx
 from ..db import DB
 from ..logging import note
-from ..paths import is_target_product, set_prod_perms
+from ..paths import is_muck_product, is_target_product, set_prod_perms
 from ..pithy.ansi import RST, TXT_B, TXT_G, TXT_R
-from ..pithy.filestatus import is_link, is_sticky
+from ..pithy.filestatus import is_link
 from ..pithy.fs import (change_dir, copy_path, is_dir, make_dirs, move_file, norm_path, path_dir, path_exists, path_ext,
   path_join, remove_path, remove_path_if_exists, walk_dirs, walk_paths)
 from ..pithy.interactive import ExitOnKeyboardInterrupt
@@ -205,7 +205,7 @@ def muck_clean_all(args:Namespace) -> None:
   '`muck clean-all` command.'
   remove_path_if_exists(db_name)
   for path in walk_paths('.'):
-    if is_sticky(path, follow=False):
+    if is_muck_product(path):
       remove_path(path)
 
 
@@ -218,7 +218,7 @@ def muck_clean(ctx:Ctx) -> None:
     if not ctx.db.contains_record(target=target):
       errL(f'muck clean note: {target}: skipping unknown target.')
       continue
-    if is_sticky(target, follow=False):
+    if is_target_product(target):
       remove_path(target)
     ctx.db.delete_record(target=target)
 

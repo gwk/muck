@@ -16,7 +16,7 @@ from .constants import muck_out_ext, reserved_or_ignored_exts
 from .ctx import BuildError, Ctx, Dpdt, InvalidTarget, match_format, TargetNotFound, TargetStatus
 from .db import TargetRecord
 from .logging import note, warn
-from .paths import set_prod_perms, set_write_perm
+from .paths import is_target_product, set_prod_perms, set_write_perm
 from .pithy.ansi import BOLD, RST, RST_BOLD, TXT_G
 from .pithy.filestatus import dir_entry_type_char, file_perms_desc
 from .pithy.fs import (DirEntries, file_size, file_status, is_dir, is_file, is_file_executable_by_owner, make_dirs, move_file,
@@ -123,7 +123,7 @@ def update_target_status(ctx:Ctx, fifo:AsyncLineReader, target:str, dpdt:Dpdt, f
   if status and status.is_link and not path_exists(target, follow=True):
     raise BuildError(target, f'target is a dangling symlink to: {read_link(target)}')
 
-  is_product = status is None or status.is_sticky # Note: this logic must match muck.paths.is_target_product.
+  is_product = is_target_product(target)
 
   if is_product:
     target_dir = path_dir_or_dot(target)
@@ -219,7 +219,7 @@ def update_product(ctx:Ctx, fifo:AsyncLineReader, target:str, needs_update:bool,
       if product == target:
         change_time = product_change_time
     return change_time
-  else: # Does not needs_update.
+  else: # Does not need update.
     assert old is not None
     return update_deps_and_record(ctx, fifo=fifo, target=target, is_target_dir=is_target_dir, is_changed=False,
       size=old.size, mtime=mtime, change_time=old.change_time, update_time=update_time, file_hash=old.hash, src=src,
