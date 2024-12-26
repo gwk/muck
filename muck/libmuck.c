@@ -54,14 +54,17 @@ typedef uint8_t U8;
 static const char* program_name = "?";
 static char pid_str[24] = "<PID>"; // U64 max is 20 chars plus terminator.
 
-#define errF(fmt, ...) { \
-  fprintf(stderr, "\x1b[36mlibmuck %s:\x1b[m " fmt, program_name, ## __VA_ARGS__); \
+#define TXT_C "\x1b[36m"
+#define TXT_RST "\x1b[m"
+
+#define _errF(fmt, ...) { \
+  fprintf(stderr, TXT_C "libmuck %s: " fmt, program_name, ## __VA_ARGS__); \
   fflush(stderr); \
 }
 
-#define errFL(fmt, ...) errF(fmt "\n", ## __VA_ARGS__)
+#define errFL(fmt, ...) _errF(fmt TXT_RST "\n", ## __VA_ARGS__)
 
-#define errFRL(chars, fmt, ...) { errF(fmt, __VA_ARGS__); write_chars_repr(2, chars); write_nl(2); }
+#define errFRL(chars, fmt, ...) { _errF(fmt, __VA_ARGS__); write_chars_repr(2, chars); write_chars(2, TXT_RST); write_nl(2); }
 
 #define fail(fmt, ...) { errFL("error: " fmt, ## __VA_ARGS__); exit(1); }
 
@@ -415,7 +418,7 @@ static void muck_init(void) {
   char* dbg_flag = getenv("MUCK_DEPS_DBG");
   dbg = (dbg_flag && *dbg_flag);
 
-  if (dbg) { errFL("\x1b[36minitialized.\x1b[m"); }
+  if (dbg) { errFL("initialized."); }
 }
 
 
@@ -498,7 +501,7 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
   if (set_insert_chars(msg.ptr+call_pos)) {  // Skip the pid prefix, which changes per invocation. Makes debugging stable.
     return;
   }
-  if (dbg) { errFL("\x1b[36m%s\x1b[0m", msg.ptr); }
+  if (dbg) { errFL("%s", msg.ptr); }
   str_append_char(&msg, '\n');
 
   if (fd_fifo) { // Communicate with the muck build process.
@@ -507,7 +510,7 @@ static void muck_communicate(const char* call_name, char mode_char, const char* 
   }
   if (dbg) { // show that the client is no longer blocked.
     //str_truncate_by(&msg, 1); // Trim newline for debug printing.
-    errFL("\x1b[36mresume.\x1b[m");
+    errFL("resume.");
   }
 }
 
