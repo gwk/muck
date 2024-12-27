@@ -721,7 +721,7 @@ def hash_for_file_contents(path:str) -> bytes:
   except PermissionError as e:
     try: desc = file_perms_desc(path)
     except Exception: desc = 'unknown'
-    raise BuildError(path, f'permission denied: {desc}') from e
+    raise BuildError(path, f'hash_for_file_contents: permission denied: {desc}') from e
 
   try:
     h = Hasher()

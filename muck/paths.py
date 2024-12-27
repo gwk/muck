@@ -37,7 +37,7 @@ def set_is_muck_product(path:str, is_product:bool) -> None:
   except IOError as e:
     try: desc = file_perms_desc(path)
     except Exception: desc = 'unknown'
-    raise BuildError(path, f'permission denied: {desc}') from e
+    raise BuildError(path, f'set_is_muck_product: permission denied: {desc}') from e
 
 
 
