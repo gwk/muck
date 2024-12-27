@@ -545,27 +545,67 @@ static bool get_full_path(char* full_path, int fd, const char* path) {
 }
 
 
+//// Interposed functions.
+
+// Note: we redeclare each of the system functions here so that it is clear that we are preserving the signatures.
+// If there is a mismatch then clang will complain.
+
 // fcntl.h.
 
-static int muck_open(const char* path, int oflag, int mode) {
+int open(const char* path, int oflag, ...);
+
+static int muck_open(const char* path, int oflag, ...) {
+
+  va_list args;
+  mode_t mode = 0;
+  va_start(args, oflag);
+  if (oflag & O_CREAT) { // If O_CREAT is set in oflag, we need to get the mode argument.
+    mode = (mode_t)va_arg(args, int);
+  }
+  va_end(args);
+
   char mode_char = calc_mode_char(oflag);
   COMMUNICATE(mode_char, path);
-  return open(path, oflag, mode);
+
+  // Call the original open with the appropriate number of arguments.
+  if (oflag & O_CREAT) {
+    return open(path, oflag, mode);
+  } else {
+    return open(path, oflag);
+  }
 }
 INTERPOSE(open);
 
-static int muck_openat(int fd, const char* path, int oflag, int mode) {
+
+int openat(int fd, const char *path, int oflag, ...);
+
+static int muck_openat(int fd, const char* path, int oflag, ...) {
+
+  va_list args;
+  mode_t mode = 0;
+  va_start(args, oflag);
+  if (oflag & O_CREAT) { // If O_CREAT is set in oflag, we need to get the mode argument.
+    mode = (mode_t)va_arg(args, int);
+  }
+  va_end(args);
+
   char full_path[MAXPATHLEN] = {};
   if (get_full_path(full_path, fd, path)) {
     char mode_char = calc_mode_char(oflag);
     COMMUNICATE(mode_char, full_path);
   }
-  return openat(fd, path, oflag, mode);
+  if (oflag & O_CREAT) {
+    return openat(fd, path, oflag, mode);
+  } else {
+    return openat(fd, path, oflag);
+  }
 }
 INTERPOSE(openat);
 
 
 // sys/stat.h.
+
+int chmod(const char *path, mode_t mode);
 
 static int muck_chmod(const char *path, mode_t mode) {
   COMMUNICATE('C', path);
@@ -573,6 +613,8 @@ static int muck_chmod(const char *path, mode_t mode) {
 }
 INTERPOSE(chmod);
 
+
+int fchmod(int fd, mode_t mode);
 
 static int muck_fchmod(int fd, mode_t mode) {
   char path[MAXPATHLEN] = {};
@@ -584,6 +626,8 @@ static int muck_fchmod(int fd, mode_t mode) {
 INTERPOSE(fchmod);
 
 
+int fchmodat(int fd, const char *path, mode_t mode, int flag);
+
 static int muck_fchmodat(int fd, const char *path, mode_t mode, int flag) {
   char full_path[MAXPATHLEN] = {};
   if (get_full_path(full_path, fd, path)) {
@@ -594,6 +638,8 @@ static int muck_fchmodat(int fd, const char *path, mode_t mode, int flag) {
 INTERPOSE(fchmodat);
 
 
+int stat(const char* restrict path, struct stat* restrict buf);
+
 static int muck_stat(const char* restrict path, struct stat* restrict buf) {
   COMMUNICATE('S', path);
   return stat(path, buf);
@@ -601,12 +647,16 @@ static int muck_stat(const char* restrict path, struct stat* restrict buf) {
 INTERPOSE(stat);
 
 
+int lstat(const char* restrict path, struct stat* restrict buf);
+
 static int muck_lstat(const char* restrict path, struct stat* restrict buf) {
   COMMUNICATE('S', path);
   return lstat(path, buf);
 }
 INTERPOSE(lstat);
 
+
+int fstat(int fd, struct stat *buf);
 
 static int muck_fstat(int fd, struct stat *buf) {
   char path[MAXPATHLEN] = {};
@@ -617,6 +667,8 @@ static int muck_fstat(int fd, struct stat *buf) {
 }
 INTERPOSE(fstat);
 
+
+int fstatat(int fd, const char *path, struct stat *buf, int flag);
 
 static int muck_fstatat(int fd, const char* path, struct stat* buf, int flag) {
   char full_path[MAXPATHLEN] = {};
@@ -630,29 +682,76 @@ INTERPOSE(fstatat);
 
 // libc.
 
-static FILE* muck_fopen(const char* __restrict __filename, const char* __restrict __mode) {
+static char muck_mode_char(const char* mode) {
+  // Helper for c standard library functions that take a mode string.
+  // The stdlib functions may be more strict about order than this parser suggests;
+  // this only needs to get the correct mode in terms of muck semantics; a subsequent error will be handled.
   char mode_char = '?';
-  const char* m = __mode;
-  while (*m) {
-    switch (*m++) {
-      case '+': mode_char = 'U'; break; // "Updating"; both read and write/append.
-      case 'r': mode_char = 'R'; continue;
-      case 'w': mode_char = 'W'; continue;
-      case 'a': mode_char = 'A'; continue;
-      default: continue;
+  switch (*mode) {
+    case 'r': mode_char = 'R'; break; // Read.
+    case 'w': mode_char = 'W'; break; // Write.
+    case 'a': mode_char = 'A'; break; // Append.
+    default: return '?';
+  }
+  mode++;
+  while (*mode++) {
+    switch (*mode) {
+      case '+': return 'U'; // Update; both read and write/append.
+      // 'x', 'e', 'b' flags are all irrelevant.
     }
   }
-  COMMUNICATE(mode_char, __filename);
-  return fopen(__filename, __mode);
+  return mode_char;
+}
+
+
+FILE* fopen(const char * restrict path, const char * restrict mode);
+
+static FILE* muck_fopen(const char* restrict path, const char* restrict mode) {
+  char mode_char = muck_mode_char(mode);
+  COMMUNICATE(mode_char, path);
+  return fopen(path, mode);
 }
 INTERPOSE(fopen);
 
+
+FILE* fdopen(int fildes, const char *mode);
+
+static FILE* muck_fdopen(int fildes, const char *mode) {
+  char mode_char = muck_mode_char(mode);
+  COMMUNICATE(mode_char, mode);
+  return fdopen(fildes, mode);
+}
+INTERPOSE(fdopen);
+
+
+FILE *freopen(const char *path, const char *mode, FILE *stream);
+
+static FILE* muck_freopen(const char *path, const char *mode, FILE *stream) {
+  char mode_char = muck_mode_char(mode);
+  COMMUNICATE(mode_char, mode);
+  return freopen(path, mode, stream);
+}
+INTERPOSE(freopen);
+
+
+FILE *fmemopen(void * restrict buf, size_t size, const char * restrict mode);
+
+static FILE* muck_fmemopen(void * restrict buf, size_t size, const char * restrict mode) {
+  char mode_char = muck_mode_char(mode);
+  COMMUNICATE(mode_char, mode);
+  return fmemopen(buf, size, mode);
+}
+INTERPOSE(fmemopen);
+
+
+DIR* opendir(const char* name);
 
 static DIR* muck_opendir(const char* name) {
   COMMUNICATE('R', name);
   return opendir(name);
 }
 INTERPOSE(opendir);
+
 
 
 // Hash table capacity primes.
