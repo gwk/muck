@@ -17,5 +17,4 @@ _notes.md
 docs/_muck
 docs/*.wu
 todo.txt
-try-interpose.sh
-libmuck.*
+libmuck.so
